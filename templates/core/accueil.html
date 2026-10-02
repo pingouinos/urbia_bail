@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block contenu %}
+<h1>Bonjour {{ user.first_name|default:user.username }}</h1>
+<p>Rôle : {% if est_admin %}administrateur{% else %}gestionnaire{% endif %}.</p>
+<div class="grille">
+  <section class="carte"><h2>Biens</h2><p class="discret">Référentiel des lots et import Excel : prochaine étape.</p></section>
+  <section class="carte"><h2>Candidatures</h2><p class="discret">Liens DossierFacile des candidats : à venir.</p></section>
+  <section class="carte"><h2>Baux</h2><p class="discret">Génération Word et PDF : à venir.</p></section>
+</div>
+{% endblock %}
