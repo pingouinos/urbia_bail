@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block titre %}{{ bien.adresse }} · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'biens:liste' %}">← Biens</a></p>
+<div class="titre-actions">
+  <h1>{{ bien.adresse }}{% if bien.complement %}, {{ bien.complement }}{% endif %}</h1>
+  <div class="actions"><a class="bouton-petit" href="{% url 'biens:bien_modifier' bien.pk %}">Modifier</a></div>
+</div>
+<p class="discret">{{ bien.code_postal }} {{ bien.ville }} · {{ bien.get_usage_display }}{% if bien.meuble %} meublé{% endif %} · Réf. ICS {{ bien.ref_ics|default:"non renseignée" }}{% if not bien.actif %} · <strong>plus géré par l'agence</strong>{% endif %}</p>
+
+{% if bien.location_interdite %}<p class="message alerte-fond">Logement classé G au DPE : il ne peut plus faire l'objet d'un nouveau bail d'habitation depuis le 1er janvier 2025.</p>{% endif %}
+{% with manquants=bien.champs_manquants_pour_bail %}{% if manquants %}
+<p class="message">À compléter avant de rédiger un bail : {{ manquants|join:", " }}.</p>
+{% endif %}{% endwith %}
+
+<div class="grille">
+  <section class="carte">
+    <h2>Bailleur</h2>
+    <p><a href="{{ bien.bailleur.get_absolute_url }}">{{ bien.bailleur }}</a><br><span class="discret">{{ bien.bailleur.get_type_display }}</span></p>
+  </section>
+  <section class="carte">
+    <h2>Description</h2>
+    <dl>
+      <dt>Type d'habitat</dt><dd>{{ bien.get_type_habitat_display|default:"—" }}</dd>
+      <dt>Régime juridique</dt><dd>{{ bien.get_regime_juridique_display|default:"—" }}</dd>
+      <dt>Construction</dt><dd>{{ bien.get_periode_construction_display|default:"—" }}</dd>
+      <dt>Surface</dt><dd>{% if bien.surface %}{{ bien.surface }} m²{% else %}—{% endif %}</dd>
+      <dt>Pièces principales</dt><dd>{{ bien.nb_pieces|default:"—" }}</dd>
+    </dl>
+  </section>
+  <section class="carte">
+    <h2>Énergie et loyer</h2>
+    <dl>
+      <dt>Classe DPE</dt><dd>{{ bien.get_classe_dpe_display|default:"—" }}{% if bien.date_dpe %} ({{ bien.date_dpe }}){% endif %}</dd>
+      <dt>Dépenses d'énergie</dt><dd>{% if bien.depenses_energie_min %}{{ bien.depenses_energie_min }} à {{ bien.depenses_energie_max }} € par an{% else %}—{% endif %}</dd>
+      <dt>Zone tendue</dt><dd>{{ bien.zone_tendue|yesno:"oui,non" }}</dd>
+      <dt>Dernier loyer HC</dt><dd>{% if bien.dernier_loyer %}{{ bien.dernier_loyer }} €{% else %}—{% endif %}</dd>
+      <dt>Charges</dt><dd>{% if bien.charges %}{{ bien.charges }} €{% else %}—{% endif %}</dd>
+    </dl>
+  </section>
+</div>
+
+<section class="carte">
+  <h2>Équipements et annexes</h2>
+  <dl>
+    <dt>Chauffage</dt><dd>{{ bien.get_chauffage_display|default:"—" }}</dd>
+    <dt>Eau chaude</dt><dd>{{ bien.get_eau_chaude_display|default:"—" }}</dd>
+    <dt>Équipements</dt><dd>{{ bien.equipements|linebreaksbr|default:"—" }}</dd>
+    <dt>Accès TIC</dt><dd>{{ bien.acces_tic|default:"—" }}</dd>
+    <dt>Annexes privatives</dt><dd>{{ bien.annexes|linebreaksbr|default:"—" }}</dd>
+    <dt>Parties communes</dt><dd>{{ bien.parties_communes|linebreaksbr|default:"—" }}</dd>
+    {% if bien.observations %}<dt>Observations</dt><dd>{{ bien.observations|linebreaksbr }}</dd>{% endif %}
+  </dl>
+</section>
+
+<section class="carte">
+  <h2>Historique</h2>
+  <ul class="historique">
+  {% for version in historique %}
+    <li>{{ version.history_date|date:"d/m/Y H:i" }} · {{ version.get_history_type_display }} par {{ version.history_user|default:"import ou système" }}</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endblock %}

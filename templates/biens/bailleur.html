@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titre %}{{ bailleur }} · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'biens:bailleurs' %}">← Bailleurs</a></p>
+<div class="titre-actions">
+  <h1>{{ bailleur }}</h1>
+  <div class="actions">
+    <a href="{% url 'biens:bien_creer' %}?bailleur={{ bailleur.pk }}">Ajouter un bien</a>
+    <a class="bouton-petit" href="{% url 'biens:bailleur_modifier' bailleur.pk %}">Modifier</a>
+  </div>
+</div>
+<section class="carte">
+  <dl>
+    <dt>Type</dt><dd>{{ bailleur.get_type_display }} (bail nu de {{ bailleur.duree_bail_nu_ans }} ans)</dd>
+    <dt>Réf. ICS</dt><dd>{{ bailleur.ref_ics|default:"—" }}</dd>
+    <dt>Adresse</dt><dd>{% if bailleur.adresse %}{{ bailleur.adresse }}, {{ bailleur.code_postal }} {{ bailleur.ville }}{% else %}—{% endif %}</dd>
+    <dt>Contact</dt><dd>{{ bailleur.email|default:"" }} {{ bailleur.telephone|default:"" }}</dd>
+    {% if bailleur.siren %}<dt>SIREN</dt><dd>{{ bailleur.siren }}</dd>{% endif %}
+  </dl>
+</section>
+<h2>Biens ({{ biens|length }})</h2>
+<ul>
+{% for bien in biens %}<li><a href="{{ bien.get_absolute_url }}">{{ bien }}</a>{% if not bien.actif %} <span class="discret">(plus géré)</span>{% endif %}</li>
+{% empty %}<li class="discret">Aucun bien.</li>{% endfor %}
+</ul>
+{% endblock %}

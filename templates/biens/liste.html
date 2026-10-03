@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block titre %}Biens · UrbiaBail{% endblock %}
+{% block contenu %}
+<div class="titre-actions">
+  <h1>Biens</h1>
+  <div class="actions">
+    <a href="{% url 'biens:importer' %}">Importer</a>
+    <a href="{% url 'biens:exporter' %}?{{ request.GET.urlencode }}">Exporter (Excel)</a>
+    <a class="bouton-petit" href="{% url 'biens:bien_creer' %}">Nouveau bien</a>
+  </div>
+</div>
+<form class="filtres" method="get">
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Référence, adresse, ville, bailleur…" aria-label="Rechercher">
+  <select name="usage" aria-label="Usage">
+    <option value="">Tous les usages</option>
+    {% for valeur, libelle in usages %}<option value="{{ valeur }}"{% if request.GET.usage == valeur %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
+  </select>
+  <label><input type="checkbox" name="inactifs" value="1"{% if request.GET.inactifs == "1" %} checked{% endif %}> Inclure les biens qui ne sont plus gérés</label>
+  <button type="submit">Filtrer</button>
+</form>
+<p class="discret">{{ page.paginator.count }} bien(s)</p>
+<table>
+  <thead><tr><th>Réf. ICS</th><th>Adresse</th><th>Ville</th><th>Usage</th><th>Bailleur</th><th>DPE</th></tr></thead>
+  <tbody>
+  {% for bien in page %}
+    <tr{% if not bien.actif %} class="inactif"{% endif %}>
+      <td>{{ bien.ref_ics|default:"—" }}</td>
+      <td><a href="{{ bien.get_absolute_url }}">{{ bien.adresse }}{% if bien.complement %}, {{ bien.complement }}{% endif %}</a></td>
+      <td>{{ bien.code_postal }} {{ bien.ville }}</td>
+      <td>{{ bien.get_usage_display }}{% if bien.meuble %} meublé{% endif %}</td>
+      <td>{{ bien.bailleur }}</td>
+      <td>{% if bien.location_interdite %}<span class="alerte">G</span>{% else %}{{ bien.classe_dpe|default:"—" }}{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="discret">Aucun bien. Commencez par <a href="{% url 'biens:importer' %}">importer un fichier</a>.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% include "biens/_pagination.html" %}
+{% endblock %}

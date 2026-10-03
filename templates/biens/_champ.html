@@ -1,0 +1,10 @@
+<div class="champ{% if champ.errors %} en-erreur{% endif %}">
+  {% if champ.widget_type == "checkbox" %}
+  <label class="case">{{ champ }} {{ champ.label }}</label>
+  {% else %}
+  {{ champ.label_tag }}
+  {{ champ }}
+  {% endif %}
+  {% if champ.help_text %}<small class="discret">{{ champ.help_text }}</small>{% endif %}
+  {% for erreur in champ.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
+</div>

@@ -42,8 +42,10 @@ INSTALLED_APPS = [
     "django_otp.plugins.otp_totp",
     "axes",
     "mozilla_django_oidc",
+    "simple_history",
     "comptes",
     "core",
+    "biens",
 ]
 
 MIDDLEWARE = [
@@ -59,6 +61,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "comptes.middleware.ConnexionObligatoireMiddleware",
     "axes.middleware.AxesMiddleware",
+    # Enregistre l'auteur de chaque modification dans l'historique.
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
