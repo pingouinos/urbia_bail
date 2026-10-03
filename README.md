@@ -24,6 +24,16 @@ Par défaut (`GOOGLE_CREATION_AUTO=false`), un administrateur crée d'abord le c
 
 Les comptes locaux (identifiant et mot de passe) servent d'accès de secours aux administrateurs. Ils passent par une double authentification TOTP : à la première connexion, scanner le QR code avec une application d'authentification, puis saisir le code à chaque connexion.
 
+## Mandats de gestion
+
+Chaque mandat reçoit à l'enregistrement un numéro d'ordre définitif : la page « Mandats » tient le registre exigé par la loi Hoguet, exportable en Excel, et aucun mandat ne peut être supprimé. Un mandat se crée depuis la fiche d'un bien, prérempli avec le bailleur et le bien, puis se télécharge en Word ou en PDF. L'exemplaire signé et scanné se dépose sur la fiche du mandat.
+
+L'application signale les honoraires de location contraires à l'article 5 I de la loi du 6 juillet 1989 : part du locataire supérieure à celle du bailleur, ou au plafond de 10 €/m² en zone tendue (8 €/m² ailleurs) pour la visite, le dossier et le bail, et de 3 €/m² pour l'état des lieux.
+
+## Modèles Word
+
+Les documents sont produits à partir des modèles Word de l'agence (`documents/modeles/`), dont les parties variables sont écrites entre doubles accolades, par exemple `{{ mandant }}`. Un administrateur peut télécharger un modèle, le retoucher dans Word et le redéposer depuis la page « Modèles Word » de l'accueil ; l'application refuse un modèle qui contient une balise inconnue.
+
 ## Développement local
 
 ```bash

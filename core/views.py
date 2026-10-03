@@ -4,12 +4,14 @@ from django.shortcuts import render
 
 from biens.models import Bien
 from comptes.roles import est_administrateur
+from mandats.models import Mandat
 
 
 def accueil(request):
     return render(request, "core/accueil.html", {
         "est_admin": est_administrateur(request.user),
         "nb_biens": Bien.objects.filter(actif=True).count(),
+        "nb_mandats": Mandat.objects.filter(date_fin__isnull=True).count(),
     })
 
 

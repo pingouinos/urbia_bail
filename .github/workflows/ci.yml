@@ -44,5 +44,25 @@ jobs:
           printf 'SECRET_KEY=ci\nPOSTGRES_PASSWORD=ci\nALLOWED_HOSTS=localhost\n' > .env
           docker compose up -d --wait web
           docker compose exec -T web python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/sante/').read().decode())"
+      - name: Produire un mandat en PDF avec Gotenberg
+        run: |
+          docker compose up -d --wait gotenberg
+          docker compose exec -T web python manage.py shell -v0 -c "
+          from decimal import Decimal
+          from documents.generation import convertir_pdf, generer_docx
+          from mandats.models import Mandat
+          mandat = Mandat(numero=1, mandant='Monsieur ESSAI Jean', mandant_adresse='1 rue de la Paix',
+                          mandant_code_postal_ville='31000 Toulouse', designation='Appartement T2 de 39 m²',
+                          adresse_bien='5 rue du Taur 31000 TOULOUSE', loyer_cc=Decimal('899'), charges=Decimal('45'))
+          pdf = convertir_pdf(generer_docx('mandat_gestion.docx', mandat.contexte_document()))
+          assert pdf.startswith(b'%PDF'), pdf[:200]
+          open('/tmp/mandat.pdf', 'wb').write(pdf)
+          print(len(pdf), 'octets')
+          "
+          docker compose cp web:/tmp/mandat.pdf mandat-exemple.pdf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandat-exemple
+          path: mandat-exemple.pdf
       - if: failure()
         run: docker compose logs

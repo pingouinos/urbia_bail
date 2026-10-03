@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titre %}Modèles Word · UrbiaBail{% endblock %}
+{% block contenu %}
+<h1>Modèles Word</h1>
+<p>Pour retoucher le texte d'un document, téléchargez son modèle, modifiez-le dans Word en gardant les balises entre doubles accolades, puis déposez-le ici. Il sert alors à tous les documents produits ensuite.</p>
+{% for modele in modeles %}
+<section class="carte">
+  <h2>{{ modele.libelle }}</h2>
+  <p class="discret">{% if modele.personnalise %}Modèle déposé par l'agence.{% else %}Modèle d'origine.{% endif %}</p>
+  <p><a href="{% url 'documents:telecharger' modele.nom %}">Télécharger le modèle en service</a></p>
+  <form method="post" enctype="multipart/form-data" action="{% url 'documents:deposer' modele.nom %}" class="en-ligne">
+    {% csrf_token %}
+    <input type="file" name="fichier" accept=".docx" required>
+    <button type="submit">Déposer un nouveau modèle</button>
+  </form>
+  {% if modele.personnalise %}
+  <form method="post" action="{% url 'documents:retablir' modele.nom %}" class="en-ligne">{% csrf_token %}<button type="submit" class="lien">Rétablir le modèle d'origine</button></form>
+  {% endif %}
+  <details><summary>Balises disponibles</summary><p><code>{% for variable in modele.variables %}{% templatetag openvariable %} {{ variable }} {% templatetag closevariable %}{% if not forloop.last %}, {% endif %}{% endfor %}</code></p></details>
+</section>
+{% endfor %}
+{% endblock %}

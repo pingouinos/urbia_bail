@@ -15,8 +15,12 @@
 
 <div class="grille">
   <section class="carte">
-    <h2>Bailleur</h2>
+    <h2>Bailleur et mandat</h2>
     <p><a href="{{ bien.bailleur.get_absolute_url }}">{{ bien.bailleur }}</a><br><span class="discret">{{ bien.bailleur.get_type_display }}</span></p>
+    {% with mandat=bien.mandat_en_cours %}
+    {% if mandat %}<p><a href="{{ mandat.get_absolute_url }}">Mandat n° {{ mandat.numero }}</a>{% if mandat.alertes %} <span class="alerte">à vérifier</span>{% endif %}</p>
+    {% else %}<p class="discret">Aucun mandat en cours. <a href="{% url 'mandats:creer' %}?bien={{ bien.pk }}">Créer le mandat</a></p>{% endif %}
+    {% endwith %}
   </section>
   <section class="carte">
     <h2>Description</h2>
@@ -26,6 +30,9 @@
       <dt>Construction</dt><dd>{{ bien.get_periode_construction_display|default:"—" }}</dd>
       <dt>Surface</dt><dd>{% if bien.surface %}{{ bien.surface }} m²{% else %}—{% endif %}</dd>
       <dt>Pièces principales</dt><dd>{{ bien.nb_pieces|default:"—" }}</dd>
+      {% if bien.etage %}<dt>Étage</dt><dd>{{ bien.etage }}</dd>{% endif %}
+      {% if bien.numero_appartement or bien.numero_parking or bien.numero_cellier %}<dt>Numéros</dt><dd>{% if bien.numero_appartement %}appartement {{ bien.numero_appartement }} {% endif %}{% if bien.numero_parking %}parking {{ bien.numero_parking }} {% endif %}{% if bien.numero_cellier %}cellier {{ bien.numero_cellier }}{% endif %}</dd>{% endif %}
+      {% if bien.syndic %}<dt>Syndic</dt><dd>{{ bien.syndic }}</dd>{% endif %}
     </dl>
   </section>
   <section class="carte">
@@ -36,6 +43,7 @@
       <dt>Zone tendue</dt><dd>{{ bien.zone_tendue|yesno:"oui,non" }}</dd>
       <dt>Dernier loyer HC</dt><dd>{% if bien.dernier_loyer %}{{ bien.dernier_loyer }} €{% else %}—{% endif %}</dd>
       <dt>Charges</dt><dd>{% if bien.charges %}{{ bien.charges }} €{% else %}—{% endif %}</dd>
+      {% if bien.dispositif_fiscal %}<dt>Dispositif fiscal</dt><dd>{{ bien.dispositif_fiscal }}</dd>{% endif %}
     </dl>
   </section>
 </div>
@@ -49,6 +57,7 @@
     <dt>Accès TIC</dt><dd>{{ bien.acces_tic|default:"—" }}</dd>
     <dt>Annexes privatives</dt><dd>{{ bien.annexes|linebreaksbr|default:"—" }}</dd>
     <dt>Parties communes</dt><dd>{{ bien.parties_communes|linebreaksbr|default:"—" }}</dd>
+    <dt>Détecteur de fumée</dt><dd>{{ bien.detecteur_fumee|yesno:"installé,non signalé" }}</dd>
     {% if bien.observations %}<dt>Observations</dt><dd>{{ bien.observations|linebreaksbr }}</dd>{% endif %}
   </dl>
 </section>

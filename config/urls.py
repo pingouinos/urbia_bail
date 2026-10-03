@@ -12,6 +12,8 @@ urlpatterns = [
     path("", views.accueil, name="accueil"),
     path("sante/", views.sante, name="sante"),
     path("biens/", include("biens.urls")),
+    path("mandats/", include("mandats.urls")),
+    path("modeles/", include("documents.urls")),
     path(
         "connexion/",
         auth_views.LoginView.as_view(redirect_authenticated_user=True),

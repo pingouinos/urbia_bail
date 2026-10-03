@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block titre %}Registre des mandats · UrbiaBail{% endblock %}
+{% block contenu %}
+<div class="titre-actions">
+  <h1>Registre des mandats</h1>
+  <div class="actions">
+    <a href="{% url 'mandats:registre_export' %}?{{ request.GET.urlencode }}">Exporter (Excel)</a>
+    <a class="bouton-petit" href="{% url 'mandats:creer' %}">Nouveau mandat</a>
+  </div>
+</div>
+<form class="filtres" method="get">
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Numéro, mandant, adresse…" aria-label="Rechercher">
+  <select name="etat" aria-label="État">
+    <option value="">Tous les mandats</option>
+    <option value="en_cours"{% if request.GET.etat == "en_cours" %} selected{% endif %}>En cours</option>
+    <option value="termines"{% if request.GET.etat == "termines" %} selected{% endif %}>Terminés</option>
+  </select>
+  <button type="submit">Filtrer</button>
+</form>
+<p class="discret">{{ page.paginator.count }} mandat(s)</p>
+<table>
+  <thead><tr><th>N°</th><th>Signé le</th><th>Mandant</th><th>Bien</th><th>Durée</th><th>État</th></tr></thead>
+  <tbody>
+  {% for mandat in page %}
+    <tr{% if not mandat.en_cours %} class="inactif"{% endif %}>
+      <td><a href="{{ mandat.get_absolute_url }}">{{ mandat.numero }}</a></td>
+      <td>{{ mandat.date_signature|date:"d/m/Y"|default:"—" }}</td>
+      <td>{{ mandat.mandant }}</td>
+      <td>{{ mandat.adresse_bien }}</td>
+      <td>{{ mandat.duree_ans }} an{{ mandat.duree_ans|pluralize }}{% if mandat.reconductions %} + {{ mandat.reconductions }} reconduction{{ mandat.reconductions|pluralize }}{% endif %}</td>
+      <td>{% if mandat.en_cours %}{% if mandat.alertes %}<span class="alerte">à vérifier</span>{% else %}en cours{% endif %}{% else %}terminé le {{ mandat.date_fin|date:"d/m/Y" }}{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="discret">Aucun mandat. Un mandat se crée depuis la fiche d'un bien ou avec « Nouveau mandat ».</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% include "biens/_pagination.html" %}
+{% endblock %}

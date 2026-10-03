@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titre %}{% if mandat %}Modifier le mandat{% else %}Nouveau mandat{% endif %} · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% if mandat %}{{ mandat.get_absolute_url }}{% else %}{% url 'mandats:registre' %}{% endif %}">← Retour</a></p>
+<h1>{% if mandat %}Modifier le mandat n° {{ mandat.numero }}{% else %}Nouveau mandat{% endif %}</h1>
+{% if not mandat %}<p class="discret">Le numéro au registre est attribué à l'enregistrement et ne pourra plus être supprimé.</p>{% endif %}
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for titre, champs in form.sections %}
+  <fieldset>
+    <legend>{{ titre }}</legend>
+    {% if titre == "Honoraires de location" %}<p class="discret">La part du locataire ne peut dépasser ni celle du bailleur ni le plafond légal : 10 €/m² en zone tendue (8 €/m² ailleurs) pour la visite, le dossier et le bail, 3 €/m² pour l'état des lieux.</p>{% endif %}
+    {% for champ in champs %}{% include "biens/_champ.html" %}{% endfor %}
+  </fieldset>
+  {% endfor %}
+  <button type="submit">Enregistrer</button>
+</form>
+{% endblock %}

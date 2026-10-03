@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     "comptes",
     "core",
     "biens",
+    "documents",
+    "mandats",
 ]
 
 MIDDLEWARE = [
@@ -118,7 +120,7 @@ STORAGES = {
 }
 
 # Dossier où l'application range les documents (volume Docker en production).
-MEDIA_ROOT = Path(env("DOCUMENTS_DIR", default=str(BASE_DIR / "documents")))
+MEDIA_ROOT = Path(env("DOCUMENTS_DIR", default=str(BASE_DIR / "donnees")))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

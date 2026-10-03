@@ -5,6 +5,8 @@ décrire. La référence ICS du lot sert de clé pour les imports successifs et
 pour la future migration du logiciel de gestion.
 """
 
+from decimal import Decimal
+
 from django.db import models
 from django.urls import reverse
 from simple_history.models import HistoricalRecords
@@ -24,9 +26,20 @@ class Bailleur(Horodatage):
         SCI_FAMILIALE = "sci_familiale", "SCI familiale"
         PERSONNE_MORALE = "morale", "Personne morale"
 
+    class Civilite(models.TextChoices):
+        MONSIEUR = "M.", "Monsieur"
+        MADAME = "Mme", "Madame"
+
     type = models.CharField(max_length=20, choices=Type.choices, default=Type.PERSONNE_PHYSIQUE)
+    civilite = models.CharField("civilité", max_length=5, choices=Civilite.choices, blank=True)
     nom = models.CharField("nom ou raison sociale", max_length=200)
     prenom = models.CharField("prénom", max_length=100, blank=True)
+    # Second propriétaire (couple, indivision) mentionné comme co-mandant.
+    conjoint_civilite = models.CharField(
+        "civilité du conjoint", max_length=5, choices=Civilite.choices, blank=True
+    )
+    conjoint_nom = models.CharField("nom du conjoint ou co-propriétaire", max_length=200, blank=True)
+    conjoint_prenom = models.CharField("prénom du conjoint", max_length=100, blank=True)
     ref_ics = models.CharField(
         "référence ICS", max_length=50, unique=True, null=True, blank=True
     )
@@ -48,6 +61,22 @@ class Bailleur(Horodatage):
 
     def get_absolute_url(self):
         return reverse("biens:bailleur", args=[self.pk])
+
+    @property
+    def designation(self):
+        """Désignation complète, telle qu'elle figure en tête d'un mandat ou
+        d'un bail : « Monsieur DURAND Paul et Madame MARTIN Anne »."""
+        if self.type != self.Type.PERSONNE_PHYSIQUE:
+            return self.nom
+
+        def personne(civilite, nom, prenom):
+            libelle = self.Civilite(civilite).label if civilite else ""
+            return " ".join(m for m in (libelle, nom.upper(), prenom) if m)
+
+        titulaire = personne(self.civilite, self.nom, self.prenom)
+        if not self.conjoint_nom:
+            return titulaire
+        return f"{titulaire} et {personne(self.conjoint_civilite, self.conjoint_nom, self.conjoint_prenom)}"
 
     @property
     def duree_bail_nu_ans(self):
@@ -110,6 +139,14 @@ class Bien(Horodatage):
     code_postal = models.CharField("code postal", max_length=10)
     ville = models.CharField(max_length=100)
 
+    etage = models.CharField("étage", max_length=20, blank=True)
+    numero_appartement = models.CharField("n° d'appartement", max_length=20, blank=True)
+    numero_parking = models.CharField("n° de parking", max_length=20, blank=True)
+    numero_cellier = models.CharField("n° de cave ou cellier", max_length=20, blank=True)
+    syndic = models.CharField(
+        max_length=200, blank=True, help_text="Syndic de l'immeuble, si ce n'est pas l'agence."
+    )
+
     # Description
     type_habitat = models.CharField(
         "type d'habitat", max_length=20, choices=TypeHabitat.choices, blank=True
@@ -143,6 +180,7 @@ class Bien(Horodatage):
         "locaux et équipements privatifs", blank=True, help_text="Cave, parking, jardin…"
     )
     parties_communes = models.TextField("parties et équipements communs", blank=True)
+    detecteur_fumee = models.BooleanField("détecteur de fumée installé", default=False)
 
     # Énergie
     classe_dpe = models.CharField("classe DPE", max_length=2, choices=ClasseDPE.choices, blank=True)
@@ -166,6 +204,10 @@ class Bien(Horodatage):
     charges = models.DecimalField(
         "provision sur charges (€)", max_digits=9, decimal_places=2, null=True, blank=True
     )
+    dispositif_fiscal = models.CharField(
+        "dispositif fiscal et n° de convention", max_length=200, blank=True,
+        help_text="Pinel, Denormandie, Loc'Avantages… Le loyer peut alors être plafonné.",
+    )
 
     observations = models.TextField(blank=True)
 
@@ -181,6 +223,27 @@ class Bien(Horodatage):
 
     def get_absolute_url(self):
         return reverse("biens:bien", args=[self.pk])
+
+    @property
+    def mandat_en_cours(self):
+        return self.mandats.filter(date_fin__isnull=True).order_by("-numero").first()
+
+    @property
+    def designation(self):
+        """Description courte pour un mandat : « Appartement T2 meublé de 39 m² »."""
+        if self.usage == self.Usage.STATIONNEMENT:
+            return "Un emplacement de stationnement"
+        if not self.est_habitation:
+            return f"Un {self.get_usage_display().lower()}"
+        nature = "Maison" if self.type_habitat == self.TypeHabitat.INDIVIDUEL else "Appartement"
+        morceaux = [nature]
+        if self.nb_pieces:
+            morceaux.append(f"T{self.nb_pieces}")
+        if self.meuble:
+            morceaux.append("meublé")
+        if self.surface:
+            morceaux.append(f"de {Decimal(str(self.surface)).normalize():f} m²".replace(".", ","))
+        return " ".join(morceaux)
 
     @property
     def est_habitation(self):
