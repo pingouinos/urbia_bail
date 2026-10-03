@@ -24,6 +24,48 @@ PLAFOND_ETAT_DES_LIEUX = Decimal("3")
 NOMBRES = {1: "un", 2: "deux", 3: "trois", 4: "quatre", 5: "cinq", 6: "six"}
 
 
+def plafonds_locataire(bien):
+    """Plafonds (bail, état des lieux) de la part locataire, ou None si le
+    bien n'y est pas soumis ou si sa surface est inconnue."""
+    if not bien.est_habitation or not bien.surface:
+        return None
+    par_m2 = PLAFOND_BAIL_ZONE_TENDUE if bien.zone_tendue else PLAFOND_BAIL_HORS_ZONE_TENDUE
+    return bien.surface * par_m2, bien.surface * PLAFOND_ETAT_DES_LIEUX
+
+
+def controler_honoraires(bien, bail_bailleur, bail_locataire, edl_bailleur, edl_locataire):
+    """Points contraires à l'article 5 I de la loi du 6 juillet 1989 : la part
+    du locataire ne peut excéder celle du bailleur ni le plafond par m² de
+    surface habitable."""
+    from documents.generation import montant
+
+    if not bien.est_habitation:
+        return []
+    alertes = []
+    prestations = [
+        ("visite, dossier et bail", bail_locataire, bail_bailleur),
+        ("état des lieux", edl_locataire, edl_bailleur),
+    ]
+    for libelle, locataire, bailleur in prestations:
+        if locataire > bailleur:
+            alertes.append(
+                f"Honoraires de {libelle} : la part du locataire ({montant(locataire)} €) dépasse "
+                f"celle du bailleur ({montant(bailleur)} €), ce que la loi interdit."
+            )
+    plafonds = plafonds_locataire(bien)
+    if plafonds is None:
+        if bail_locataire or edl_locataire:
+            alertes.append("Surface habitable du bien inconnue : plafonds non vérifiés.")
+        return alertes
+    for (libelle, locataire, _), plafond in zip(prestations, plafonds):
+        if locataire > plafond:
+            alertes.append(
+                f"Honoraires de {libelle} : la part du locataire ({montant(locataire)} €) dépasse "
+                f"le plafond légal de {montant(plafond)} € pour {montant(bien.surface)} m²."
+            )
+    return alertes
+
+
 def _montant(**options):
     return models.DecimalField(max_digits=9, decimal_places=2, **options)
 
@@ -151,46 +193,12 @@ class Mandat(Horodatage):
     def honoraires_edl(self):
         return self.honoraires_edl_bailleur + self.honoraires_edl_locataire
 
-    def plafonds_locataire(self):
-        """Plafonds (bail, état des lieux) de la part locataire, ou None si
-        le bien n'y est pas soumis ou si sa surface est inconnue."""
-        if not self.bien.est_habitation or not self.bien.surface:
-            return None
-        par_m2 = PLAFOND_BAIL_ZONE_TENDUE if self.bien.zone_tendue else PLAFOND_BAIL_HORS_ZONE_TENDUE
-        return self.bien.surface * par_m2, self.bien.surface * PLAFOND_ETAT_DES_LIEUX
-
     @property
     def alertes(self):
-        """Points contraires à l'article 5 I de la loi du 6 juillet 1989 :
-        la part du locataire ne peut excéder celle du bailleur ni le plafond
-        par m² de surface habitable."""
-        from documents.generation import montant
-
-        if not self.bien.est_habitation:
-            return []
-        alertes = []
-        prestations = [
-            ("visite, dossier et bail", self.honoraires_bail_locataire, self.honoraires_bail_bailleur),
-            ("état des lieux", self.honoraires_edl_locataire, self.honoraires_edl_bailleur),
-        ]
-        for libelle, locataire, bailleur in prestations:
-            if locataire > bailleur:
-                alertes.append(
-                    f"Honoraires de {libelle} : la part du locataire ({montant(locataire)} €) dépasse "
-                    f"celle du bailleur ({montant(bailleur)} €), ce que la loi interdit."
-                )
-        plafonds = self.plafonds_locataire()
-        if plafonds is None:
-            if self.honoraires_bail_locataire or self.honoraires_edl_locataire:
-                alertes.append("Surface habitable du bien inconnue : plafonds non vérifiés.")
-            return alertes
-        for (libelle, locataire, _), plafond in zip(prestations, plafonds):
-            if locataire > plafond:
-                alertes.append(
-                    f"Honoraires de {libelle} : la part du locataire ({montant(locataire)} €) dépasse "
-                    f"le plafond légal de {montant(plafond)} € pour {montant(self.bien.surface)} m²."
-                )
-        return alertes
+        return controler_honoraires(
+            self.bien, self.honoraires_bail_bailleur, self.honoraires_bail_locataire,
+            self.honoraires_edl_bailleur, self.honoraires_edl_locataire,
+        )
 
     def contexte_document(self):
         """Valeurs à placer dans le modèle Word du mandat."""

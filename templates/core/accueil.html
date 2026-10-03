@@ -6,6 +6,6 @@
   <section class="carte"><h2><a href="{% url 'biens:liste' %}">Biens</a></h2><p class="discret">{{ nb_biens }} lot(s) actif(s) au référentiel.</p><p><a href="{% url 'biens:importer' %}">Importer un fichier Excel</a></p></section>
   <section class="carte"><h2><a href="{% url 'mandats:registre' %}">Mandats</a></h2><p class="discret">{{ nb_mandats }} mandat(s) en cours au registre.</p>{% if est_admin %}<p><a href="{% url 'documents:modeles' %}">Modèles Word</a></p>{% endif %}</section>
   <section class="carte"><h2>Candidatures</h2><p class="discret">Liens DossierFacile des candidats : à venir.</p></section>
-  <section class="carte"><h2>Baux</h2><p class="discret">Génération Word et PDF : à venir.</p></section>
+  <section class="carte"><h2><a href="{% url 'baux:liste' %}">Baux</a></h2><p class="discret">{{ nb_baux }} bail(s) en cours.</p><p><a href="{% url 'baux:creer' %}">Rédiger un bail</a></p></section>
 </div>
 {% endblock %}

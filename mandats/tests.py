@@ -157,7 +157,7 @@ class VuesTests(Donnees, TestCase):
         mandat = self.creer_mandat()
         reponse = self.client.get(reverse("mandats:word", args=[mandat.pk]))
         self.assertIn("Monsieur DURAND Paul", texte_docx(reponse.content))
-        with mock.patch("mandats.views.convertir_pdf", return_value=b"%PDF-1.7") as convertir:
+        with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7") as convertir:
             reponse = self.client.get(reverse("mandats:pdf", args=[mandat.pk]))
         self.assertEqual(reponse["Content-Type"], "application/pdf")
         self.assertEqual(reponse.content, b"%PDF-1.7")
@@ -165,7 +165,7 @@ class VuesTests(Donnees, TestCase):
 
     def test_pdf_indisponible(self):
         mandat = self.creer_mandat()
-        with mock.patch("mandats.views.convertir_pdf", side_effect=ConversionImpossible("hors service")):
+        with mock.patch("documents.views.convertir_pdf", side_effect=ConversionImpossible("hors service")):
             reponse = self.client.get(reverse("mandats:pdf", args=[mandat.pk]), follow=True)
         self.assertContains(reponse, "téléchargez la version Word")
 

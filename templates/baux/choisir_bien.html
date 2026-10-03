@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titre %}Nouveau bail · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'baux:liste' %}">← Baux</a></p>
+<h1>Nouveau bail</h1>
+<form method="get" class="formulaire">
+  <fieldset>
+    <legend>Logement loué</legend>
+    <div class="champ">
+      <label for="bien">Bien</label>
+      <select name="bien" id="bien" required>
+        <option value="">Choisir un logement</option>
+        {% for bien in biens %}<option value="{{ bien.pk }}">{{ bien }} · {{ bien.bailleur }}</option>{% endfor %}
+      </select>
+      <small class="discret">Le bail est prérempli avec la fiche du bien et les honoraires de son mandat en cours.</small>
+    </div>
+  </fieldset>
+  <button type="submit">Continuer</button>
+</form>
+{% endblock %}

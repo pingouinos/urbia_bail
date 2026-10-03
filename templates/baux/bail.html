@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block titre %}Bail · {{ bail.bien.adresse }} · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'baux:liste' %}">← Baux</a></p>
+<div class="titre-actions">
+  <h1>Bail · {{ bail.bien.adresse }}</h1>
+  <div class="actions">
+    <a href="{% url 'baux:word' bail.pk %}">Word</a>
+    <a href="{% url 'baux:pdf' bail.pk %}">PDF</a>
+    <a class="bouton-petit" href="{% url 'baux:modifier' bail.pk %}">Modifier</a>
+  </div>
+</div>
+<p class="discret">{{ bail.get_type_display }} · du {{ bail.date_effet|date:"d/m/Y" }} au {{ bail.date_fin|date:"d/m/Y" }}{% if bail.date_signature %} · signé le {{ bail.date_signature|date:"d/m/Y" }}{% endif %}{% if not bail.en_cours %} · terminé le {{ bail.date_fin_effective|date:"d/m/Y" }}{% endif %}</p>
+
+{% for alerte in bail.alertes %}<p class="message alerte-fond">{{ alerte }}</p>{% endfor %}
+
+<div class="grille">
+  <section class="carte">
+    <h2>Logement</h2>
+    <p><a href="{{ bail.bien.get_absolute_url }}">{{ bail.bien }}</a><br><span class="discret">Bailleur : {{ bail.bien.bailleur.designation }}</span></p>
+    {% if bail.mandat %}<p><a href="{{ bail.mandat.get_absolute_url }}">Mandat n° {{ bail.mandat.numero }}</a></p>{% endif %}
+  </section>
+  <section class="carte">
+    <h2>Locataires</h2>
+    <ul>{% for locataire in bail.locataires.all %}<li>{{ locataire.designation }}{{ locataire.naissance }}{% if locataire.email %}<br><span class="discret">{{ locataire.email }} {{ locataire.telephone }}</span>{% endif %}</li>{% endfor %}</ul>
+    {% if bail.garant %}<p class="discret">Garant : {{ bail.garant }}</p>{% endif %}
+  </section>
+  <section class="carte">
+    <h2>Loyer</h2>
+    <dl>
+      <dt>Loyer HC</dt><dd>{{ bail.loyer }} €</dd>
+      <dt>Charges</dt><dd>{{ bail.charges }} € ({{ bail.get_mode_charges_display|lower }})</dd>
+      <dt>Total</dt><dd>{{ bail.total_mensuel }} € par mois</dd>
+      <dt>Dépôt</dt><dd>{{ bail.depot_garantie }} €</dd>
+      <dt>IRL</dt><dd>{{ bail.irl_trimestre }} ({{ bail.irl_valeur }})</dd>
+    </dl>
+  </section>
+</div>
+
+<section class="carte">
+  <h2>Honoraires de location</h2>
+  <dl>
+    <dt>Visite, dossier, bail</dt><dd>{{ bail.honoraires_bail_bailleur }} € bailleur, {{ bail.honoraires_bail_locataire }} € locataire</dd>
+    <dt>État des lieux</dt><dd>{{ bail.honoraires_edl_bailleur }} € bailleur, {{ bail.honoraires_edl_locataire }} € locataire</dd>
+  </dl>
+</section>
+
+<section class="carte">
+  <h2>Annexes à joindre</h2>
+  <ul>{% for annexe in bail.annexes %}<li>{{ annexe }}</li>{% endfor %}</ul>
+</section>
+
+<section class="carte">
+  <h2>Exemplaire signé</h2>
+  {% if bail.fichier_signe %}<p><a href="{% url 'baux:fichier_signe' bail.pk %}">Ouvrir le bail signé</a></p>{% endif %}
+  <form method="post" enctype="multipart/form-data" action="{% url 'baux:deposer_signe' bail.pk %}" class="en-ligne">
+    {% csrf_token %}
+    {{ form_signe.fichier_signe }}
+    <button type="submit">{% if bail.fichier_signe %}Remplacer{% else %}Déposer le scan{% endif %}</button>
+  </form>
+</section>
+
+<section class="carte">
+  <h2>Historique</h2>
+  <ul class="historique">
+  {% for version in historique %}
+    <li>{{ version.history_date|date:"d/m/Y H:i" }} · {{ version.get_history_type_display }} par {{ version.history_user|default:"système" }}</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endblock %}

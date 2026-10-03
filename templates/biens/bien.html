@@ -21,6 +21,7 @@
     {% if mandat %}<p><a href="{{ mandat.get_absolute_url }}">Mandat n° {{ mandat.numero }}</a>{% if mandat.alertes %} <span class="alerte">à vérifier</span>{% endif %}</p>
     {% else %}<p class="discret">Aucun mandat en cours. <a href="{% url 'mandats:creer' %}?bien={{ bien.pk }}">Créer le mandat</a></p>{% endif %}
     {% endwith %}
+    <p><a href="{% url 'baux:creer' %}?bien={{ bien.pk }}">Rédiger un bail</a>{% with nb=bien.baux.count %}{% if nb %} · {{ nb }} {{ nb|pluralize:"bail,baux" }} au dossier{% endif %}{% endwith %}</p>
   </section>
   <section class="carte">
     <h2>Description</h2>
@@ -32,6 +33,7 @@
       <dt>Pièces principales</dt><dd>{{ bien.nb_pieces|default:"—" }}</dd>
       {% if bien.etage %}<dt>Étage</dt><dd>{{ bien.etage }}</dd>{% endif %}
       {% if bien.numero_appartement or bien.numero_parking or bien.numero_cellier %}<dt>Numéros</dt><dd>{% if bien.numero_appartement %}appartement {{ bien.numero_appartement }} {% endif %}{% if bien.numero_parking %}parking {{ bien.numero_parking }} {% endif %}{% if bien.numero_cellier %}cellier {{ bien.numero_cellier }}{% endif %}</dd>{% endif %}
+      {% if bien.identifiant_fiscal %}<dt>Identifiant fiscal</dt><dd>{{ bien.identifiant_fiscal }}</dd>{% endif %}
       {% if bien.syndic %}<dt>Syndic</dt><dd>{{ bien.syndic }}</dd>{% endif %}
     </dl>
   </section>

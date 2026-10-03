@@ -143,6 +143,10 @@ class Bien(Horodatage):
     numero_appartement = models.CharField("n° d'appartement", max_length=20, blank=True)
     numero_parking = models.CharField("n° de parking", max_length=20, blank=True)
     numero_cellier = models.CharField("n° de cave ou cellier", max_length=20, blank=True)
+    identifiant_fiscal = models.CharField(
+        "identifiant fiscal du logement", max_length=20, blank=True,
+        help_text="Visible dans l'espace « Gérer mes biens immobiliers » du propriétaire sur impots.gouv.fr.",
+    )
     syndic = models.CharField(
         max_length=200, blank=True, help_text="Syndic de l'immeuble, si ce n'est pas l'agence."
     )

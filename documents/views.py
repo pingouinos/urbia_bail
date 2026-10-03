@@ -1,24 +1,51 @@
 """Remplacement des modèles Word par un administrateur (par exemple quand
 Elodie retouche le texte d'un mandat)."""
 
+import mimetypes
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 from docxtpl import DocxTemplate
 
 from comptes.roles import est_administrateur
 
-from .generation import DOCX, MODELES_PAR_DEFAUT, chemin_modele
+from .generation import DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, convertir_pdf, generer_docx
 
 MODELES = {
     "mandat_gestion.docx": "Mandat de gestion",
+    "bail_habitation.docx": "Bail d'habitation (nu ou meublé)",
 }
 TAILLE_MAX = 10 * 1024 * 1024
+
+
+def document(request, objet, modele, format_):
+    """Réponse de téléchargement du document d'un objet (mandat, bail) en
+    Word ou en PDF ; sans PDF disponible, retour à la fiche avec un message."""
+    contenu = generer_docx(modele, objet.contexte_document())
+    type_, extension = DOCX, "docx"
+    if format_ == "pdf":
+        try:
+            contenu = convertir_pdf(contenu, modele)
+        except ConversionImpossible:
+            messages.error(request, "La conversion en PDF est indisponible pour le moment ; "
+                                    "téléchargez la version Word.")
+            return redirect(objet)
+        type_, extension = "application/pdf", "pdf"
+    reponse = HttpResponse(contenu, content_type=type_)
+    reponse["Content-Disposition"] = f'attachment; filename="{objet.nom_fichier}.{extension}"'
+    return reponse
+
+
+def fichier_signe(objet):
+    if not objet.fichier_signe:
+        raise Http404
+    type_, _ = mimetypes.guess_type(objet.fichier_signe.name)
+    return FileResponse(objet.fichier_signe.open("rb"), content_type=type_ or "application/octet-stream")
 
 
 def _verifier(request, nom):
