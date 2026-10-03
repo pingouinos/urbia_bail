@@ -1,0 +1,62 @@
+# Déploiement de TEST sur le NAS Synology de l'agence (DS220+, 2 Go de RAM),
+# accessible uniquement depuis le réseau local en HTTP : http://<IP du NAS>:8080
+# La production reste le VPS (docker-compose.yml à la racine, avec Caddy).
+#
+# Différences avec le VPS : pas de Caddy ni de HTTPS, pas de Gotenberg (la
+# génération des baux n'existe pas encore), mémoire de chaque conteneur bornée.
+# Consommation attendue : environ 500 Mo pour l'ensemble.
+name: urbiabail
+
+services:
+  web:
+    build:
+      context: ../..
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://urbiabail:${POSTGRES_PASSWORD}@db:5432/urbiabail
+      DOCUMENTS_DIR: /documents
+      GUNICORN_WORKERS: "2"
+    ports:
+      - "8080:8000"
+    volumes:
+      - documents:/documents
+    mem_limit: 384m
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/sante/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Réglages PostgreSQL réduits pour tenir dans 256 Mo.
+    command: postgres -c shared_buffers=64MB -c work_mem=4MB -c max_connections=20
+    environment:
+      POSTGRES_DB: urbiabail
+      POSTGRES_USER: urbiabail
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    mem_limit: 256m
+    shm_size: 128m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urbiabail"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # À décommenter quand la génération des baux en PDF sera livrée.
+  # LibreOffice ne démarre qu'à la première conversion.
+  # gotenberg:
+  #   image: gotenberg/gotenberg:8
+  #   restart: unless-stopped
+  #   mem_limit: 768m
+
+volumes:
+  documents:
+  postgres:
