@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titre %}Réponse au candidat · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{{ candidature.get_absolute_url }}">← Candidature</a></p>
+<h1>Réponse au candidat</h1>
+<p class="discret">Pour {{ candidature.noms }} · {{ candidature.bien }}<br>Destinataire(s) : {{ destinataires|join:", "|default:"aucune adresse e-mail sur la fiche" }}</p>
+<p class="message">Le message reste neutre : aucun motif de refus n'est à donner au candidat. Il l'informe de l'effacement de ses données sous trois mois.</p>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  <fieldset>
+    <legend>Message</legend>
+    {% include "biens/_champ.html" with champ=form.texte %}
+  </fieldset>
+  {% if envoi and destinataires %}
+  <button type="submit" name="action" value="envoyer">Envoyer l'e-mail</button>
+  <button type="submit" name="action" value="manuel" class="secondaire">Je l'ai envoyé moi-même</button>
+  {% else %}
+  <p class="discret">{% if destinataires %}L'envoi depuis l'application n'est pas configuré{% else %}La fiche n'a pas d'adresse e-mail{% endif %} : copier ce texte dans Gmail, l'envoyer, puis le noter ici.</p>
+  <button type="submit" name="action" value="manuel">Je l'ai envoyé moi-même</button>
+  {% endif %}
+</form>
+{% endblock %}

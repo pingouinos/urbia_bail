@@ -51,3 +51,5 @@ label.case { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
 form.en-ligne { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 form.en-ligne button[type=submit] { margin-top: 0; }
 .sous-formulaire { border-bottom: 1px solid #e3e3e3; padding-bottom: 8px; margin-bottom: 8px; }
+button.secondaire[type=submit] { background: var(--carte); color: var(--accent); border: 1px solid var(--accent); }
+button.danger[type=submit] { background: var(--erreur); }

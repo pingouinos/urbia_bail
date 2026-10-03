@@ -21,6 +21,7 @@
     {% if mandat %}<p><a href="{{ mandat.get_absolute_url }}">Mandat n° {{ mandat.numero }}</a>{% if mandat.alertes %} <span class="alerte">à vérifier</span>{% endif %}</p>
     {% else %}<p class="discret">Aucun mandat en cours. <a href="{% url 'mandats:creer' %}?bien={{ bien.pk }}">Créer le mandat</a></p>{% endif %}
     {% endwith %}
+    <p><a href="{% url 'candidatures:creer' %}?bien={{ bien.pk }}">Enregistrer une candidature</a>{% with nb=bien.candidatures.count %}{% if nb %} · <a href="{% url 'candidatures:liste' %}?bien={{ bien.pk }}">{{ nb }} candidature{{ nb|pluralize }}</a>{% endif %}{% endwith %}</p>
     <p><a href="{% url 'baux:creer' %}?bien={{ bien.pk }}">Rédiger un bail</a>{% with nb=bien.baux.count %}{% if nb %} · {{ nb }} {{ nb|pluralize:"bail,baux" }} au dossier{% endif %}{% endwith %}</p>
   </section>
   <section class="carte">

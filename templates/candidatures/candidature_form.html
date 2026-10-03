@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block titre %}{% if candidature %}Modifier la candidature{% else %}Nouvelle candidature{% endif %} · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% if candidature %}{{ candidature.get_absolute_url }}{% else %}{% url 'candidatures:liste' %}{% endif %}">← Retour</a></p>
+<h1>{% if candidature %}Modifier la candidature{% else %}Nouvelle candidature{% endif %}</h1>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <fieldset>
+    <legend>Logement et dossier</legend>
+    {% for champ in form %}{% include "biens/_champ.html" %}{% endfor %}
+  </fieldset>
+  <fieldset>
+    <legend>Candidats</legend>
+    {{ candidats.management_form }}
+    {% for erreur in candidats.non_form_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
+    <p class="discret">Les pièces justificatives restent sur DossierFacile. Ne pas recueillir de coordonnées bancaires, de situation de famille ni de nationalité : la loi interdit de les exiger ou d'en faire un critère de choix.</p>
+    {% for sous_form in candidats %}
+    <div class="sous-formulaire">
+      {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
+      {% for champ in sous_form.visible_fields %}{% include "biens/_champ.html" %}{% endfor %}
+    </div>
+    {% endfor %}
+    <small class="discret">Jusqu'à quatre candidats (colocataires, couple) ; enregistrez pour ajouter une ligne vide.</small>
+  </fieldset>
+  <button type="submit">Enregistrer</button>
+</form>
+{% endblock %}

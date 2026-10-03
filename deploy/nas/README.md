@@ -29,6 +29,10 @@ Prérequis : DSM 7.2 ou plus récent et le paquet **Container Manager** install�
 
 Si le pare-feu de DSM est activé : *Panneau de configuration* > *Sécurité* > *Pare-feu*, autoriser le port 8080 depuis le réseau local.
 
+## Dépannage
+
+- **La construction échoue sur `pip install` (« Could not find a version that satisfies the requirement Django »)** : la construction n'atteint pas Internet. Le projet construit déjà l'image sur le réseau du NAS (`network: host`) ; si l'erreur persiste, vérifier dans *Panneau de configuration* > *Réseau* > *Général* que la passerelle et le serveur DNS sont renseignés (par exemple l'adresse de la box, ou `1.1.1.1`), puis relancer *Construire*.
+
 ## Mettre à jour
 
 Télécharger le nouveau ZIP et remplacer les fichiers de `docker/urbiabail` (garder `deploy/nas/.env`). Puis *Projet* > `urbiabail` > *Action* > *Arrêter*, *Construire*, et *Démarrer*. Les migrations s'appliquent au démarrage ; les données restent dans les volumes Docker `urbiabail_postgres` et `urbiabail_documents`.

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titre %}Candidatures · UrbiaBail{% endblock %}
+{% block contenu %}
+<div class="titre-actions">
+  <h1>Candidatures</h1>
+  <div class="actions"><a class="bouton-petit" href="{% url 'candidatures:creer' %}{% if bien %}?bien={{ bien.pk }}{% endif %}">Nouvelle candidature</a></div>
+</div>
+{% if bien %}<p>Pour <a href="{{ bien.get_absolute_url }}">{{ bien }}</a> · <a href="{% url 'candidatures:liste' %}">tous les logements</a></p>{% endif %}
+<form class="filtres" method="get">
+  {% if bien %}<input type="hidden" name="bien" value="{{ bien.pk }}">{% endif %}
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Adresse, candidat, référence…" aria-label="Rechercher">
+  <select name="statut" aria-label="Statut">
+    <option value="">Tous les statuts</option>
+    {% for valeur, libelle in statuts %}<option value="{{ valeur }}"{% if request.GET.statut == valeur %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
+  </select>
+  <button type="submit">Filtrer</button>
+</form>
+<p class="discret">{{ page.paginator.count }} candidature(s). Celles qui ne sont pas retenues sont effacées trois mois après la décision.</p>
+<table>
+  <thead><tr><th>Logement</th><th>Candidats</th><th>Revenus nets</th><th>Taux d'effort</th><th>Reçue le</th><th>Statut</th></tr></thead>
+  <tbody>
+  {% for candidature in page %}
+    <tr{% if candidature.statut == "non_retenue" or candidature.statut == "desistement" %} class="inactif"{% endif %}>
+      <td>{{ candidature.bien.adresse }}<br><span class="discret">{{ candidature.bien.code_postal }} {{ candidature.bien.ville }}</span></td>
+      <td><a href="{{ candidature.get_absolute_url }}">{{ candidature.noms|default:"Sans nom" }}</a></td>
+      <td>{% if candidature.revenus %}{{ candidature.revenus|floatformat:0 }} €{% else %}—{% endif %}</td>
+      <td>{% with taux=candidature.taux_effort %}{% if taux is not None %}{{ taux }} %{% else %}—{% endif %}{% endwith %}</td>
+      <td>{{ candidature.cree_le|date:"d/m/Y" }}</td>
+      <td>{% if candidature.bail %}<a href="{{ candidature.bail.get_absolute_url }}">bail rédigé</a>{% else %}{{ candidature.get_statut_display }}{% if candidature.alertes %} <span class="alerte">à vérifier</span>{% endif %}{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="discret">Aucune candidature. Une candidature s'enregistre depuis la fiche d'un logement ou avec « Nouvelle candidature ».</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% include "biens/_pagination.html" %}
+{% endblock %}

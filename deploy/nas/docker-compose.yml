@@ -12,6 +12,9 @@ services:
   web:
     build:
       context: ../..
+      # Construire sur le réseau du NAS : sur certains Synology, le réseau
+      # Docker par défaut n'atteint pas Internet et pip ne trouve pas Django.
+      network: host
     restart: unless-stopped
     env_file: .env
     environment:

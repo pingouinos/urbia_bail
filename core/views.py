@@ -4,6 +4,7 @@ from django.shortcuts import render
 
 from baux.models import Bail
 from biens.models import Bien
+from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from mandats.models import Mandat
 
@@ -13,6 +14,7 @@ def accueil(request):
         "est_admin": est_administrateur(request.user),
         "nb_biens": Bien.objects.filter(actif=True).count(),
         "nb_baux": Bail.objects.filter(date_fin_effective__isnull=True).count(),
+        "nb_candidatures": Candidature.objects.filter(statut=Candidature.Statut.A_ETUDIER).count(),
         "nb_mandats": Mandat.objects.filter(date_fin__isnull=True).count(),
     })
 

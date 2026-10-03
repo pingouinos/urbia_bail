@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block titre %}Candidature · {{ candidature.bien.adresse }} · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'candidatures:liste' %}?bien={{ candidature.bien.pk }}">← Candidatures pour ce logement</a></p>
+<div class="titre-actions">
+  <h1>{{ candidature.noms|default:"Candidature" }}</h1>
+  <div class="actions"><a class="bouton-petit" href="{% url 'candidatures:modifier' candidature.pk %}">Modifier</a></div>
+</div>
+<p class="discret">{{ candidature.get_statut_display }}{% if candidature.decide_le %} le {{ candidature.decide_le|date:"d/m/Y" }}{% if candidature.decide_par %} par {{ candidature.decide_par.get_full_name|default:candidature.decide_par.username }}{% endif %}{% endif %} · reçue le {{ candidature.cree_le|date:"d/m/Y" }}</p>
+
+{% for alerte in candidature.alertes %}<p class="message alerte-fond">{{ alerte }}</p>{% endfor %}
+
+<div class="grille">
+  <section class="carte">
+    <h2>Logement</h2>
+    <p><a href="{{ candidature.bien.get_absolute_url }}">{{ candidature.bien }}</a><br><span class="discret">{{ candidature.bien.designation }}</span></p>
+    <dl>
+      <dt>Loyer HC</dt><dd>{% if candidature.bien.dernier_loyer %}{{ candidature.bien.dernier_loyer }} €{% else %}—{% endif %}</dd>
+      <dt>Charges</dt><dd>{% if candidature.bien.charges %}{{ candidature.bien.charges }} €{% else %}—{% endif %}</dd>
+      <dt>Entrée souhaitée</dt><dd>{{ candidature.date_entree_souhaitee|date:"d/m/Y"|default:"—" }}</dd>
+    </dl>
+  </section>
+  <section class="carte">
+    <h2>Dossier</h2>
+    {% if candidature.lien_dossierfacile %}<p><a href="{{ candidature.lien_dossierfacile }}" target="_blank" rel="noopener noreferrer">Ouvrir le dossier DossierFacile</a></p>
+    {% else %}<p class="discret">Aucun lien DossierFacile.</p>{% endif %}
+    <dl>
+      <dt>Pièces vérifiées</dt><dd>{{ candidature.dossier_verifie|yesno:"oui,non" }}</dd>
+      <dt>Garantie</dt><dd>{{ candidature.get_garantie_display }}</dd>
+      <dt>Revenus nets</dt><dd>{% if candidature.revenus %}{{ candidature.revenus|floatformat:0 }} € par mois{% else %}—{% endif %}</dd>
+      <dt>Taux d'effort</dt><dd>{% with taux=candidature.taux_effort %}{% if taux is not None %}{{ taux }} % du revenu pour le loyer charges comprises{% else %}—{% endif %}{% endwith %}</dd>
+    </dl>
+  </section>
+</div>
+
+<section class="carte">
+  <h2>Candidats</h2>
+  <table>
+    <thead><tr><th>Nom</th><th>Contact</th><th>Activité</th><th>Revenus nets</th></tr></thead>
+    <tbody>
+    {% for candidat in candidature.candidats.all %}
+      <tr>
+        <td>{{ candidat }}{% if candidat.date_naissance %}<br><span class="discret">né(e) le {{ candidat.date_naissance|date:"d/m/Y" }}{% if candidat.lieu_naissance %} à {{ candidat.lieu_naissance }}{% endif %}</span>{% endif %}</td>
+        <td>{{ candidat.email }}<br>{{ candidat.telephone }}</td>
+        <td>{{ candidat.profession|default:"—" }}{% if candidat.employeur %} chez {{ candidat.employeur }}{% endif %}{% if candidat.contrat %}<br><span class="discret">{{ candidat.get_contrat_display }}{% if candidat.date_embauche %} depuis le {{ candidat.date_embauche|date:"d/m/Y" }}{% endif %}</span>{% endif %}</td>
+        <td>{% if candidat.revenus_mensuels %}{{ candidat.revenus_mensuels|floatformat:0 }} €{% else %}—{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if candidature.notes %}<section class="carte"><h2>Notes internes</h2><p>{{ candidature.notes|linebreaksbr }}</p></section>{% endif %}
+
+<section class="carte">
+  <h2>Décision</h2>
+  {% if candidature.bail %}
+  <p>Candidature retenue, <a href="{{ candidature.bail.get_absolute_url }}">bail rédigé</a>.</p>
+  {% else %}
+  <form method="post" action="{% url 'candidatures:decider' candidature.pk %}" class="en-ligne">
+    {% csrf_token %}
+    {% if candidature.statut != "retenue" %}<button type="submit" name="statut" value="retenue">Retenir</button>{% endif %}
+    {% if candidature.statut != "non_retenue" %}<button type="submit" name="statut" value="non_retenue" class="secondaire">Ne pas retenir</button>{% endif %}
+    {% if candidature.statut != "desistement" %}<button type="submit" name="statut" value="desistement" class="secondaire">Le candidat se désiste</button>{% endif %}
+    {% if candidature.decidee %}<button type="submit" name="statut" value="a_etudier" class="lien">Remettre à l'étude</button>{% endif %}
+  </form>
+  {% if candidature.statut == "retenue" %}<p><a class="bouton-petit" href="{% url 'baux:creer' %}?candidature={{ candidature.pk }}">Rédiger le bail</a></p>{% endif %}
+  {% if candidature.statut == "non_retenue" %}
+  <p>{% if candidature.refus_envoye_le %}Réponse envoyée le {{ candidature.refus_envoye_le|date:"d/m/Y" }}.{% else %}<a href="{% url 'candidatures:reponse' candidature.pk %}">Préparer la réponse au candidat</a>{% endif %}</p>
+  {% endif %}
+  {% endif %}
+</section>
+
+<section class="carte">
+  <h2>Données personnelles</h2>
+  {% if candidature.bail %}<p>Conservées avec le bail.</p>
+  {% else %}
+  {% if candidature.date_effacement %}<p>Effacement automatique le {{ candidature.date_effacement|date:"d/m/Y" }}{% if candidature.statut == "a_etudier" %}, sauf décision ou modification d'ici là{% elif candidature.statut == "retenue" %}, si aucun bail n'est rédigé d'ici là{% endif %}.</p>{% endif %}
+  <form method="post" action="{% url 'candidatures:effacer' candidature.pk %}" class="en-ligne" onsubmit="return confirm('Effacer définitivement cette candidature et les données du candidat ?');">
+    {% csrf_token %}
+    <button type="submit" class="danger">Effacer maintenant</button>
+    <small class="discret">À la demande du candidat, ou si le dossier est retiré.</small>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}
