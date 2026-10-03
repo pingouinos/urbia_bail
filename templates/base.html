@@ -11,7 +11,9 @@
     <a class="marque" href="{% url 'accueil' %}">UrbiaBail</a>
     {% if user.is_authenticated %}
     <nav>
-      <span>{{ user.get_full_name|default:user.username }}</span>
+      <a href="{% url 'biens:liste' %}">Biens</a>
+      <a href="{% url 'biens:bailleurs' %}">Bailleurs</a>
+      <span class="discret">{{ user.get_full_name|default:user.username }}</span>
       {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administration</a>{% endif %}
       <form method="post" action="{% url 'deconnexion' %}">{% csrf_token %}<button type="submit" class="lien">Se déconnecter</button></form>
     </nav>

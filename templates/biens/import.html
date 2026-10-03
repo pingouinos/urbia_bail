@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titre %}Importer des biens · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'biens:liste' %}">← Biens</a></p>
+<h1>Importer des biens</h1>
+{% if not rapport %}
+<section class="carte">
+  <p>Partez du <a href="{% url 'biens:modele' %}">modèle Excel</a> (une ligne par lot), complété par exemple à partir d'une extraction ICS. Un lot déjà présent (même « Réf. ICS lot ») est mis à jour ; une cellule vide ne remplace pas la valeur existante.</p>
+  <p>Le fichier est d'abord vérifié sans rien enregistrer ; vous confirmez ensuite l'import.</p>
+  <form method="post" enctype="multipart/form-data" class="formulaire">
+    {% csrf_token %}
+    {% with champ=form.fichier %}{% include "biens/_champ.html" %}{% endwith %}
+    <button type="submit">Vérifier le fichier</button>
+  </form>
+</section>
+{% else %}
+<section class="carte">
+  <h2>Résultat de la vérification</h2>
+  <ul>
+    <li>{{ rapport.crees }} bien(s) à créer</li>
+    <li>{{ rapport.mis_a_jour }} bien(s) à mettre à jour</li>
+    <li>{{ rapport.bailleurs_crees }} bailleur(s) à créer</li>
+    <li>{{ rapport.erreurs|length }} ligne(s) en erreur, qui seront ignorées</li>
+  </ul>
+  {% if rapport.colonnes_ignorees %}<p class="discret">Colonnes non reconnues, ignorées : {{ rapport.colonnes_ignorees|join:", " }}.</p>{% endif %}
+  {% if rapport.erreurs %}
+  <table>
+    <thead><tr><th>Ligne</th><th>Problème</th></tr></thead>
+    <tbody>{% for ligne, message in rapport.erreurs %}<tr><td>{{ ligne }}</td><td>{{ message }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+  {% if rapport.total %}
+  <form method="post" action="{% url 'biens:importer_confirmer' %}">
+    {% csrf_token %}
+    <button type="submit">Importer {{ rapport.total }} bien(s)</button>
+  </form>
+  {% endif %}
+  <p><a href="{% url 'biens:importer' %}">Déposer un autre fichier</a></p>
+</section>
+{% endif %}
+{% endblock %}

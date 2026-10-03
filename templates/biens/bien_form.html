@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titre %}{% if bien %}Modifier le bien{% else %}Nouveau bien{% endif %} · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% if bien %}{{ bien.get_absolute_url }}{% else %}{% url 'biens:liste' %}{% endif %}">← Retour</a></p>
+<h1>{% if bien %}Modifier {{ bien.adresse }}{% else %}Nouveau bien{% endif %}</h1>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for titre, champs in form.sections %}
+  <fieldset>
+    <legend>{{ titre }}</legend>
+    {% for champ in champs %}{% include "biens/_champ.html" %}{% endfor %}
+  </fieldset>
+  {% endfor %}
+  <button type="submit">Enregistrer</button>
+</form>
+{% endblock %}

@@ -2,11 +2,15 @@ from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import render
 
+from biens.models import Bien
 from comptes.roles import est_administrateur
 
 
 def accueil(request):
-    return render(request, "core/accueil.html", {"est_admin": est_administrateur(request.user)})
+    return render(request, "core/accueil.html", {
+        "est_admin": est_administrateur(request.user),
+        "nb_biens": Bien.objects.filter(actif=True).count(),
+    })
 
 
 def sante(request):

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titre %}Bailleurs · UrbiaBail{% endblock %}
+{% block contenu %}
+<div class="titre-actions">
+  <h1>Bailleurs</h1>
+  <div class="actions"><a class="bouton-petit" href="{% url 'biens:bailleur_creer' %}">Nouveau bailleur</a></div>
+</div>
+<form class="filtres" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nom, prénom, référence ICS…" aria-label="Rechercher">
+  <button type="submit">Rechercher</button>
+</form>
+<table>
+  <thead><tr><th>Nom</th><th>Type</th><th>Réf. ICS</th><th>Ville</th><th>Biens</th></tr></thead>
+  <tbody>
+  {% for bailleur in page %}
+    <tr>
+      <td><a href="{{ bailleur.get_absolute_url }}">{{ bailleur }}</a></td>
+      <td>{{ bailleur.get_type_display }}</td>
+      <td>{{ bailleur.ref_ics|default:"—" }}</td>
+      <td>{{ bailleur.ville|default:"—" }}</td>
+      <td>{{ bailleur.nb_biens }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" class="discret">Aucun bailleur.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% with parametres="q="|add:q %}{% include "biens/_pagination.html" %}{% endwith %}
+{% endblock %}

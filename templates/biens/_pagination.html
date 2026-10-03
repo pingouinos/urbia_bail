@@ -1,0 +1,7 @@
+{% if page.paginator.num_pages > 1 %}
+<p class="pagination">
+  {% if page.has_previous %}<a href="?{{ parametres }}&page={{ page.previous_page_number }}">← Précédents</a>{% endif %}
+  Page {{ page.number }} sur {{ page.paginator.num_pages }}
+  {% if page.has_next %}<a href="?{{ parametres }}&page={{ page.next_page_number }}">Suivants →</a>{% endif %}
+</p>
+{% endif %}
