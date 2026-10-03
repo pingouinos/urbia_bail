@@ -12,4 +12,4 @@ RUN SECRET_KEY=build python manage.py collectstatic --noinput \
     && mkdir /documents && chown urbiabail /documents
 USER urbiabail
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi --bind 0.0.0.0:8000 --workers 3 --access-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --access-logfile -"]

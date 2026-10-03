@@ -61,3 +61,7 @@ Restauration de la base :
 ```bash
 docker compose exec -T db pg_restore -U urbiabail -d urbiabail --clean < base-AAAA-MM-JJ.dump
 ```
+
+## Test sur le NAS de l'agence
+
+Une version allégée tourne sur le NAS Synology pour un essai sur le réseau local : voir [deploy/nas/README.md](deploy/nas/README.md).
