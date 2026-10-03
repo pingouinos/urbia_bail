@@ -16,9 +16,6 @@ env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
     CSRF_TRUSTED_ORIGINS=(list, []),
-    LDAP_ENABLED=(bool, False),
-    LDAP_START_TLS=(bool, False),
-    LDAP_GROUP_TYPE=(str, "ad"),
     HTTPS=(bool, False),
     MFA_OBLIGATOIRE=(bool, True),
 )
@@ -44,6 +41,7 @@ INSTALLED_APPS = [
     "django_otp",
     "django_otp.plugins.otp_totp",
     "axes",
+    "mozilla_django_oidc",
     "comptes",
     "core",
 ]
@@ -75,6 +73,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "comptes.context_processors.connexion",
             ],
         },
     },
@@ -136,18 +135,20 @@ SESSION_COOKIE_AGE = 60 * 60 * 10  # une journée de travail
 GOTENBERG_URL = env("GOTENBERG_URL", default="http://gotenberg:3000")
 
 # --- Authentification -------------------------------------------------------
-# Double authentification (code TOTP d'une application d'authentification)
-# exigée pour chaque collaborateur, sauf si MFA_OBLIGATOIRE=false.
+# Double authentification (code TOTP) exigée pour les comptes locaux, sauf si
+# MFA_OBLIGATOIRE=false. Les comptes Google la font chez Google (validation en
+# deux étapes à imposer dans la console d'administration Workspace).
 MFA_OBLIGATOIRE = env("MFA_OBLIGATOIRE")
 OTP_TOTP_ISSUER = "UrbiaBail"
 
-# Les comptes locaux Django restent possibles (administrateur de secours).
-# Quand LDAP_ENABLED est vrai, les collaborateurs se connectent avec leur
-# compte de l'annuaire Synology.
+# Les collaborateurs se connectent avec leur compte Google Workspace de
+# l'agence ; le formulaire identifiant / mot de passe reste réservé aux
+# comptes locaux de secours, qui passent par la double authentification TOTP.
 
 AUTHENTICATION_BACKENDS = [
     # Bloque un identifiant après trop d'échecs depuis une même adresse.
     "axes.backends.AxesStandaloneBackend",
+    "comptes.google.GoogleWorkspaceBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 
@@ -160,20 +161,34 @@ AXES_LOCKOUT_TEMPLATE = "comptes/verrouille.html"
 AXES_IPWARE_PROXY_COUNT = 1 if HTTPS else 0
 AXES_IPWARE_META_PRECEDENCE_ORDER = ["HTTP_X_FORWARDED_FOR", "REMOTE_ADDR"]
 
-# Annuaire LDAP (NAS Synology) : facultatif, désactivé par défaut depuis le
-# choix d'un hébergement en ligne.
-LDAP_ENABLED = env("LDAP_ENABLED")
-if LDAP_ENABLED:
-    from comptes.ldap import configurer_ldap
-
-    globals().update(configurer_ldap(env))
-    AUTHENTICATION_BACKENDS.insert(1, "django_auth_ldap.backend.LDAPBackend")
+# --- Connexion Google Workspace (OpenID Connect) -----------------------------
+# Domaine Google Workspace de l'agence : seuls ses comptes sont acceptés.
+GOOGLE_DOMAINE = env("GOOGLE_DOMAINE", default="")
+# Si vrai, un compte du domaine inconnu de l'application est créé comme
+# gestionnaire à sa première connexion ; sinon un administrateur doit d'abord
+# créer le compte avec la même adresse e-mail.
+GOOGLE_CREATION_AUTO = env.bool("GOOGLE_CREATION_AUTO", default=False)
+OIDC_CREATE_USER = GOOGLE_CREATION_AUTO
+OIDC_RP_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
+OIDC_RP_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
+OIDC_RP_SIGN_ALGO = "RS256"
+OIDC_RP_SCOPES = "openid email profile"
+OIDC_OP_AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
+OIDC_OP_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
+OIDC_OP_USER_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo"
+OIDC_OP_JWKS_ENDPOINT = "https://www.googleapis.com/oauth2/v3/certs"
+# hd limite le sélecteur de compte Google au domaine de l'agence (le contrôle
+# réel est refait côté serveur dans GoogleWorkspaceBackend).
+OIDC_AUTH_REQUEST_EXTRA_PARAMS = {"hd": GOOGLE_DOMAINE, "prompt": "select_account"}
+OIDC_USE_PKCE = True
+LOGIN_REDIRECT_URL_FAILURE = "/connexion/?echec=google"
+GOOGLE_CONNEXION_ACTIVE = bool(GOOGLE_DOMAINE and OIDC_RP_CLIENT_ID and OIDC_RP_CLIENT_SECRET)
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "loggers": {
-        "django_auth_ldap": {"handlers": ["console"], "level": "INFO"},
+        "comptes": {"handlers": ["console"], "level": "INFO"},
     },
 }

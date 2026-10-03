@@ -1,9 +1,9 @@
 Django>=5.2,<5.3
-django-auth-ldap>=5.3,<6
 django-axes>=8,<9
 django-environ>=0.14,<1
 django-otp>=1.6,<2
 gunicorn>=23
+mozilla-django-oidc>=4,<6
 psycopg[binary]>=3.2,<4
 qrcode>=8,<9
 whitenoise>=6.9,<7
