@@ -1,0 +1,23 @@
+:root { --fond: #f6f6f4; --carte: #fff; --texte: #1f2328; --discret: #5f6670; --accent: #1f5fbf; --bord: #d8dbe0; --erreur: #b42318; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.5 system-ui, "Segoe UI", sans-serif; background: var(--fond); color: var(--texte); }
+.entete { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; background: var(--carte); border-bottom: 1px solid var(--bord); }
+.entete nav { display: flex; gap: 16px; align-items: center; }
+.entete form { margin: 0; }
+.marque { font-weight: 700; color: var(--texte); text-decoration: none; }
+main { max-width: 1040px; margin: 0 auto; padding: 24px 16px; }
+a, .lien { color: var(--accent); }
+.lien { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
+.carte { background: var(--carte); border: 1px solid var(--bord); border-radius: 8px; padding: 16px 20px; }
+.grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.connexion { max-width: 380px; margin: 48px auto; }
+.connexion form { display: grid; gap: 8px; }
+input { padding: 8px 10px; border: 1px solid var(--bord); border-radius: 6px; font: inherit; }
+button[type=submit]:not(.lien) { margin-top: 8px; padding: 10px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+.discret { color: var(--discret); }
+.erreur { color: var(--erreur); }
+.message { padding: 8px 12px; background: #eef4ff; border-radius: 6px; }
+.qr { display: flex; justify-content: center; margin: 12px 0; }
+.qr svg { width: 200px; height: 200px; background: #fff; }
+.bouton { display: block; text-align: center; padding: 10px; border-radius: 6px; background: var(--accent); color: #fff; text-decoration: none; margin: 8px 0 16px; }
+details summary { cursor: pointer; margin-bottom: 8px; }
