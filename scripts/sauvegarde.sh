@@ -8,6 +8,8 @@ cd "$(dirname "$0")/.."
 SAUVEGARDES="${SAUVEGARDES:-/var/backups/urbiabail}"
 JOUR="$(date +%F)"
 mkdir -p "$SAUVEGARDES"
+# Efface d'abord les candidatures non retenues depuis plus de trois mois.
+docker compose exec -T web python manage.py purger_candidatures || echo "Purge des candidatures en échec" >&2
 docker compose exec -T db pg_dump -U urbiabail --format=custom urbiabail > "$SAUVEGARDES/base-$JOUR.dump"
 docker compose run --rm --no-deps -T --user root -v "$SAUVEGARDES:/sauvegardes" --entrypoint tar web \
   czf "/sauvegardes/documents-$JOUR.tar.gz" -C /documents .

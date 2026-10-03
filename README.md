@@ -30,6 +30,14 @@ Chaque mandat reçoit à l'enregistrement un numéro d'ordre définitif : la pag
 
 L'application signale les honoraires de location contraires à l'article 5 I de la loi du 6 juillet 1989 : part du locataire supérieure à celle du bailleur, ou au plafond de 10 €/m² en zone tendue (8 €/m² ailleurs) pour la visite, le dossier et le bail, et de 3 €/m² pour l'état des lieux.
 
+## Candidatures
+
+Une candidature s'enregistre depuis la fiche d'un logement : lien de partage DossierFacile (les pièces justificatives restent sur DossierFacile), garantie, date d'entrée souhaitée, puis jusqu'à quatre candidats avec leur activité et leurs revenus nets. La fiche calcule le taux d'effort sur le loyer charges comprises et signale une caution demandée alors que le mandat prévoit une assurance loyers impayés (art. 22-1 de la loi du 6 juillet 1989). Elle ne contient ni coordonnées bancaires, ni situation de famille, ni nationalité.
+
+La décision (retenue, non retenue, désistement) est datée et attribuée au collaborateur qui l'a prise. Une candidature retenue donne un bail en un clic, prérempli avec les candidats comme locataires. Pour une candidature non retenue, l'application prépare une réponse neutre, sans motif, qui annonce l'effacement des données sous trois mois ; elle l'envoie elle-même si `EMAIL_URL` est renseigné, sinon on la copie dans Gmail et on la note comme envoyée.
+
+Les candidatures non retenues, abandonnées, retenues sans bail ou restées sans suite sont effacées trois mois après la décision (ou la dernière modification), comme le recommande le référentiel CNIL de la gestion locative. La purge passe à chaque ouverture de la liste des candidatures et chaque nuit avec la sauvegarde (`python manage.py purger_candidatures`). Un bouton efface une candidature sur-le-champ, à la demande du candidat.
+
 ## Baux d'habitation
 
 Un bail se rédige depuis la fiche d'un logement : il reprend la fiche du bien et les honoraires du mandat en cours, puis on saisit les locataires (jusqu'à quatre), la date de prise d'effet, le loyer, les charges, le dépôt de garantie et l'IRL de référence. Le document suit le contrat type du décret n° 2015-587 (annexe 1 pour le logement nu, annexe 2 pour le meublé, y compris le bail étudiant de neuf mois), complété des clauses propres à l'agence et de la liste des réparations locatives. La durée (3 ou 6 ans en nu selon le bailleur, 1 an en meublé), la clause de solidarité et la liste des annexes s'adaptent toutes seules.
@@ -60,7 +68,7 @@ Sans `DATABASE_URL`, l'application utilise SQLite. Les tests : `python manage.py
 2. Faire pointer un nom de domaine (enregistrement DNS A) vers l'adresse IP du VPS.
 3. Sur le VPS : installer Docker (`curl -fsSL https://get.docker.com | sh`), ouvrir uniquement les ports 22, 80 et 443 dans le pare-feu.
 4. Dans la console Google Cloud (projet rattaché au Workspace de l'agence) : écran de consentement OAuth de type « Interne », puis identifiants OAuth « Application Web » avec l'URI de redirection `https://<DOMAINE>/oidc/callback/`.
-5. Cloner le dépôt dans `/opt/urbiabail`, copier `.env.example` en `.env` et le remplir (`SECRET_KEY`, `POSTGRES_PASSWORD`, `DOMAINE`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_*`).
+5. Cloner le dépôt dans `/opt/urbiabail`, copier `.env.example` en `.env` et le remplir (`SECRET_KEY`, `POSTGRES_PASSWORD`, `DOMAINE`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_*`, et `EMAIL_URL` pour que l'application envoie elle-même les réponses aux candidats).
 6. Lancer la pile : `docker compose up -d --build`. Caddy obtient seul le certificat HTTPS.
 7. Créer l'administrateur de secours : `docker compose exec web python manage.py createsuperuser`, puis, depuis `/admin/`, créer les comptes des collaborateurs avec leur adresse Google.
 
@@ -70,7 +78,7 @@ Mise à jour : `git pull && docker compose up -d --build` (les migrations s'appl
 
 ### Sauvegarde
 
-`scripts/sauvegarde.sh` exporte chaque nuit la base et les documents dans `/var/backups/urbiabail` et garde 14 jours. À planifier par cron (`0 2 * * * /opt/urbiabail/scripts/sauvegarde.sh`) puis à recopier hors du VPS, par exemple vers le NAS de l'agence avec Hyper Backup ou vers un stockage objet OVH.
+`scripts/sauvegarde.sh` efface les candidatures arrivées à échéance puis exporte chaque nuit la base et les documents dans `/var/backups/urbiabail` et garde 14 jours. À planifier par cron (`0 2 * * * /opt/urbiabail/scripts/sauvegarde.sh`) puis à recopier hors du VPS, par exemple vers le NAS de l'agence avec Hyper Backup ou vers un stockage objet OVH.
 
 Restauration de la base :
 

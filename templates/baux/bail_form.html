@@ -6,6 +6,8 @@
 <p class="discret">{{ form.instance.bien }}</p>
 <form method="post" class="formulaire">
   {% csrf_token %}
+  {% if candidature %}<input type="hidden" name="candidature" value="{{ candidature.pk }}">
+  <p class="discret">D'après la <a href="{{ candidature.get_absolute_url }}">candidature retenue</a> : vérifier les locataires et compléter l'IRL.</p>{% endif %}
   {{ form.non_field_errors }}
   <fieldset>
     <legend>Locataires</legend>

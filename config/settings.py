@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "documents",
     "mandats",
     "baux",
+    "candidatures",
 ]
 
 MIDDLEWARE = [
@@ -140,6 +141,11 @@ SESSION_COOKIE_AGE = 60 * 60 * 10  # une journée de travail
 
 # Service de conversion Word vers PDF (utilisé à l'étape « Baux »).
 GOTENBERG_URL = env("GOTENBERG_URL", default="http://gotenberg:3000")
+
+# Envoi des e-mails (réponses aux candidats). Sans EMAIL_URL, l'application
+# n'envoie rien : la réponse est à copier dans Gmail.
+vars().update(env.email_url_config(env("EMAIL_URL", default="") or "consolemail://"))
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="webmaster@localhost")
 
 # --- Authentification -------------------------------------------------------
 # Double authentification (code TOTP) exigée pour les comptes locaux, sauf si

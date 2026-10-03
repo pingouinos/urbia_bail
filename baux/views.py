@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from biens.models import Bien
+from candidatures.models import Candidature
 from documents import views as documents
 
 from .forms import BailForm, FichierSigneForm, LocataireFormSet
@@ -44,26 +45,57 @@ def bail(request, pk):
 
 def bail_editer(request, pk=None):
     objet = get_object_or_404(Bail, pk=pk) if pk else None
+    # Bail rédigé depuis une candidature retenue : logement, date d'entrée et
+    # locataires viennent de la fiche du candidat.
+    candidature = None
+    pk_candidature = request.GET.get("candidature") or request.POST.get("candidature") or ""
+    if objet is None and pk_candidature.isdigit():
+        candidature = get_object_or_404(
+            Candidature.objects.select_related("bien"), statut=Candidature.Statut.RETENUE, bail__isnull=True,
+            pk=pk_candidature,
+        )
     if objet is None and request.method == "GET":
-        if not request.GET.get("bien"):
+        if not request.GET.get("bien") and not candidature:
             return render(request, "baux/choisir_bien.html", {
                 "biens": Bien.objects.filter(actif=True, usage=Bien.Usage.HABITATION).select_related("bailleur"),
             })
-        bien = get_object_or_404(Bien.objects.select_related("bailleur"), pk=request.GET["bien"])
+        bien = candidature.bien if candidature else get_object_or_404(
+            Bien.objects.select_related("bailleur"), pk=request.GET["bien"]
+        )
         objet_initial = Bail.depuis_bien(bien)
+        initial = []
+        if candidature:
+            objet_initial.date_effet = candidature.date_entree_souhaitee
+            initial = [
+                {champ: getattr(candidat, champ) for champ in (
+                    "civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone",
+                )}
+                for candidat in candidature.candidats.all()
+            ]
         form = BailForm(instance=objet_initial)
-        locataires = LocataireFormSet(instance=objet_initial)
+        locataires = LocataireFormSet(instance=objet_initial, initial=initial)
+        if initial:
+            # Une ligne par candidat, sans ligne vide en plus.
+            locataires.extra = max(len(initial) - locataires.min_num, 0)
     else:
         form = BailForm(request.POST or None, instance=objet)
         locataires = LocataireFormSet(request.POST or None, instance=form.instance)
         if request.method == "POST" and form.is_valid() and locataires.is_valid():
-            with transaction.atomic():
-                objet = form.save()
-                locataires.instance = objet
-                locataires.save()
-            messages.success(request, "Bail enregistré.")
-            return redirect(objet)
-    return render(request, "baux/bail_form.html", {"form": form, "locataires": locataires, "bail": objet})
+            if candidature and form.cleaned_data["bien"] != candidature.bien:
+                form.add_error("bien", "La candidature porte sur un autre logement.")
+            else:
+                with transaction.atomic():
+                    objet = form.save()
+                    locataires.instance = objet
+                    locataires.save()
+                    if candidature:
+                        candidature.bail = objet
+                        candidature.save(update_fields=["bail", "modifie_le"])
+                messages.success(request, "Bail enregistré.")
+                return redirect(objet)
+    return render(request, "baux/bail_form.html", {
+        "form": form, "locataires": locataires, "bail": objet, "candidature": candidature,
+    })
 
 
 def telecharger(request, pk, format_):
