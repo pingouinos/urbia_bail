@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titre %}Nouveau mandat · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'mandats:registre' %}">← Registre des mandats</a></p>
+<h1>Nouveau mandat</h1>
+<form method="get" class="formulaire">
+  <fieldset>
+    <legend>Bien confié à l'agence</legend>
+    <div class="champ">
+      <label for="bien">Bien</label>
+      <select name="bien" id="bien" required>
+        <option value="">Choisir un bien sans mandat en cours</option>
+        {% for bien in biens %}<option value="{{ bien.pk }}">{{ bien }} · {{ bien.bailleur }}</option>{% endfor %}
+      </select>
+      <small class="discret">Le mandat est prérempli avec les fiches du bien et du bailleur. Un bien absent de la liste doit d'abord être <a href="{% url 'biens:bien_creer' %}">ajouté au référentiel</a>.</small>
+    </div>
+  </fieldset>
+  <button type="submit">Continuer</button>
+</form>
+{% endblock %}

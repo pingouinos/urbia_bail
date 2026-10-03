@@ -11,6 +11,7 @@
 </div>
 <section class="carte">
   <dl>
+    <dt>Désignation</dt><dd>{{ bailleur.designation }}</dd>
     <dt>Type</dt><dd>{{ bailleur.get_type_display }} (bail nu de {{ bailleur.duree_bail_nu_ans }} ans)</dd>
     <dt>Réf. ICS</dt><dd>{{ bailleur.ref_ics|default:"—" }}</dd>
     <dt>Adresse</dt><dd>{% if bailleur.adresse %}{{ bailleur.adresse }}, {{ bailleur.code_postal }} {{ bailleur.ville }}{% else %}—{% endif %}</dd>

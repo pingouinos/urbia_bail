@@ -48,3 +48,5 @@ label.case { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
 .pagination { display: flex; gap: 16px; margin-top: 12px; }
 .historique { margin: 0; padding-left: 18px; }
 @media (max-width: 640px) { table { display: block; overflow-x: auto; } .entete { flex-wrap: wrap; gap: 8px; } }
+form.en-ligne { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+form.en-ligne button[type=submit] { margin-top: 0; }

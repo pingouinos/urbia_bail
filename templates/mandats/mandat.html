@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block titre %}Mandat n° {{ mandat.numero }} · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'mandats:registre' %}">← Registre des mandats</a></p>
+<div class="titre-actions">
+  <h1>Mandat de gestion n° {{ mandat.numero }}</h1>
+  <div class="actions">
+    <a href="{% url 'mandats:word' mandat.pk %}">Word</a>
+    <a href="{% url 'mandats:pdf' mandat.pk %}">PDF</a>
+    <a class="bouton-petit" href="{% url 'mandats:modifier' mandat.pk %}">Modifier</a>
+  </div>
+</div>
+<p class="discret">{{ mandat.mandant }} · {% if mandat.en_cours %}en cours{% else %}terminé le {{ mandat.date_fin|date:"d/m/Y" }}{% endif %}</p>
+
+{% for alerte in mandat.alertes %}<p class="message alerte-fond">{{ alerte }}</p>{% endfor %}
+
+<div class="grille">
+  <section class="carte">
+    <h2>Bien</h2>
+    <p><a href="{{ mandat.bien.get_absolute_url }}">{{ mandat.adresse_bien }}</a><br><span class="discret">{{ mandat.designation }}</span></p>
+    <dl>
+      <dt>Loyer</dt><dd>{{ mandat.loyer_cc }} € charges comprises, dont {{ mandat.charges }} € de charges</dd>
+    </dl>
+  </section>
+  <section class="carte">
+    <h2>Mandant</h2>
+    <p>{{ mandat.mandant }}<br>{{ mandat.mandant_adresse }}<br>{{ mandat.mandant_code_postal_ville }}</p>
+  </section>
+  <section class="carte">
+    <h2>Durée</h2>
+    <dl>
+      <dt>Signé le</dt><dd>{{ mandat.date_signature|date:"d/m/Y"|default:"date à compléter" }}</dd>
+      <dt>Durée</dt><dd>{{ mandat.duree_texte|capfirst }}</dd>
+    </dl>
+  </section>
+</div>
+
+<section class="carte">
+  <h2>Rémunération</h2>
+  <dl>
+    <dt>Gestion</dt><dd>{{ mandat.taux_gestion }} % TTC · {{ mandat.get_base_gestion_display|lower }}</dd>
+    <dt>Loyers impayés</dt><dd>{% if mandat.assurance_loyers_impayes %}souscrite à {{ mandat.taux_assurance }} % TTC{% else %}non{% endif %}</dd>
+    <dt>Visite, dossier, bail</dt><dd>{{ mandat.honoraires_bail }} € TTC : {{ mandat.honoraires_bail_bailleur }} € bailleur, {{ mandat.honoraires_bail_locataire }} € locataire</dd>
+    <dt>État des lieux</dt><dd>{{ mandat.honoraires_edl }} € TTC : {{ mandat.honoraires_edl_bailleur }} € bailleur, {{ mandat.honoraires_edl_locataire }} € locataire</dd>
+    {% if mandat.observations %}<dt>Observations</dt><dd>{{ mandat.observations|linebreaksbr }}</dd>{% endif %}
+  </dl>
+</section>
+
+<section class="carte">
+  <h2>Exemplaire signé</h2>
+  {% if mandat.fichier_signe %}<p><a href="{% url 'mandats:fichier_signe' mandat.pk %}">Ouvrir le mandat signé</a></p>{% endif %}
+  <form method="post" enctype="multipart/form-data" action="{% url 'mandats:deposer_signe' mandat.pk %}" class="en-ligne">
+    {% csrf_token %}
+    {{ form_signe.fichier_signe }}
+    <button type="submit">{% if mandat.fichier_signe %}Remplacer{% else %}Déposer le scan{% endif %}</button>
+  </form>
+</section>
+
+<section class="carte">
+  <h2>Historique</h2>
+  <ul class="historique">
+  {% for version in historique %}
+    <li>{{ version.history_date|date:"d/m/Y H:i" }} · {{ version.get_history_type_display }} par {{ version.history_user|default:"système" }}</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endblock %}

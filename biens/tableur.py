@@ -49,6 +49,11 @@ COLONNES = [
     Colonne("Complément", "complement", largeur=24),
     Colonne("Code postal", "code_postal", obligatoire=True, largeur=12),
     Colonne("Ville", "ville", obligatoire=True),
+    Colonne("Étage", "etage", largeur=10),
+    Colonne("N° appartement", "numero_appartement", largeur=12),
+    Colonne("N° parking", "numero_parking", largeur=12),
+    Colonne("N° cellier", "numero_cellier", largeur=12),
+    Colonne("Syndic", "syndic", largeur=20),
     Colonne("Type d'habitat", "type_habitat", "choix"),
     Colonne("Régime juridique", "regime_juridique", "choix"),
     Colonne("Période de construction", "periode_construction", "choix", largeur=22),
@@ -60,6 +65,7 @@ COLONNES = [
     Colonne("Accès TIC", "acces_tic", largeur=20),
     Colonne("Annexes privatives", "annexes", largeur=24),
     Colonne("Parties communes", "parties_communes", largeur=24),
+    Colonne("Détecteur de fumée", "detecteur_fumee", "booleen", largeur=10),
     Colonne("Classe DPE", "classe_dpe", "choix", largeur=10),
     Colonne("Énergie min (€/an)", "depenses_energie_min", "entier", largeur=12),
     Colonne("Énergie max (€/an)", "depenses_energie_max", "entier", largeur=12),
@@ -68,6 +74,7 @@ COLONNES = [
     Colonne("Loyer de référence majoré (€/m²)", "loyer_reference_majore", "decimal", largeur=14),
     Colonne("Dernier loyer HC (€)", "dernier_loyer", "decimal", largeur=12),
     Colonne("Charges (€)", "charges", "decimal", largeur=12),
+    Colonne("Dispositif fiscal", "dispositif_fiscal", largeur=20),
     Colonne("Observations", "observations", largeur=30),
 ]
 

@@ -15,7 +15,8 @@ class BailleurForm(RefIcsVideEnNullMixin, forms.ModelForm):
     class Meta:
         model = Bailleur
         fields = [
-            "type", "nom", "prenom", "ref_ics", "adresse", "code_postal", "ville",
+            "type", "civilite", "nom", "prenom", "conjoint_civilite", "conjoint_nom",
+            "conjoint_prenom", "ref_ics", "adresse", "code_postal", "ville",
             "email", "telephone", "siren",
         ]
 
@@ -35,11 +36,15 @@ class BienForm(RefIcsVideEnNullMixin, forms.ModelForm):
     # Regroupement des champs à l'affichage.
     SECTIONS = [
         ("Identification", ["ref_ics", "bailleur", "usage", "meuble", "actif"]),
-        ("Localisation", ["adresse", "complement", "code_postal", "ville"]),
+        ("Localisation", [
+            "adresse", "complement", "code_postal", "ville", "etage", "numero_appartement",
+            "numero_parking", "numero_cellier", "syndic",
+        ]),
         ("Description", ["type_habitat", "regime_juridique", "periode_construction", "surface", "nb_pieces"]),
-        ("Équipements", ["equipements", "chauffage", "eau_chaude", "acces_tic", "annexes", "parties_communes"]),
+        ("Équipements", ["equipements", "chauffage", "eau_chaude", "acces_tic", "annexes", "parties_communes",
+                          "detecteur_fumee"]),
         ("Énergie", ["classe_dpe", "depenses_energie_min", "depenses_energie_max", "date_dpe"]),
-        ("Loyer", ["zone_tendue", "loyer_reference_majore", "dernier_loyer", "charges"]),
+        ("Loyer", ["zone_tendue", "loyer_reference_majore", "dernier_loyer", "charges", "dispositif_fiscal"]),
         ("Notes", ["observations"]),
     ]
 

@@ -3,6 +3,7 @@ django-axes>=8,<9
 django-environ>=0.14,<1
 django-otp>=1.6,<2
 django-simple-history>=3.8,<4
+docxtpl>=0.20,<1
 gunicorn>=23
 mozilla-django-oidc>=4,<6
 openpyxl>=3.1,<4
