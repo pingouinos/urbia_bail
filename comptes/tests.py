@@ -5,6 +5,9 @@ from django.contrib.auth.models import Group, User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from django_otp.oath import totp
+from django_otp.plugins.otp_totp.models import TOTPDevice
+
 from comptes.ldap import configurer_ldap
 from comptes.roles import ADMINISTRATEURS, GESTIONNAIRES, attribuer_role, est_administrateur
 
@@ -36,13 +39,63 @@ class ConnexionTests(TestCase):
         reponse = self.client.get(reverse("accueil"))
         self.assertRedirects(reponse, f"{reverse('connexion')}?next=/")
 
-    def test_connexion_puis_accueil(self):
+    @override_settings(MFA_OBLIGATOIRE=False)
+    def test_connexion_puis_accueil_sans_mfa(self):
         User.objects.create_user("gestion", password="mot-de-passe-solide")
         reponse = self.client.post(
             reverse("connexion"), {"username": "gestion", "password": "mot-de-passe-solide"}
         )
         self.assertRedirects(reponse, reverse("accueil"))
         self.assertContains(self.client.get(reverse("accueil")), "gestionnaire")
+
+
+def code_courant(appareil):
+    return f"{totp(appareil.bin_key, appareil.step, appareil.t0, appareil.digits):06d}"
+
+
+class DoubleAuthentificationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("gestion", password="mot-de-passe-solide")
+        self.client.post(
+            reverse("connexion"), {"username": "gestion", "password": "mot-de-passe-solide"}
+        )
+
+    def test_mot_de_passe_seul_ne_suffit_pas(self):
+        self.assertRedirects(
+            self.client.get(reverse("accueil")), f"{reverse('mfa')}?next=/", fetch_redirect_response=False
+        )
+        self.assertEqual(self.client.get("/admin/").status_code, 302)
+
+    def test_premiere_connexion_enrole_un_appareil(self):
+        reponse = self.client.get(reverse("mfa"))
+        self.assertContains(reponse, "<svg")
+        appareil = TOTPDevice.objects.get(user=self.user, confirmed=False)
+
+        reponse = self.client.post(reverse("mfa"), {"code": code_courant(appareil), "next": "/"})
+        self.assertRedirects(reponse, "/")
+        appareil.refresh_from_db()
+        self.assertTrue(appareil.confirmed)
+        self.assertEqual(self.client.get(reverse("accueil")).status_code, 200)
+
+    def test_code_faux_refuse(self):
+        self.client.get(reverse("mfa"))
+        reponse = self.client.post(reverse("mfa"), {"code": "000000"})
+        self.assertContains(reponse, "Code incorrect")
+        self.assertEqual(self.client.get(reverse("accueil")).status_code, 302)
+
+    def test_appareil_confirme_pas_de_nouveau_qr(self):
+        appareil = TOTPDevice.objects.create(user=self.user, confirmed=True)
+        reponse = self.client.get(reverse("mfa"))
+        self.assertNotContains(reponse, "<svg")
+        reponse = self.client.post(reverse("mfa"), {"code": code_courant(appareil)})
+        self.assertRedirects(reponse, "/")
+
+    def test_redirection_externe_ignoree(self):
+        appareil = TOTPDevice.objects.create(user=self.user, confirmed=True)
+        reponse = self.client.post(
+            reverse("mfa"), {"code": code_courant(appareil), "next": "https://exemple.com/"}
+        )
+        self.assertRedirects(reponse, "/")
 
     def test_sonde_sante_publique(self):
         reponse = self.client.get(reverse("sante"))
@@ -88,3 +141,14 @@ class RoleDepuisAnnuaireTests(TestCase):
 
         appliquer_role_annuaire_impl(user, ["cn=autre,dc=agence"])
         self.assertFalse(est_administrateur(user))
+
+
+class VerrouillageTests(TestCase):
+    def test_identifiant_bloque_apres_cinq_echecs(self):
+        User.objects.create_user("gestion", password="mot-de-passe-solide")
+        for _ in range(5):
+            self.client.post(reverse("connexion"), {"username": "gestion", "password": "faux"})
+        reponse = self.client.post(
+            reverse("connexion"), {"username": "gestion", "password": "mot-de-passe-solide"}
+        )
+        self.assertContains(reponse, "Connexion bloquée", status_code=429)

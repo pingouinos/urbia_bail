@@ -19,7 +19,8 @@ env = environ.Env(
     LDAP_ENABLED=(bool, False),
     LDAP_START_TLS=(bool, False),
     LDAP_GROUP_TYPE=(str, "ad"),
-    SECURE_COOKIES=(bool, False),
+    HTTPS=(bool, False),
+    MFA_OBLIGATOIRE=(bool, True),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -40,6 +41,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_otp",
+    "django_otp.plugins.otp_totp",
+    "axes",
     "comptes",
     "core",
 ]
@@ -52,9 +56,11 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "comptes.middleware.ConnexionObligatoireMiddleware",
+    "axes.middleware.AxesMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -108,8 +114,7 @@ STORAGES = {
     },
 }
 
-# Dossier où l'application range les documents (partage du NAS monté
-# dans le conteneur en production).
+# Dossier où l'application range les documents (volume Docker en production).
 MEDIA_ROOT = Path(env("DOCUMENTS_DIR", default=str(BASE_DIR / "documents")))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -118,26 +123,51 @@ LOGIN_URL = "connexion"
 LOGIN_REDIRECT_URL = "accueil"
 LOGOUT_REDIRECT_URL = "connexion"
 
-SESSION_COOKIE_SECURE = env("SECURE_COOKIES")
-CSRF_COOKIE_SECURE = env("SECURE_COOKIES")
+# En production, l'application est servie en HTTPS par Caddy (proxy inverse).
+HTTPS = env("HTTPS")
+SESSION_COOKIE_SECURE = HTTPS
+CSRF_COOKIE_SECURE = HTTPS
+if HTTPS:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
 SESSION_COOKIE_AGE = 60 * 60 * 10  # une journée de travail
 
 # Service de conversion Word vers PDF (utilisé à l'étape « Baux »).
 GOTENBERG_URL = env("GOTENBERG_URL", default="http://gotenberg:3000")
 
 # --- Authentification -------------------------------------------------------
+# Double authentification (code TOTP d'une application d'authentification)
+# exigée pour chaque collaborateur, sauf si MFA_OBLIGATOIRE=false.
+MFA_OBLIGATOIRE = env("MFA_OBLIGATOIRE")
+OTP_TOTP_ISSUER = "UrbiaBail"
+
 # Les comptes locaux Django restent possibles (administrateur de secours).
 # Quand LDAP_ENABLED est vrai, les collaborateurs se connectent avec leur
 # compte de l'annuaire Synology.
 
-AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
+AUTHENTICATION_BACKENDS = [
+    # Bloque un identifiant après trop d'échecs depuis une même adresse.
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # heure
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_TEMPLATE = "comptes/verrouille.html"
+# Adresse réelle du client transmise par Caddy.
+AXES_IPWARE_PROXY_COUNT = 1 if HTTPS else 0
+AXES_IPWARE_META_PRECEDENCE_ORDER = ["HTTP_X_FORWARDED_FOR", "REMOTE_ADDR"]
+
+# Annuaire LDAP (NAS Synology) : facultatif, désactivé par défaut depuis le
+# choix d'un hébergement en ligne.
 LDAP_ENABLED = env("LDAP_ENABLED")
 if LDAP_ENABLED:
     from comptes.ldap import configurer_ldap
 
     globals().update(configurer_ldap(env))
-    AUTHENTICATION_BACKENDS.insert(0, "django_auth_ldap.backend.LDAPBackend")
+    AUTHENTICATION_BACKENDS.insert(1, "django_auth_ldap.backend.LDAPBackend")
 
 LOGGING = {
     "version": 1,

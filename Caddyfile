@@ -1,0 +1,11 @@
+# Caddy obtient et renouvelle seul le certificat HTTPS (Let's Encrypt)
+# pour le domaine indiqué dans DOMAINE.
+{$DOMAINE} {
+	encode gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		-Server
+	}
+	reverse_proxy web:8000
+}

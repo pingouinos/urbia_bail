@@ -7,9 +7,9 @@ Le cadrage fonctionnel et les décisions sont dans le document de cadrage partag
 ## Stack
 
 - Django 5.2 (Python 3.12), PostgreSQL 16
-- Connexion par l'annuaire du NAS Synology (LDAP), puis Google Workspace
+- Comptes propres à l'application avec double authentification (TOTP) obligatoire, verrouillage après 5 échecs ; connexion Google Workspace prévue en 2027
 - Gotenberg pour la conversion Word vers PDF
-- Docker Compose, hébergé sur le NAS Synology (Container Manager)
+- Docker Compose sur un VPS OVH, Caddy pour le HTTPS automatique
 
 ## Rôles
 
@@ -18,7 +18,9 @@ Le cadrage fonctionnel et les décisions sont dans le document de cadrage partag
 | Administrateurs | Tout, y compris l'administration (comptes, modèles, paramètres) |
 | Gestionnaires | Biens, candidatures, baux |
 
-Avec l'annuaire activé, le rôle suit les groupes de l'annuaire : `LDAP_GROUPE_ACCES` donne l'accès, `LDAP_GROUPE_ADMIN` fait d'un collaborateur un administrateur. Le rôle est recalculé à chaque connexion.
+Un administrateur crée les comptes dans l'administration (`/admin/`) et place chaque collaborateur dans un groupe. À la première connexion, le collaborateur scanne un QR code avec une application d'authentification (Google Authenticator, Microsoft Authenticator…) ; chaque connexion demande ensuite le code à 6 chiffres. Un administrateur peut réinitialiser l'appareil d'un collaborateur dans l'administration (« TOTP devices »).
+
+La connexion par un annuaire LDAP (NAS Synology) reste disponible mais désactivée (`LDAP_ENABLED`).
 
 ## Développement local
 
@@ -27,6 +29,7 @@ sudo apt install libldap2-dev libsasl2-dev   # nécessaires à python-ldap
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 echo "DEBUG=true" > .env
+echo "MFA_OBLIGATOIRE=false" >> .env          # facultatif en local
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
@@ -34,25 +37,25 @@ python manage.py runserver
 
 Sans `DATABASE_URL`, l'application utilise SQLite. Les tests : `python manage.py test`.
 
-## Déploiement sur le NAS Synology
+## Déploiement sur un VPS OVH
 
-1. Installer **Container Manager** depuis le Centre de paquets.
-2. Créer un dossier partagé `UrbiaBail` (documents) et copier le dépôt dans `/volume1/docker/urbiabail`.
-3. Copier `.env.example` en `.env` et le remplir : `SECRET_KEY`, `POSTGRES_PASSWORD`, `ALLOWED_HOSTS`, chemins des dossiers.
-4. Dans l'annuaire, créer un compte de service en lecture seule et deux groupes (accès et administrateurs), puis renseigner les variables `LDAP_*` et passer `LDAP_ENABLED=true`.
-   - Paquet « Synology Directory Server » (domaine compatible Active Directory) : `LDAP_GROUP_TYPE=ad`.
-   - Paquet « LDAP Server » : `LDAP_GROUP_TYPE=posix`.
-5. Container Manager > Projet > Créer, source : `/volume1/docker/urbiabail`, fichier `docker-compose.yml`.
-6. Créer un compte administrateur de secours :
-   `docker compose exec web python manage.py createsuperuser`
-7. Pour le HTTPS : Panneau de configuration > Portail de connexion > Avancé > Proxy inversé, vers `localhost:8000`, puis `SECURE_COOKIES=true`.
+1. Commander un VPS (Debian 12, 2 Go de RAM minimum, 4 Go conseillés avec Gotenberg) dans un centre de données français.
+2. Faire pointer un nom de domaine (enregistrement DNS A) vers l'adresse IP du VPS.
+3. Sur le VPS : installer Docker (`curl -fsSL https://get.docker.com | sh`), ouvrir uniquement les ports 22, 80 et 443 dans le pare-feu.
+4. Cloner le dépôt dans `/opt/urbiabail`, copier `.env.example` en `.env` et le remplir (`SECRET_KEY`, `POSTGRES_PASSWORD`, `DOMAINE`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`).
+5. Lancer la pile : `docker compose up -d --build`. Caddy obtient seul le certificat HTTPS.
+6. Créer le premier administrateur : `docker compose exec web python manage.py createsuperuser`, puis le placer dans le groupe « Administrateurs ».
 
 La sonde `/sante/` répond `{"statut": "ok"}` quand l'application et la base fonctionnent.
 
+Mise à jour : `git pull && docker compose up -d --build` (les migrations s'appliquent au démarrage).
+
 ### Sauvegarde
 
-Hyper Backup doit inclure le dossier des documents et celui de la base (`DB_HOST_DIR`). Pour un export logique en plus :
+`scripts/sauvegarde.sh` exporte chaque nuit la base et les documents dans `/var/backups/urbiabail` et garde 14 jours. À planifier par cron (`0 2 * * * /opt/urbiabail/scripts/sauvegarde.sh`) puis à recopier hors du VPS, par exemple vers le NAS de l'agence avec Hyper Backup ou vers un stockage objet OVH.
+
+Restauration de la base :
 
 ```bash
-docker compose exec db pg_dump -U urbiabail urbiabail > urbiabail-$(date +%F).sql
+docker compose exec -T db pg_restore -U urbiabail -d urbiabail --clean < base-AAAA-MM-JJ.dump
 ```

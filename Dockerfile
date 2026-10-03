@@ -19,7 +19,8 @@ ENV PATH="/venv/bin:$PATH" \
     STATIC_MANIFEST=1
 WORKDIR /app
 COPY --chown=urbiabail . .
-RUN SECRET_KEY=build python manage.py collectstatic --noinput
+RUN SECRET_KEY=build python manage.py collectstatic --noinput \
+    && mkdir /documents && chown urbiabail /documents
 USER urbiabail
 EXPOSE 8000
 CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi --bind 0.0.0.0:8000 --workers 3 --access-logfile -"]

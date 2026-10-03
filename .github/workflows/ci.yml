@@ -44,6 +44,6 @@ jobs:
         run: |
           printf 'SECRET_KEY=ci\nPOSTGRES_PASSWORD=ci\nALLOWED_HOSTS=localhost\n' > .env
           docker compose up -d --wait web
-          curl -fsS http://localhost:8000/sante/
+          docker compose exec -T web python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/sante/').read().decode())"
       - if: failure()
         run: docker compose logs

@@ -17,3 +17,5 @@ button[type=submit]:not(.lien) { margin-top: 8px; padding: 10px; border: 0; bord
 .discret { color: var(--discret); }
 .erreur { color: var(--erreur); }
 .message { padding: 8px 12px; background: #eef4ff; border-radius: 6px; }
+.qr { display: flex; justify-content: center; margin: 12px 0; }
+.qr svg { width: 200px; height: 200px; background: #fff; }
