@@ -2,9 +2,10 @@
 # accessible uniquement depuis le réseau local en HTTP : http://<IP du NAS>:8080
 # La production reste le VPS (docker-compose.yml à la racine, avec Caddy).
 #
-# Différences avec le VPS : pas de Caddy ni de HTTPS, pas de Gotenberg (la
-# génération des baux n'existe pas encore), mémoire de chaque conteneur bornée.
-# Consommation attendue : environ 500 Mo pour l'ensemble.
+# Différences avec le VPS : pas de Caddy ni de HTTPS, mémoire de chaque
+# conteneur bornée. Consommation mesurée : environ 160 Mo au repos, 310 Mo
+# une fois le premier PDF produit (LibreOffice démarre à la première
+# conversion et reste ensuite en mémoire).
 name: urbiabail
 
 services:
@@ -16,6 +17,7 @@ services:
     environment:
       DATABASE_URL: postgres://urbiabail:${POSTGRES_PASSWORD}@db:5432/urbiabail
       DOCUMENTS_DIR: /documents
+      GOTENBERG_URL: http://gotenberg:3000
       GUNICORN_WORKERS: "2"
     ports:
       - "8080:8000"
@@ -50,12 +52,11 @@ services:
       timeout: 5s
       retries: 5
 
-  # À décommenter quand la génération des baux en PDF sera livrée.
-  # LibreOffice ne démarre qu'à la première conversion.
-  # gotenberg:
-  #   image: gotenberg/gotenberg:8
-  #   restart: unless-stopped
-  #   mem_limit: 768m
+  # Conversion Word vers PDF des mandats et des baux.
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    mem_limit: 768m
 
 volumes:
   documents:
