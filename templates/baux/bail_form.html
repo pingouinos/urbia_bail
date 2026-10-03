@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titre %}{% if bail %}Modifier le bail{% else %}Nouveau bail{% endif %} · UrbiaBail{% endblock %}
+{% block contenu %}
+<p><a href="{% if bail %}{{ bail.get_absolute_url }}{% else %}{% url 'baux:liste' %}{% endif %}">← Retour</a></p>
+<h1>{% if bail %}Modifier le bail{% else %}Nouveau bail{% endif %}</h1>
+<p class="discret">{{ form.instance.bien }}</p>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <fieldset>
+    <legend>Locataires</legend>
+    {{ locataires.management_form }}
+    {% for erreur in locataires.non_form_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
+    {% for sous_form in locataires %}
+    <div class="sous-formulaire">
+      {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
+      {% for champ in sous_form.visible_fields %}{% include "biens/_champ.html" %}{% endfor %}
+    </div>
+    {% endfor %}
+    <small class="discret">Jusqu'à quatre locataires ; enregistrez pour ajouter une ligne vide.</small>
+  </fieldset>
+  {% for titre, champs in form.sections %}
+  <fieldset>
+    <legend>{{ titre }}</legend>
+    {% if titre == "Précédent locataire (zone tendue)" %}<p class="discret">En zone tendue, si le précédent locataire est parti depuis moins de 18 mois, le bail doit indiquer son dernier loyer.</p>{% endif %}
+    {% for champ in champs %}{% include "biens/_champ.html" %}{% endfor %}
+  </fieldset>
+  {% endfor %}
+  <button type="submit">Enregistrer</button>
+</form>
+{% endblock %}

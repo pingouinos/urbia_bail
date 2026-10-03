@@ -38,7 +38,7 @@ class BienForm(RefIcsVideEnNullMixin, forms.ModelForm):
         ("Identification", ["ref_ics", "bailleur", "usage", "meuble", "actif"]),
         ("Localisation", [
             "adresse", "complement", "code_postal", "ville", "etage", "numero_appartement",
-            "numero_parking", "numero_cellier", "syndic",
+            "numero_parking", "numero_cellier", "identifiant_fiscal", "syndic",
         ]),
         ("Description", ["type_habitat", "regime_juridique", "periode_construction", "surface", "nb_pieces"]),
         ("Équipements", ["equipements", "chauffage", "eau_chaude", "acces_tic", "annexes", "parties_communes",

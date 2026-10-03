@@ -13,6 +13,7 @@ urlpatterns = [
     path("sante/", views.sante, name="sante"),
     path("biens/", include("biens.urls")),
     path("mandats/", include("mandats.urls")),
+    path("baux/", include("baux.urls")),
     path("modeles/", include("documents.urls")),
     path(
         "connexion/",

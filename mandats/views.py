@@ -1,9 +1,7 @@
-import mimetypes
-
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import FileResponse, Http404, HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -11,7 +9,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from biens.models import Bien
-from documents.generation import DOCX, ConversionImpossible, convertir_pdf, generer_docx
+from documents import views as documents
 
 from .forms import FichierSigneForm, MandatForm
 from .models import Mandat
@@ -100,20 +98,7 @@ def mandat_editer(request, pk=None):
 
 
 def telecharger(request, pk, format_):
-    objet = get_object_or_404(Mandat, pk=pk)
-    contenu = generer_docx(MODELE, objet.contexte_document())
-    type_, extension = DOCX, "docx"
-    if format_ == "pdf":
-        try:
-            contenu = convertir_pdf(contenu, f"mandat-{objet.numero}.docx")
-        except ConversionImpossible:
-            messages.error(request, "La conversion en PDF est indisponible pour le moment ; "
-                                    "téléchargez la version Word.")
-            return redirect(objet)
-        type_, extension = "application/pdf", "pdf"
-    reponse = HttpResponse(contenu, content_type=type_)
-    reponse["Content-Disposition"] = f'attachment; filename="{objet.nom_fichier}.{extension}"'
-    return reponse
+    return documents.document(request, get_object_or_404(Mandat, pk=pk), MODELE, format_)
 
 
 @require_POST
@@ -130,8 +115,4 @@ def deposer_signe(request, pk):
 
 
 def fichier_signe(request, pk):
-    objet = get_object_or_404(Mandat, pk=pk)
-    if not objet.fichier_signe:
-        raise Http404
-    type_, _ = mimetypes.guess_type(objet.fichier_signe.name)
-    return FileResponse(objet.fichier_signe.open("rb"), content_type=type_ or "application/octet-stream")
+    return documents.fichier_signe(get_object_or_404(Mandat, pk=pk))

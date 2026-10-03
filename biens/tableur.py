@@ -53,6 +53,7 @@ COLONNES = [
     Colonne("N° appartement", "numero_appartement", largeur=12),
     Colonne("N° parking", "numero_parking", largeur=12),
     Colonne("N° cellier", "numero_cellier", largeur=12),
+    Colonne("Identifiant fiscal", "identifiant_fiscal", largeur=16),
     Colonne("Syndic", "syndic", largeur=20),
     Colonne("Type d'habitat", "type_habitat", "choix"),
     Colonne("Régime juridique", "regime_juridique", "choix"),
