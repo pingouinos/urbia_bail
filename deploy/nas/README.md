@@ -2,7 +2,7 @@
 
 Version allégée de l'application pour un essai sur le réseau local de l'agence, sur le DS220+ (2 Go de RAM). La production reste le VPS décrit dans le README principal.
 
-Ce qui change par rapport au VPS : pas de HTTPS ni de Caddy (adresse `http://<IP du NAS>:8080`, accessible seulement depuis le bureau), pas de Gotenberg tant que la génération des baux n'est pas livrée, mémoire bornée (384 Mo pour l'application, 256 Mo pour la base ; environ 160 Mo réellement utilisés au repos). La connexion Google ne fonctionne pas ici, car Google refuse une adresse de retour en HTTP : on teste avec un compte local et sa double authentification.
+Ce qui change par rapport au VPS : pas de HTTPS ni de Caddy (adresse `http://<IP du NAS>:8080`, accessible seulement depuis le bureau) et mémoire bornée (384 Mo pour l'application, 256 Mo pour la base, 768 Mo pour Gotenberg, qui convertit les mandats et les baux en PDF). L'ensemble utilise environ 160 Mo au repos et 310 Mo une fois le premier PDF produit, LibreOffice restant ensuite chargé. La connexion Google ne fonctionne pas ici, car Google refuse une adresse de retour en HTTP : on teste avec un compte local et sa double authentification.
 
 ## Mise en place dans Container Manager
 
@@ -22,9 +22,10 @@ Prérequis : DSM 7.2 ou plus récent et le paquet **Container Manager** install�
    - Source : *Utiliser le docker-compose.yml existant* ;
    - *Suivant*, ne pas activer le portail Web Station, puis *Terminé*.
 
-   La construction de l'image prend quelques minutes la première fois. Le projet passe ensuite à *En cours d'exécution*, avec deux conteneurs `urbiabail-web-1` et `urbiabail-db-1`.
+   La première fois, la construction de l'image et le téléchargement de Gotenberg (environ 1 Go) prennent une dizaine de minutes. Le projet passe ensuite à *En cours d'exécution*, avec trois conteneurs `urbiabail-web-1`, `urbiabail-db-1` et `urbiabail-gotenberg-1`.
 5. **Créer l'administrateur.** Container Manager > *Conteneur* > `urbiabail-web-1` > *Action* > *Ouvrir un terminal* > *Créer* > *Lancer avec commande* : `python manage.py createsuperuser`, puis répondre aux questions (identifiant, e-mail, mot de passe).
 6. **Tester.** Depuis un poste du bureau, ouvrir `http://<IP du NAS>:8080`, se connecter avec ce compte et scanner le QR code avec une application d'authentification (Google Authenticator, Microsoft Authenticator…). L'adresse `http://<IP du NAS>:8080/sante/` doit répondre `{"statut": "ok"}`.
+7. **Essayer la chaîne complète.** Créer un bailleur puis un bien (ou les importer depuis Excel), créer le mandat depuis la fiche du bien et le télécharger en PDF, puis faire de même avec « Rédiger un bail ». Le premier PDF prend quelques secondes de plus, le temps que LibreOffice démarre.
 
 Si le pare-feu de DSM est activé : *Panneau de configuration* > *Sécurité* > *Pare-feu*, autoriser le port 8080 depuis le réseau local.
 
