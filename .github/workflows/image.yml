@@ -1,0 +1,31 @@
+# Publie l'image de l'application sur le registre de GitHub à chaque fusion
+# sur main. Le NAS de test la télécharge au lieu de la construire.
+name: Image publiée
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/pingouinos/urbia_bail:main
+            ghcr.io/pingouinos/urbia_bail:${{ github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/pingouinos/urbia_bail

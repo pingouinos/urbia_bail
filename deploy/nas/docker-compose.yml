@@ -10,11 +10,11 @@ name: urbiabail
 
 services:
   web:
-    build:
-      context: ../..
-      # Construire sur le réseau du NAS : sur certains Synology, le réseau
-      # Docker par défaut n'atteint pas Internet et pip ne trouve pas Django.
-      network: host
+    # Image construite et publiée par GitHub à chaque fusion sur main : le
+    # NAS la télécharge au lieu de la construire (la construction sur le
+    # Synology n'atteignait pas le dépôt des paquets Python).
+    image: ghcr.io/pingouinos/urbia_bail:main
+    pull_policy: always
     restart: unless-stopped
     env_file: .env
     environment:
