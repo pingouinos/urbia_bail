@@ -9,7 +9,7 @@
 #
 # Avant de coller, remplacer :
 #   - CHANGER-CETTE-CLE (une fois) par une cinquantaine de caractères aléatoires ;
-#   - MOTDEPASSE (deux fois, à l'identique) par un mot de passe sans @ : / ;
+#   - MOTDEPASSE (deux fois, à l'identique) par des lettres et des chiffres ;
 #   - 192.168.1.10 (deux fois) par l'adresse IP du NAS.
 services:
   web:
