@@ -17,7 +17,7 @@ from biens.models import Bien
 from .forms import (
     CandidatFormSet, CandidatureForm, DossierLocataireForm, ReponseForm, candidat_locataire_formset,
 )
-from .models import Candidature
+from .models import Candidature, Garant
 
 
 def envoi_configure():
@@ -179,7 +179,7 @@ def formulaire_locataire(request, jeton):
         return render(request, "candidatures/locataire_invalide.html", status=404)
     form = DossierLocataireForm(request.POST or None, instance=objet)
     candidats = candidat_locataire_formset(objet, request.POST or None)
-    if request.method == "POST" and form.is_valid() and candidats.is_valid():
+    if request.method == "POST" and formulaire_locataire_valide(form, candidats):
         with transaction.atomic():
             objet = form.save(commit=False)
             if "lien_dossierfacile" in form.changed_data:
@@ -189,10 +189,28 @@ def formulaire_locataire(request, jeton):
             objet.rempli_le = timezone.now()
             objet.save()
             candidats.save()
+            for sous_form in candidats.forms:
+                # Ligne du second locataire laissée vide : rien à enregistrer.
+                if sous_form.instance.pk:
+                    sous_form.garants.save()
+            if objet.garantie == Candidature.Garantie.AUCUNE and Garant.objects.filter(
+                    candidat__candidature=objet).exists():
+                objet.garantie = Candidature.Garantie.PERSONNE
+                objet.save(update_fields=["garantie"])
         return redirect("formulaire_locataire_merci")
     return render(request, "candidatures/locataire.html", {
         "candidature": objet, "form": form, "candidats": candidats,
     })
+
+
+def formulaire_locataire_valide(form, candidats):
+    # Tous les formulaires sont validés, pour afficher toutes les erreurs.
+    valide = all([form.is_valid(), candidats.is_valid(), *(f.garants.is_valid() for f in candidats.forms)])
+    for sous_form in candidats.forms:
+        if not sous_form.instance.pk and not sous_form.has_changed() and sous_form.garants.has_changed():
+            sous_form.add_error(None, "Indiquez d'abord ce locataire, puis ses garants.")
+            valide = False
+    return valide
 
 
 def formulaire_locataire_merci(request):

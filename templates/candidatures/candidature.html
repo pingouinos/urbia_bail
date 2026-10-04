@@ -40,7 +40,7 @@
     <tbody>
     {% for candidat in candidature.candidats.all %}
       <tr>
-        <td>{{ candidat }}{% if candidat.date_naissance %}<br><span class="discret">né(e) le {{ candidat.date_naissance|date:"d/m/Y" }}{% if candidat.lieu_naissance %} à {{ candidat.lieu_naissance }}{% endif %}</span>{% endif %}</td>
+        <td>{{ candidat }}{% if candidat.date_naissance %}<br><span class="discret">né(e) le {{ candidat.date_naissance|date:"d/m/Y" }}{% if candidat.lieu_naissance %} à {{ candidat.lieu_naissance }}{% endif %}</span>{% endif %}{% for garant in candidat.garants.all %}<br><span class="discret">Garant : {{ garant.ligne_bail }}{% if garant.email or garant.telephone %} · {{ garant.email }} {{ garant.telephone }}{% endif %}</span>{% endfor %}</td>
         <td>{{ candidat.email }}<br>{{ candidat.telephone }}</td>
         <td>{{ candidat.profession|default:"—" }}{% if candidat.employeur %} chez {{ candidat.employeur }}{% endif %}{% if candidat.contrat %}<br><span class="discret">{{ candidat.get_contrat_display }}{% if candidat.date_embauche %} depuis le {{ candidat.date_embauche|date:"d/m/Y" }}{% endif %}</span>{% endif %}</td>
         <td>{% if candidat.revenus_mensuels %}{{ candidat.revenus_mensuels|floatformat:0 }} €{% else %}—{% endif %}</td>

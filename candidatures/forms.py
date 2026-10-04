@@ -2,7 +2,7 @@ from django import forms
 
 from biens.models import Bien
 
-from .models import Candidat, Candidature
+from .models import Candidat, Candidature, Garant
 
 DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
@@ -90,4 +90,22 @@ def candidat_locataire_formset(candidature, data=None):
     for nom, valeur in [("nom", "family-name"), ("prenom", "given-name"), ("date_naissance", "bday"),
                         ("email", "email"), ("telephone", "tel")]:
         formset.forms[0].fields[nom].widget.attrs["autocomplete"] = valeur
+    # Les garants de chaque locataire, deux au plus.
+    for i, form in enumerate(formset.forms):
+        garants = GarantFormSet(data, instance=form.instance, prefix=f"garants-{i}")
+        deja = garants.get_queryset().count() if form.instance.pk else 0
+        garants.extra = max(GarantFormSet.max_num - deja, 0)
+        form.garants = garants
+        form.garants_ouverts = bool(deja) or bool(data and garants.has_changed())
     return formset
+
+
+class GarantForm(forms.ModelForm):
+    class Meta:
+        model = Garant
+        fields = ["civilite", "nom", "prenom", "adresse", "email", "telephone"]
+
+
+GarantFormSet = forms.inlineformset_factory(
+    Candidat, Garant, form=GarantForm, extra=0, max_num=2, validate_max=True, can_delete=True,
+)

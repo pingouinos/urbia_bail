@@ -24,6 +24,11 @@ def _montant(**options):
     return models.DecimalField(max_digits=9, decimal_places=2, **options)
 
 
+def lignes(texte):
+    """Lignes non vides d'un champ saisi une valeur par ligne."""
+    return [ligne.strip() for ligne in texte.splitlines() if ligne.strip()]
+
+
 class Bail(Horodatage):
     class Type(models.TextChoices):
         NU = "nu", "Logement nu"
@@ -43,9 +48,9 @@ class Bail(Horodatage):
     usage_mixte = models.BooleanField(
         "usage mixte professionnel et d'habitation", default=False,
     )
-    garant = models.CharField(
-        "garant commun", max_length=255, blank=True,
-        help_text="Nom et adresse d'une caution qui garantit tous les locataires, le cas échéant.",
+    garants = models.TextField(
+        "garants communs", blank=True,
+        help_text="Nom et adresse de chaque caution qui garantit tous les locataires, une par ligne.",
     )
     # Colocation au sens de l'article 8-1 de la loi du 6 juillet 1989 : plusieurs
     # locataires qui ne sont pas un couple marié ou pacsé. La solidarité d'un
@@ -198,6 +203,10 @@ class Bail(Horodatage):
         )
         return alertes
 
+    @property
+    def liste_garants(self):
+        return lignes(self.garants)
+
     def texte_solidarite(self, nb_locataires):
         texte = ("Les locataires sont tenus solidairement et indivisiblement de l'ensemble des obligations "
                  "découlant du présent contrat, notamment du paiement du loyer, des charges et des réparations "
@@ -288,14 +297,14 @@ class Bail(Horodatage):
                     "designation": locataire.designation,
                     "naissance": locataire.naissance,
                     "email": locataire.email,
-                    "garant": locataire.garant,
+                    "garants": lignes(locataire.garants),
                 }
                 for locataire in locataires
             ],
             "plusieurs_locataires": len(locataires) > 1,
             "colocation": self.colocation and len(locataires) > 1,
             "texte_solidarite": self.texte_solidarite(len(locataires)),
-            "garant": self.garant,
+            "garants": lignes(self.garants),
             "adresse_logement": ", ".join(
                 m for m in [bien.adresse, bien.complement,
                             f"étage {bien.etage}" if bien.etage else "",
@@ -382,8 +391,8 @@ class Locataire(models.Model):
     email = models.EmailField("e-mail", blank=True)
     telephone = models.CharField("téléphone", max_length=30, blank=True)
     # En colocation, l'acte de caution doit désigner le colocataire garanti.
-    garant = models.CharField(
-        max_length=255, blank=True, help_text="Nom et adresse de la caution de ce locataire, le cas échéant."
+    garants = models.TextField(
+        blank=True, help_text="Nom et adresse de chaque caution de ce locataire, une par ligne."
     )
 
     history = HistoricalRecords()
@@ -399,6 +408,10 @@ class Locataire(models.Model):
     def designation(self):
         civilite = self.Civilite(self.civilite).label if self.civilite else ""
         return " ".join(m for m in (civilite, self.nom.upper(), self.prenom) if m)
+
+    @property
+    def liste_garants(self):
+        return lignes(self.garants)
 
     @property
     def naissance(self):

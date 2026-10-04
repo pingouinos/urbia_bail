@@ -14,7 +14,7 @@ from baux.models import Bail
 from baux.tests import Donnees as DonneesBaux
 from mandats.models import Mandat
 
-from .models import Candidat, Candidature, valider_lien_dossierfacile
+from .models import Candidat, Candidature, Garant, valider_lien_dossierfacile
 
 LIEN = "https://locataire.dossierfacile.logement.gouv.fr/file/3f2a"
 
@@ -245,6 +245,9 @@ class LienLocataireTests(Donnees, TestCase):
             "candidats-0-telephone": "06 12 34 56 78",
             "candidats-1-nom": "", "candidats-1-prenom": "",
         }
+        for i in (0, 1):
+            donnees.update({f"garants-{i}-TOTAL_FORMS": "2", f"garants-{i}-INITIAL_FORMS": "0",
+                            f"garants-{i}-MIN_NUM_FORMS": "0", f"garants-{i}-MAX_NUM_FORMS": "2"})
         donnees.update(autres)
         return donnees
 
@@ -343,3 +346,34 @@ class LienLocataireTests(Donnees, TestCase):
                 self.assertEqual(self.client.get(chemin, HTTP_HOST="locataire.urbia.example").status_code, 404)
         # Au bureau, l'application reste entière.
         self.assertEqual(self.client.get(self.candidature.get_absolute_url()).status_code, 200)
+
+    def test_garants(self):
+        formulaire = self.creer_lien()
+        self.client.logout()
+        self.assertContains(self.client.get(formulaire), "Garants qui se portent caution pour vous")
+        garants = {
+            "garants-0-0-civilite": "Mme", "garants-0-0-nom": "Martin", "garants-0-0-prenom": "Sophie",
+            "garants-0-0-adresse": "8 rue des Arts, 81000 Albi", "garants-0-0-email": "sophie@exemple.fr",
+            "garants-0-1-civilite": "M.", "garants-0-1-nom": "Martin", "garants-0-1-prenom": "Alain",
+            "garants-0-1-adresse": "8 rue des Arts, 81000 Albi",
+        }
+        # Pas de garant pour un second locataire laissé vide.
+        reponse = self.client.post(formulaire, self.donnees(**garants, **{
+            "garants-1-0-nom": "Roux", "garants-1-0-prenom": "Paul", "garants-1-0-adresse": "Toulouse"}))
+        self.assertContains(reponse, "Indiquez d&#x27;abord ce locataire, puis ses garants.")
+        # L'adresse d'un garant est obligatoire.
+        reponse = self.client.post(formulaire, self.donnees(**{**garants, "garants-0-1-adresse": ""}))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertFalse(Garant.objects.exists())
+        self.assertRedirects(self.client.post(formulaire, self.donnees(**garants)),
+                             reverse("formulaire_locataire_merci"))
+        self.candidature.refresh_from_db()
+        self.assertEqual(self.candidature.garantie, Candidature.Garantie.PERSONNE)
+        self.assertEqual([g.ligne_bail for g in Garant.objects.all()], [
+            "Madame MARTIN Sophie, 8 rue des Arts, 81000 Albi", "Monsieur MARTIN Alain, 8 rue des Arts, 81000 Albi",
+        ])
+        # La candidature les montre, le bail les reprend.
+        self.client.force_login(User.objects.get(username="gestion"))
+        self.assertContains(self.client.get(self.candidature.get_absolute_url()), "sophie@exemple.fr")
+        page = self.client.get(reverse("baux:creer"), {"candidature": self.candidature.pk})
+        self.assertContains(page, "Madame MARTIN Sophie, 8 rue des Arts, 81000 Albi\nMonsieur MARTIN Alain")

@@ -122,6 +122,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--acier); }
 .formulaire legend { font-weight: 700; padding: 0 6px; }
 .pleine-largeur { grid-column: 1 / -1; }
 .sous-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; }
+.sous-grille .champ:has(textarea) { grid-column: 1 / -1; }
 .section-repliee { margin: 0 0 16px; border: 1px solid var(--bord); border-radius: var(--rayon); background: var(--carte); }
 .section-repliee summary { padding: 14px 20px; font-weight: 700; cursor: pointer; }
 .section-repliee summary::after { content: " · facultatif ou prérempli"; font-weight: 400; color: var(--discret); }
@@ -147,6 +148,8 @@ details summary { cursor: pointer; }
 
 /* Connexion */
 .connexion { max-width: 400px; margin: 8px auto 48px; }
+.garants summary { cursor: pointer; font-weight: 600; color: var(--acier); padding: 4px 0; }
+.garants[open] summary { margin-bottom: 8px; }
 .copie { display: flex; gap: 8px; flex-wrap: wrap; }
 .copie input { flex: 1 1 260px; min-width: 0; }
 .actions-formulaire { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

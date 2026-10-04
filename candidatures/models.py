@@ -256,3 +256,30 @@ class Candidat(models.Model):
 
     def __str__(self):
         return f"{self.prenom} {self.nom.upper()}"
+
+
+class Garant(models.Model):
+    """Caution personne physique d'un candidat, déclarée par lui dans le
+    formulaire reçu par lien. Ses pièces sont dans le dossier DossierFacile."""
+
+    candidat = models.ForeignKey(Candidat, on_delete=models.CASCADE, related_name="garants")
+    civilite = models.CharField("civilité", max_length=5, choices=Bailleur.Civilite.choices, blank=True)
+    nom = models.CharField(max_length=100)
+    prenom = models.CharField("prénom", max_length=100)
+    adresse = models.CharField("adresse complète", max_length=255, help_text="Rue, code postal et ville.")
+    email = models.EmailField("e-mail", blank=True)
+    telephone = models.CharField("téléphone", max_length=30, blank=True)
+
+    class Meta:
+        ordering = ["pk"]
+        verbose_name = "garant"
+
+    def __str__(self):
+        return f"{self.prenom} {self.nom.upper()}"
+
+    @property
+    def ligne_bail(self):
+        """Désignation reprise dans le bail : « Madame BERNARD Claire, 3 rue
+        d'Alsace, 31000 Toulouse »."""
+        identite = " ".join(m for m in (self.get_civilite_display(), self.nom.upper(), self.prenom) if m)
+        return f"{identite}, {self.adresse}"

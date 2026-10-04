@@ -84,7 +84,7 @@
       if (!evenement.target.classList.contains("retirer-locataire")) return;
       // Une ligne vidée est ignorée à l'enregistrement.
       var bloc = evenement.target.closest(".sous-formulaire");
-      bloc.querySelectorAll("input:not([type=hidden]), select").forEach(function (champ) { champ.value = ""; });
+      bloc.querySelectorAll("input:not([type=hidden]), select, textarea").forEach(function (champ) { champ.value = ""; });
       bloc.hidden = true;
       liste.querySelectorAll(".sous-formulaire:not([hidden]) .sous-titre").forEach(function (titre, i) {
         titre.textContent = "Locataire " + (i + 1);

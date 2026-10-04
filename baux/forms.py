@@ -18,6 +18,7 @@ class BailForm(forms.ModelForm):
                 "date_effet", "precedent_date_versement", "precedent_date_revision",
                 "date_signature", "date_fin_effective",
             )},
+            "garants": forms.Textarea(attrs={"rows": 2}),
             "travaux": forms.Textarea(attrs={"rows": 2}),
             "conditions_particulieres": forms.Textarea(attrs={"rows": 3}),
         }
@@ -25,7 +26,7 @@ class BailForm(forms.ModelForm):
     # Sections du formulaire : (titre, champs, repliée). Les sections repliées
     # sont facultatives ou déjà préremplies ; elles s'ouvrent en cas d'erreur.
     SECTIONS = [
-        ("Bail", ["bien", "type", "usage_mixte", "garant"], False),
+        ("Bail", ["bien", "type", "usage_mixte", "garants"], False),
         ("Dates", ["date_effet", "lieu_signature", "date_signature", "date_fin_effective"], False),
         ("Loyer et charges", [
             "loyer", "mode_charges", "charges", "jour_paiement", "a_echoir", "depot_garantie",
@@ -128,9 +129,9 @@ class LocataireForm(forms.ModelForm):
     class Meta:
         model = Locataire
         fields = [
-            "civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone", "garant",
+            "civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone", "garants",
         ]
-        widgets = {"date_naissance": DATE}
+        widgets = {"date_naissance": DATE, "garants": forms.Textarea(attrs={"rows": 2})}
 
 
 # Une ligne au départ ; le bouton « Ajouter un locataire » en ajoute d'autres.
