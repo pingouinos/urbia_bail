@@ -17,7 +17,7 @@ Prérequis : DSM 7.2 ou plus récent et le paquet **Container Manager** install�
    - `CHANGER-CETTE-CLE` par une cinquantaine de caractères aléatoires (générateur de mots de passe) ;
    - `MOTDEPASSE`, aux deux endroits, par un même mot de passe fait uniquement de lettres et de chiffres (un `@`, `:`, `/`, `#`, `%`, `?` ou `&` casse l'adresse de connexion à la base) ;
    - `192.168.1.10`, aux deux endroits, par l'IP du NAS.
-3. **Créer un dossier vide.** File Station > dossier partagé `docker` (créé par Container Manager) > *Créer un dossier* `urbia`.
+3. **Créer les dossiers.** File Station > dossier partagé `docker` (créé par Container Manager) > *Créer un dossier* `urbia`, puis, dans `urbia`, un dossier `sauvegardes` : le NAS ne le crée pas tout seul.
 4. **Créer le projet.** Container Manager > *Projet* > *Créer* :
    - Nom du projet : `urbia` ;
    - Chemin : `docker/urbia` ;
@@ -37,6 +37,7 @@ Si le pare-feu de DSM est activé : *Panneau de configuration* > *Sécurité* > 
 - **La création s'arrête sur `dependency failed to start: container urbia-db-1 is unhealthy`** : la base n'a pas démarré ; le journal de `urbia-db-1` en donne la cause (souvent `Address in use`, ci-dessous).
 - **Le journal parle de `Address already in use` ou `Address in use`** : un autre service du NAS occupe déjà le port (c'est le cas du 5433 sur le DS220+). Pour l'application, remplacer `8080` par un port libre (par exemple `8090`) dans la ligne `command` et dans `CSRF_TRUSTED_ORIGINS` ; pour la base, `25432` aux trois endroits (`DATABASE_URL`, `command` et test de santé de `db`) ; pour Gotenberg, `23300` dans `GOTENBERG_URL` et dans sa `command`.
 - **La page reste vide (« réponse vide », `NS_ERROR_NET_EMPTY_RESPONSE`)** : l'application n'écoute pas encore. Au premier démarrage, la préparation de la base prend jusqu'à une minute ; sinon, lire *Conteneur* > `urbia-web-1` > *Détails* > *Journal*. Un mot de passe différent entre `DATABASE_URL` et `POSTGRES_PASSWORD` fait redémarrer l'application en boucle. La base garde le mot de passe de sa création : pour en changer, supprimer le projet puis le recréer sous un autre nom, ce qui repart d'une base neuve.
+- **`Bind mount failed: '/volume1/docker/urbia/sauvegardes' does not exist`** : créer le dossier `sauvegardes` dans `docker/urbia` avec File Station, puis *Action* > *Construire*. Les trois autres conteneurs tournent déjà, seul `urbia-sauvegarde-1` attend ce dossier.
 - **Le téléchargement de `ghcr.io/pingouinos/urbia_bail` est refusé (`denied` ou `unauthorized`)** : sur GitHub, ouvrir le paquet `urbia_bail` du compte, puis *Package settings* > *Change visibility* > *Public*.
 
 ## Sauvegardes
@@ -47,7 +48,7 @@ Pour restaurer une base, depuis le terminal de `urbia-sauvegarde-1` : `pg_restor
 
 ## Mettre à jour
 
-*Projet* > `urbia` > *Action* > *Arrêter*, puis *Construire* : le NAS télécharge la dernière image publiée. Les migrations s'appliquent au démarrage ; les données restent dans les volumes Docker `urbia_postgres` et `urbia_documents`.
+*Projet* > `urbia` > *Action* > *Arrêter*, puis *Construire* : le NAS télécharge la dernière image publiée. Si le fichier `docker-compose.yml` a changé (nouveau conteneur, par exemple), coller d'abord le nouveau texte dans l'onglet *YAML* du projet, en gardant la clé, le mot de passe et l'IP déjà en place. Les migrations s'appliquent au démarrage ; les données restent dans les volumes Docker `urbia_postgres` et `urbia_documents`.
 
 ## Arrêter l'essai
 

@@ -76,7 +76,8 @@ services:
   sauvegarde:
     # Chaque jour : copie de la base et des documents dans le dossier
     # sauvegardes/ du projet (visible dans File Station, à inclure dans Hyper
-    # Backup), gardée 14 jours.
+    # Backup), gardée 14 jours. Le NAS ne crée pas ce dossier : le créer dans
+    # docker/urbia avec File Station avant de construire le projet.
     image: postgres:16-alpine
     restart: unless-stopped
     network_mode: host

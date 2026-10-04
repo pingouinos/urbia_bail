@@ -36,14 +36,17 @@ h1 a, h2 a { color: inherit; }
 .entete-seule { justify-content: center; padding: 24px; border-bottom: 0; background: none; }
 .marque { display: flex; }
 .marque img { display: block; height: 48px; width: auto; }
-.menu { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.menu { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; order: 1; }
 .menu a { padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 500; border-bottom: 3px solid transparent; }
 .menu a:hover { background: var(--melon-clair); }
 .menu a[aria-current=page] { border-bottom-color: var(--corail); border-radius: 8px 8px 0 0; font-weight: 600; }
-.compte { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; color: var(--discret); }
+.compte { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; color: var(--discret); order: 3; }
 .compte form { margin: 0; }
 .compte a:not(.bouton-entete), .compte .lien { color: var(--discret); }
-.bouton-entete { padding: 8px 16px; border-radius: 999px; background: var(--melon); color: var(--acier); font-weight: 600; text-decoration: none; }
+.bouton-entete { order: 2; padding: 8px 16px; border-radius: 999px; background: var(--melon); color: var(--acier); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.bouton-menu { display: none; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--bord); border-radius: 8px; background: var(--carte); color: var(--acier); font-weight: 600; }
+.ouvert .bouton-menu { background: var(--melon-clair); }
+.icone-menu { width: 18px; height: 2px; margin: 6px 0; border-radius: 1px; background: currentColor; box-shadow: 0 -6px 0 currentColor, 0 6px 0 currentColor; }
 .bouton-entete:hover { background: #ffad8f; }
 
 main { max-width: 1080px; margin: 0 auto; padding: 28px 16px 48px; }
@@ -158,14 +161,23 @@ dd { margin: 0; }
 .historique { margin: 0; padding-left: 18px; }
 
 @media (max-width: 760px) {
-  .entete { display: grid; grid-template-columns: auto 1fr; padding: 10px 16px; }
+  /* En-tête compact : logo, « Nouveau bail » et un bouton qui déplie le menu. */
+  .entete { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 10px 16px; }
+  .entete-seule { display: flex; }
   .marque img { height: 40px; }
-  .compte { justify-content: flex-end; gap: 12px; }
-  .compte > span { display: none; }
-  .menu { grid-column: 1 / -1; order: 3; flex-wrap: nowrap; overflow-x: auto; }
+  .bouton-menu { display: flex; order: 3; }
+  .menu, .compte { grid-column: 1 / -1; flex-direction: column; align-items: stretch; gap: 0; }
+  .menu { order: 4; padding-top: 6px; border-top: 1px solid var(--bord); }
+  .compte { order: 5; padding: 6px 0 4px; border-top: 1px solid var(--bord); }
+  .js .entete:not(.ouvert) .menu, .js .entete:not(.ouvert) .compte { display: none; }
+  .menu a { padding: 12px 8px; border-bottom: 0; border-left: 3px solid transparent; border-radius: 0; }
+  .menu a[aria-current=page] { border-left-color: var(--corail); border-radius: 0; background: var(--melon-clair); }
+  .compte > * { padding: 10px 8px; }
+  .compte .lien { text-align: left; }
   .recherche { flex-wrap: wrap; }
   .recherche button[type=submit] { flex: 1; }
   .accroche, .document { grid-template-columns: 1fr; padding: 20px; }
   .telechargements { min-width: 0; }
   table { display: block; overflow-x: auto; }
+  .masquer-mobile { display: none; }
 }

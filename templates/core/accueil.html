@@ -29,13 +29,13 @@
   </div>
   {% if derniers_baux %}
   <table>
-    <thead><tr><th>Logement</th><th>Locataires</th><th>Prise d'effet</th><th>Document</th></tr></thead>
+    <thead><tr><th>Logement</th><th>Locataires</th><th class="masquer-mobile">Prise d'effet</th><th>Document</th></tr></thead>
     <tbody>
     {% for bail in derniers_baux %}
       <tr>
         <td><a href="{{ bail.get_absolute_url }}">{{ bail.bien.adresse }}</a><br><span class="discret">{{ bail.bien.code_postal }} {{ bail.bien.ville }}</span></td>
         <td>{% for locataire in bail.locataires.all %}{{ locataire }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-        <td>{{ bail.date_effet|date:"d/m/Y" }}</td>
+        <td class="masquer-mobile">{{ bail.date_effet|date:"d/m/Y" }}</td>
         <td class="liens"><a href="{% url 'baux:pdf' bail.pk %}">PDF</a> <a href="{% url 'baux:word' bail.pk %}">Word</a></td>
       </tr>
     {% endfor %}
