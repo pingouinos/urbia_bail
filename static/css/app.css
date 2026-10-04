@@ -147,6 +147,9 @@ details summary { cursor: pointer; }
 
 /* Connexion */
 .connexion { max-width: 400px; margin: 8px auto 48px; }
+.copie { display: flex; gap: 8px; flex-wrap: wrap; }
+.copie input { flex: 1 1 260px; min-width: 0; }
+.actions-formulaire { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .connexion form { display: grid; gap: 8px; }
 .connexion .bouton { display: block; margin: 8px 0 16px; }
 .qr { display: flex; justify-content: center; margin: 12px 0; }

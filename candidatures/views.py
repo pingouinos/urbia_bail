@@ -1,3 +1,5 @@
+from urllib.parse import quote, urlencode
+
 from django.conf import settings
 from django.contrib import messages
 from django.core.mail import EmailMessage
@@ -7,11 +9,14 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from biens.models import Bien
 
-from .forms import CandidatFormSet, CandidatureForm, ReponseForm
+from .forms import (
+    CandidatFormSet, CandidatureForm, DossierLocataireForm, ReponseForm, candidat_locataire_formset,
+)
 from .models import Candidature
 
 
@@ -123,3 +128,72 @@ def effacer(request, pk):
     objet.delete()
     messages.success(request, "Candidature et données du candidat effacées.")
     return redirect(f"{reverse('candidatures:liste')}?bien={bien.pk}")
+
+
+def adresse_lien(request, jeton):
+    """Adresse complète du formulaire : celle ouverte sur Internet si
+    URL_LOCATAIRES est renseignée, sinon celle du réseau local."""
+    chemin = reverse("formulaire_locataire", args=[jeton])
+    if settings.URL_LOCATAIRES:
+        return settings.URL_LOCATAIRES + chemin
+    return request.build_absolute_uri(chemin)
+
+
+def lien(request, pk):
+    """Lien personnel du candidat retenu, et message pour le lui envoyer."""
+    objet = get_object_or_404(Candidature.objects.select_related("bien"), pk=pk)
+    if request.method == "POST" and request.POST.get("action") == "creer":
+        if objet.statut != Candidature.Statut.RETENUE or objet.bail_id:
+            messages.error(request, "Le lien s'envoie à une candidature retenue, avant la rédaction du bail.")
+            return redirect(objet)
+        objet.creer_lien()
+        return redirect("candidatures:lien", pk=objet.pk)
+    if not objet.lien_valide:
+        messages.error(request, "Aucun lien valable pour cette candidature.")
+        return redirect(objet)
+    adresse = adresse_lien(request, objet.jeton)
+    texte = objet.texte_lien(adresse, request.user.get_full_name())
+    form = ReponseForm(request.POST or None, initial={"texte": texte})
+    destinataires = sorted({c.email for c in objet.candidats.all() if c.email})
+    sujet = f"Votre bail pour le logement {objet.bien.adresse}, {objet.bien.ville}"
+    if request.method == "POST" and request.POST.get("action") == "envoyer" and form.is_valid():
+        if envoi_configure() and destinataires:
+            EmailMessage(subject=sujet, body=form.cleaned_data["texte"], to=destinataires).send()
+            messages.success(request, "Lien envoyé au candidat.")
+            return redirect(objet)
+        messages.error(request, "Envoi impossible depuis l'application : utiliser votre messagerie.")
+    return render(request, "candidatures/lien.html", {
+        "candidature": objet, "form": form, "adresse": adresse, "destinataires": destinataires,
+        "envoi": envoi_configure() and bool(destinataires), "local": not settings.URL_LOCATAIRES,
+        "mailto": "mailto:" + ",".join(destinataires) + "?"
+        + urlencode({"subject": sujet, "body": texte}, quote_via=quote),
+    })
+
+
+# Pages ouvertes sans connexion, aux seuls détenteurs du lien.
+
+@never_cache
+def formulaire_locataire(request, jeton):
+    objet = Candidature.par_jeton(jeton)
+    if objet is None:
+        return render(request, "candidatures/locataire_invalide.html", status=404)
+    form = DossierLocataireForm(request.POST or None, instance=objet)
+    candidats = candidat_locataire_formset(objet, request.POST or None)
+    if request.method == "POST" and form.is_valid() and candidats.is_valid():
+        with transaction.atomic():
+            objet = form.save(commit=False)
+            if "lien_dossierfacile" in form.changed_data:
+                # Nouveau dossier : les pièces sont à revoir.
+                objet.dossier_verifie = False
+            objet.jeton = None
+            objet.rempli_le = timezone.now()
+            objet.save()
+            candidats.save()
+        return redirect("formulaire_locataire_merci")
+    return render(request, "candidatures/locataire.html", {
+        "candidature": objet, "form": form, "candidats": candidats,
+    })
+
+
+def formulaire_locataire_merci(request):
+    return render(request, "candidatures/locataire_merci.html")

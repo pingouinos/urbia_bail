@@ -71,6 +71,27 @@
   {% endif %}
 </section>
 
+{% if candidature.statut == "retenue" and not candidature.bail %}
+<section class="carte">
+  <h2>Informations du locataire</h2>
+  {% if candidature.rempli_le %}<p class="succes">Complétées par le locataire le {{ candidature.rempli_le|date:"d/m/Y à H:i" }}</p>{% endif %}
+  {% if candidature.lien_valide %}
+  <p>Lien envoyé le {{ candidature.lien_cree_le|date:"d/m/Y" }}, valable jusqu'au {{ candidature.lien_expire_le|date:"d/m/Y" }}. <a href="{% url 'candidatures:lien' candidature.pk %}">Revoir le lien et le message</a></p>
+  {% elif not candidature.rempli_le %}
+  <p class="discret">Le candidat complète lui-même son identité, ses coordonnées et le lien de son dossier DossierFacile, par un lien personnel valable 14 jours.</p>
+  {% endif %}
+  <form method="post" action="{% url 'candidatures:lien' candidature.pk %}" class="en-ligne">
+    {% csrf_token %}
+    {% if candidature.lien_valide %}
+    <button type="submit" name="action" value="creer" class="secondaire">Créer un nouveau lien</button>
+    <small class="discret">L'ancien cessera de fonctionner.</small>
+    {% else %}
+    <button type="submit" name="action" value="creer"{% if candidature.rempli_le %} class="secondaire"{% endif %}>{% if candidature.rempli_le %}Renvoyer un lien{% else %}Envoyer le lien au locataire{% endif %}</button>
+    {% endif %}
+  </form>
+</section>
+{% endif %}
+
 <section class="carte">
   <h2>Données personnelles</h2>
   {% if candidature.bail %}<p>Conservées avec le bail.</p>

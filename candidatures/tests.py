@@ -214,3 +214,132 @@ class VuesTests(Donnees, TestCase):
                 self.assertEqual(self.client.get(url).status_code, 200)
         # La liste a purgé la candidature refusée il y a quatre mois.
         self.assertFalse(Candidature.objects.filter(pk=ancienne.pk).exists())
+
+
+class LienLocataireTests(Donnees, TestCase):
+    """Lien envoyé au candidat retenu pour qu'il complète lui-même ses
+    informations."""
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_user("gestion", first_name="Elodie", last_name="Durand"))
+        self.candidature = self.creer_candidature(
+            candidats=(("Martin", 1500),), statut=Candidature.Statut.RETENUE, decide_le=timezone.now(),
+            dossier_verifie=True,
+        )
+
+    def creer_lien(self):
+        reponse = self.client.post(reverse("candidatures:lien", args=[self.candidature.pk]), {"action": "creer"})
+        self.assertRedirects(reponse, reverse("candidatures:lien", args=[self.candidature.pk]))
+        self.candidature.refresh_from_db()
+        return reverse("formulaire_locataire", args=[self.candidature.jeton])
+
+    def donnees(self, **autres):
+        candidat = self.candidature.candidats.get()
+        donnees = {
+            "lien_dossierfacile": "https://locataire.dossierfacile.logement.gouv.fr/file/9b7c",
+            "candidats-TOTAL_FORMS": "2", "candidats-INITIAL_FORMS": "1",
+            "candidats-MIN_NUM_FORMS": "1", "candidats-MAX_NUM_FORMS": "2",
+            "candidats-0-id": str(candidat.pk), "candidats-0-civilite": "Mme", "candidats-0-nom": "Martin-Roux",
+            "candidats-0-prenom": "Julie", "candidats-0-date_naissance": "1996-03-08",
+            "candidats-0-lieu_naissance": "Albi (Tarn)", "candidats-0-email": "julie@exemple.fr",
+            "candidats-0-telephone": "06 12 34 56 78",
+            "candidats-1-nom": "", "candidats-1-prenom": "",
+        }
+        donnees.update(autres)
+        return donnees
+
+    def test_lien_et_message(self):
+        page = self.client.get(self.candidature.get_absolute_url())
+        self.assertContains(page, "Envoyer le lien au locataire")
+        formulaire = self.creer_lien()
+        page = self.client.get(reverse("candidatures:lien", args=[self.candidature.pk]))
+        self.assertContains(page, f"http://testserver{formulaire}")
+        self.assertContains(page, "ne fonctionne que depuis le réseau du bureau")
+        self.assertContains(page, "mailto:martin@exemple.fr?subject=")
+        self.client.post(reverse("candidatures:lien", args=[self.candidature.pk]),
+                         {"action": "envoyer", "texte": page.context["form"].initial["texte"]})
+        self.assertEqual(mail.outbox[0].to, ["martin@exemple.fr"])
+        self.assertIn(f"http://testserver{formulaire}", mail.outbox[0].body)
+        self.assertIn("valable jusqu'au", mail.outbox[0].body)
+
+    @override_settings(URL_LOCATAIRES="https://locataire.urbia.example")
+    def test_adresse_publique(self):
+        formulaire = self.creer_lien()
+        page = self.client.get(reverse("candidatures:lien", args=[self.candidature.pk]))
+        self.assertContains(page, f"https://locataire.urbia.example{formulaire}")
+        self.assertNotContains(page, "réseau du bureau")
+
+    def test_seulement_candidature_retenue_sans_bail(self):
+        self.candidature.decider(Candidature.Statut.A_ETUDIER, None)
+        self.client.post(reverse("candidatures:lien", args=[self.candidature.pk]), {"action": "creer"})
+        self.candidature.refresh_from_db()
+        self.assertIsNone(self.candidature.jeton)
+
+    def test_formulaire_rempli_par_le_locataire(self):
+        formulaire = self.creer_lien()
+        self.client.logout()
+        page = self.client.get(formulaire)
+        self.assertContains(page, "12 avenue de Muret")
+        self.assertContains(page, 'value="Martin"')
+        self.assertContains(page, "Second locataire, le cas échéant")
+        self.assertNotContains(page, "1500")  # rien d'interne : revenus, notes
+        donnees = self.donnees(**{"candidats-1-civilite": "M.", "candidats-1-nom": "Roux",
+                                  "candidats-1-prenom": "Hugo", "candidats-1-date_naissance": "1995-01-20",
+                                  "candidats-1-lieu_naissance": "Toulouse", "candidats-1-email": "hugo@exemple.fr",
+                                  "candidats-1-telephone": "07 00 00 00 00"})
+        self.assertRedirects(self.client.post(formulaire, donnees), reverse("formulaire_locataire_merci"))
+        self.candidature.refresh_from_db()
+        self.assertIsNone(self.candidature.jeton)
+        self.assertIsNotNone(self.candidature.rempli_le)
+        self.assertFalse(self.candidature.dossier_verifie)  # nouveau lien DossierFacile à vérifier
+        self.assertEqual(self.candidature.lien_dossierfacile, "https://locataire.dossierfacile.logement.gouv.fr/file/9b7c")
+        julie, hugo = self.candidature.candidats.all()
+        self.assertEqual((julie.nom, julie.lieu_naissance, julie.telephone), ("Martin-Roux", "Albi (Tarn)", "06 12 34 56 78"))
+        self.assertEqual(julie.revenus_mensuels, Decimal("1500"))  # les données internes restent
+        self.assertEqual((hugo.prenom, hugo.email), ("Hugo", "hugo@exemple.fr"))
+        # Le lien ne sert qu'une fois.
+        self.assertContains(self.client.get(formulaire), "plus valable", status_code=404)
+        # Le bail reprend les informations complétées.
+        self.client.force_login(User.objects.get(username="gestion"))
+        page = self.client.get(reverse("baux:creer"), {"candidature": self.candidature.pk})
+        self.assertContains(page, 'value="Martin-Roux"')
+        self.assertContains(page, 'value="Albi (Tarn)"')
+
+    def test_champs_obligatoires(self):
+        formulaire = self.creer_lien()
+        self.client.logout()
+        reponse = self.client.post(formulaire, self.donnees(**{"candidats-0-lieu_naissance": "",
+                                                               "lien_dossierfacile": "https://exemple.fr/x"}))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, "Indiquer le lien de partage fourni par DossierFacile.")
+        self.candidature.refresh_from_db()
+        self.assertIsNotNone(self.candidature.jeton)
+        self.assertEqual(self.candidature.candidats.get().lieu_naissance, "Albi")
+
+    def test_liens_refuses(self):
+        formulaire = self.creer_lien()
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("formulaire_locataire", args=["inconnu"])).status_code, 404)
+        self.vieillir(self.candidature, 15, champ="lien_cree_le")
+        self.assertEqual(self.client.get(formulaire).status_code, 404)
+        # Un nouveau lien remplace l'ancien.
+        self.client.force_login(User.objects.get(username="gestion"))
+        nouveau = self.creer_lien()
+        self.client.logout()
+        self.assertEqual(self.client.get(formulaire).status_code, 404)
+        self.assertEqual(self.client.get(nouveau).status_code, 200)
+        # Plus de lien une fois le bail rédigé.
+        self.candidature.bail = self.creer_bail(bien=self.candidature.bien)
+        self.candidature.save()
+        self.assertEqual(self.client.get(nouveau).status_code, 404)
+
+    @override_settings(URL_LOCATAIRES="https://locataire.urbia.example", HOTE_LOCATAIRES="locataire.urbia.example",
+                       ALLOWED_HOSTS=["locataire.urbia.example", "testserver"])
+    def test_adresse_publique_limitee_au_formulaire(self):
+        formulaire = self.creer_lien()
+        self.assertEqual(self.client.get(formulaire, HTTP_HOST="locataire.urbia.example").status_code, 200)
+        for chemin in ["/", "/connexion/", "/admin/login/", "/sante/", self.candidature.get_absolute_url()]:
+            with self.subTest(chemin=chemin):
+                self.assertEqual(self.client.get(chemin, HTTP_HOST="locataire.urbia.example").status_code, 404)
+        # Au bureau, l'application reste entière.
+        self.assertEqual(self.client.get(self.candidature.get_absolute_url()).status_code, 200)
