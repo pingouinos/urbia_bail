@@ -1,33 +1,58 @@
 {% extends "base.html" %}
-{% block titre %}{% if bail %}Modifier le bail{% else %}Nouveau bail{% endif %} · UrbiaBail{% endblock %}
+{% block titre %}{% if bail %}Modifier le bail{% else %}Nouveau bail{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% if bail %}{{ bail.get_absolute_url }}{% else %}{% url 'baux:liste' %}{% endif %}">← Retour</a></p>
+{% if bail %}<p><a href="{{ bail.get_absolute_url }}">← Retour au bail</a></p>{% endif %}
 <h1>{% if bail %}Modifier le bail{% else %}Nouveau bail{% endif %}</h1>
-<p class="discret">{{ form.instance.bien }}</p>
+{% if not bail %}{% include "baux/_etapes.html" with etape=2 %}{% endif %}
+
+{% if logement %}
+<section class="carte logement">
+  <div>
+    <strong>{{ logement }}</strong>
+    <span class="discret">{{ logement.designation }} · propriétaire : {{ logement.bailleur.designation }}</span>
+    <span class="discret">{% with mandat=logement.mandat_en_cours %}{% if mandat %}Mandat n° {{ mandat.numero }} : honoraires repris ci-dessous.{% else %}Aucun mandat de gestion en cours : honoraires à saisir.{% endif %}{% endwith %}</span>
+    {% with manquants=logement.champs_manquants_pour_bail %}{% if manquants %}<span class="alerte">Fiche incomplète, le bail aura des blancs : {{ manquants|join:", " }}. <a href="{% url 'biens:bien_modifier' logement.pk %}">Compléter la fiche</a></span>{% endif %}{% endwith %}
+  </div>
+  {% if not bail and not candidature %}<a href="{% url 'baux:creer' %}">Changer de logement</a>{% endif %}
+</section>
+{% endif %}
+
 <form method="post" class="formulaire">
   {% csrf_token %}
+  {% for champ in form.hidden_fields %}{{ champ }}{% for erreur in champ.errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}{% endfor %}
   {% if candidature %}<input type="hidden" name="candidature" value="{{ candidature.pk }}">
-  <p class="discret">D'après la <a href="{{ candidature.get_absolute_url }}">candidature retenue</a> : vérifier les locataires et compléter l'IRL.</p>{% endif %}
+  <p class="message">D'après la <a href="{{ candidature.get_absolute_url }}">candidature retenue</a> : vérifier les locataires et compléter l'IRL.</p>{% endif %}
+  {% if form.errors or locataires.total_error_count %}<p class="message message-erreur">Certains champs sont à corriger : ils sont signalés en rouge.</p>{% endif %}
   {{ form.non_field_errors }}
   <fieldset>
     <legend>Locataires</legend>
     {{ locataires.management_form }}
-    {% for erreur in locataires.non_form_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
+    {% for erreur in locataires.non_form_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
     {% for sous_form in locataires %}
-    <div class="sous-formulaire">
+    <div class="sous-formulaire pleine-largeur sous-grille">
       {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
-      {% for champ in sous_form.visible_fields %}{% include "biens/_champ.html" %}{% endfor %}
+      {% for champ in sous_form.visible_fields %}{% if champ.name != "DELETE" or sous_form.instance.pk %}{% include "biens/_champ.html" %}{% endif %}{% endfor %}
     </div>
     {% endfor %}
-    <small class="discret">Jusqu'à quatre locataires ; enregistrez pour ajouter une ligne vide.</small>
+    <small class="discret pleine-largeur">Jusqu'à quatre locataires ; enregistrez pour ajouter une ligne vide.</small>
   </fieldset>
-  {% for titre, champs in form.sections %}
-  <fieldset>
-    <legend>{{ titre }}</legend>
-    {% if titre == "Précédent locataire (zone tendue)" %}<p class="discret">En zone tendue, si le précédent locataire est parti depuis moins de 18 mois, le bail doit indiquer son dernier loyer.</p>{% endif %}
-    {% for champ in champs %}{% include "biens/_champ.html" %}{% endfor %}
-  </fieldset>
+  {% for section in form.sections %}
+  {% if section.repliee %}
+  <details class="section-repliee"{% if section.en_erreur %} open{% endif %}>
+    <summary>{{ section.titre }}</summary>
+    <fieldset>
+  {% else %}
+    <fieldset>
+      <legend>{{ section.titre }}</legend>
+  {% endif %}
+      {% if section.titre == "Précédent locataire (zone tendue)" %}<p class="discret pleine-largeur">En zone tendue, si le précédent locataire est parti depuis moins de 18 mois, le bail doit indiquer son dernier loyer.</p>{% endif %}
+      {% if section.titre == "Mandat et honoraires de location" %}<p class="discret pleine-largeur">Repris du mandat de gestion en cours ; à modifier seulement pour ce bail.</p>{% endif %}
+      {% for champ in section.champs %}{% include "biens/_champ.html" %}{% endfor %}
+    </fieldset>
+  {% if section.repliee %}</details>{% endif %}
   {% endfor %}
-  <button type="submit">Enregistrer</button>
+  <div class="barre-actions">
+    <button type="submit">{% if bail %}Enregistrer{% else %}Enregistrer et passer au document{% endif %}</button>
+  </div>
 </form>
 {% endblock %}

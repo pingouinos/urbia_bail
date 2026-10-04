@@ -10,8 +10,13 @@ from mandats.models import Mandat
 
 
 def accueil(request):
+    """Page d'accueil centrée sur la rédaction des baux : derniers baux et
+    candidatures retenues qui attendent le leur."""
     return render(request, "core/accueil.html", {
         "est_admin": est_administrateur(request.user),
+        "derniers_baux": Bail.objects.select_related("bien").prefetch_related("locataires").order_by("-modifie_le")[:8],
+        "a_rediger": Candidature.objects.filter(statut=Candidature.Statut.RETENUE, bail__isnull=True)
+        .select_related("bien").prefetch_related("candidats"),
         "nb_biens": Bien.objects.filter(actif=True).count(),
         "nb_baux": Bail.objects.filter(date_fin_effective__isnull=True).count(),
         "nb_candidatures": Candidature.objects.filter(statut=Candidature.Statut.A_ETUDIER).count(),

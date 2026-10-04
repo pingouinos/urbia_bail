@@ -1,4 +1,4 @@
-"""Configuration Django d'UrbiaBail.
+"""Configuration Django d'Urbia Gestion.
 
 Toute la configuration propre à un déploiement passe par des variables
 d'environnement (fichier .env en local, voir .env.example).
@@ -9,6 +9,11 @@ from pathlib import Path
 
 import environ
 from django.core.exceptions import ImproperlyConfigured
+
+# Nom affiché dans les pages, l'administration et les applications
+# d'authentification. Les noms techniques (base urbiabail, image urbia_bail)
+# ne changent pas.
+NOM_APPLICATION = "Urbia Gestion"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -82,6 +87,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "comptes.context_processors.connexion",
+                "core.context_processors.application",
             ],
         },
     },
@@ -103,6 +109,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "fr-fr"
+# Application en français seulement, quelle que soit la langue du navigateur.
+LANGUAGES = [("fr", "Français")]
 TIME_ZONE = "Europe/Paris"
 USE_I18N = True
 USE_TZ = True
@@ -152,7 +160,7 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="webmaster@localhost")
 # MFA_OBLIGATOIRE=false. Les comptes Google la font chez Google (validation en
 # deux étapes à imposer dans la console d'administration Workspace).
 MFA_OBLIGATOIRE = env("MFA_OBLIGATOIRE")
-OTP_TOTP_ISSUER = "UrbiaBail"
+OTP_TOTP_ISSUER = NOM_APPLICATION
 
 # Les collaborateurs se connectent avec leur compte Google Workspace de
 # l'agence ; le formulaire identifiant / mot de passe reste réservé aux

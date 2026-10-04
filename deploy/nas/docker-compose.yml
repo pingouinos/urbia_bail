@@ -1,4 +1,4 @@
-# UrbiaBail · test sur le NAS Synology, accessible seulement depuis le réseau
+# Urbia Gestion · test sur le NAS Synology, accessible seulement depuis le réseau
 # local en HTTP (http://<IP du NAS>:8080). La production reste le VPS
 # (docker-compose.yml à la racine, avec Caddy et HTTPS).
 #
@@ -7,7 +7,7 @@
 # fusion sur main. Mémoire de chaque conteneur bornée ; environ 160 Mo au repos,
 # 310 Mo une fois le premier PDF produit.
 #
-# Les trois conteneurs utilisent directement le réseau du NAS (network_mode:
+# Les conteneurs utilisent directement le réseau du NAS (network_mode:
 # host) : sur le DS220+, le réseau Docker interne laisse ouvrir une connexion
 # entre conteneurs mais n'y fait passer aucune donnée. Seule l'application
 # (port 8080) est visible du bureau ; la base (25432) et Gotenberg (23300)
@@ -15,7 +15,7 @@
 #
 # Avant de coller, remplacer :
 #   - CHANGER-CETTE-CLE (une fois) par une cinquantaine de caractères aléatoires ;
-#   - MOTDEPASSE (deux fois, à l'identique) par des lettres et des chiffres ;
+#   - MOTDEPASSE (trois fois, à l'identique) par des lettres et des chiffres ;
 #   - 192.168.1.10 (deux fois) par l'adresse IP du NAS.
 services:
   web:
@@ -72,6 +72,36 @@ services:
     network_mode: host
     command: gotenberg --api-port=23300 --api-bind-ip=127.0.0.1
     mem_limit: 768m
+
+  sauvegarde:
+    # Chaque jour : copie de la base et des documents dans le dossier
+    # sauvegardes/ du projet (visible dans File Station, à inclure dans Hyper
+    # Backup), gardée 14 jours.
+    image: postgres:16-alpine
+    restart: unless-stopped
+    network_mode: host
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        # Première copie 10 minutes après le démarrage, une fois la base à jour.
+        sleep 600
+        while true; do
+          jour=$$(date +%F)
+          pg_dump -h 127.0.0.1 -p 25432 -U urbiabail --format=custom urbiabail > /sauvegardes/base-$$jour.dump \
+            && tar czf /sauvegardes/documents-$$jour.tar.gz -C /documents . \
+            && echo "Sauvegarde $$jour faite" || echo "Sauvegarde $$jour en échec" >&2
+          find /sauvegardes -type f -mtime +14 -delete
+          sleep 86400
+        done
+    environment:
+      PGPASSWORD: "MOTDEPASSE"
+    volumes:
+      - ./sauvegardes:/sauvegardes
+      - documents:/documents:ro
+    mem_limit: 64m
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   documents:

@@ -1,11 +1,57 @@
 {% extends "base.html" %}
 {% block contenu %}
-<h1>Bonjour {{ user.first_name|default:user.username }}</h1>
-<p>Rôle : {% if est_admin %}administrateur{% else %}gestionnaire{% endif %}.</p>
-<div class="grille">
-  <section class="carte"><h2><a href="{% url 'biens:liste' %}">Biens</a></h2><p class="discret">{{ nb_biens }} lot(s) actif(s) au référentiel.</p><p><a href="{% url 'biens:importer' %}">Importer un fichier Excel</a></p></section>
-  <section class="carte"><h2><a href="{% url 'mandats:registre' %}">Mandats</a></h2><p class="discret">{{ nb_mandats }} mandat(s) en cours au registre.</p>{% if est_admin %}<p><a href="{% url 'documents:modeles' %}">Modèles Word</a></p>{% endif %}</section>
-  <section class="carte"><h2><a href="{% url 'candidatures:liste' %}">Candidatures</a></h2><p class="discret">{{ nb_candidatures }} candidature(s) à étudier.</p><p><a href="{% url 'candidatures:creer' %}">Enregistrer une candidature</a></p></section>
-  <section class="carte"><h2><a href="{% url 'baux:liste' %}">Baux</a></h2><p class="discret">{{ nb_baux }} bail(s) en cours.</p><p><a href="{% url 'baux:creer' %}">Rédiger un bail</a></p></section>
+<section class="accroche">
+  <div>
+    <h1>Bonjour {{ user.first_name|default:user.username }}</h1>
+    <p>Rédigez un bail en trois étapes : le logement, les locataires et les conditions, puis le document à faire signer.</p>
+  </div>
+  <form method="get" action="{% url 'baux:creer' %}" class="recherche">
+    <input type="search" name="q" placeholder="Adresse ou référence" aria-label="Logement à louer">
+    <button type="submit">Nouveau bail</button>
+  </form>
+</section>
+
+{% if a_rediger %}
+<section class="carte">
+  <h2>Candidatures retenues sans bail</h2>
+  <ul class="choix">
+    {% for candidature in a_rediger %}
+    <li><a href="{% url 'baux:creer' %}?candidature={{ candidature.pk }}"><strong>Rédiger le bail de {{ candidature.noms|default:"la candidature" }}</strong><span class="discret">{{ candidature.bien }}{% if candidature.date_entree_souhaitee %} · entrée le {{ candidature.date_entree_souhaitee|date:"d/m/Y" }}{% endif %}</span></a></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="carte">
+  <div class="titre-actions">
+    <h2>Derniers baux</h2>
+    <a href="{% url 'baux:liste' %}">Tous les baux</a>
+  </div>
+  {% if derniers_baux %}
+  <table>
+    <thead><tr><th>Logement</th><th>Locataires</th><th>Prise d'effet</th><th>Document</th></tr></thead>
+    <tbody>
+    {% for bail in derniers_baux %}
+      <tr>
+        <td><a href="{{ bail.get_absolute_url }}">{{ bail.bien.adresse }}</a><br><span class="discret">{{ bail.bien.code_postal }} {{ bail.bien.ville }}</span></td>
+        <td>{% for locataire in bail.locataires.all %}{{ locataire }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+        <td>{{ bail.date_effet|date:"d/m/Y" }}</td>
+        <td class="liens"><a href="{% url 'baux:pdf' bail.pk %}">PDF</a> <a href="{% url 'baux:word' bail.pk %}">Word</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="discret">Aucun bail pour l'instant. Commencez par « Nouveau bail » ci-dessus.</p>
+  {% endif %}
+</section>
+
+<div class="grille raccourcis">
+  <a class="carte" href="{% url 'candidatures:liste' %}"><strong>Candidatures</strong><span class="discret">{{ nb_candidatures }} à étudier</span></a>
+  <a class="carte" href="{% url 'biens:liste' %}"><strong>Biens</strong><span class="discret">{{ nb_biens }} lot(s) actif(s)</span></a>
+  <a class="carte" href="{% url 'mandats:registre' %}"><strong>Mandats</strong><span class="discret">{{ nb_mandats }} en cours</span></a>
+  <a class="carte" href="{% url 'biens:importer' %}"><strong>Importer des biens</strong><span class="discret">Depuis un fichier Excel</span></a>
+  {% if est_admin %}<a class="carte" href="{% url 'documents:modeles' %}"><strong>Modèles Word</strong><span class="discret">Bail et mandat</span></a>{% endif %}
 </div>
+<p class="discret">Connecté en tant que {% if est_admin %}administrateur{% else %}gestionnaire{% endif %}.</p>
 {% endblock %}

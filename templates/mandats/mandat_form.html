@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titre %}{% if mandat %}Modifier le mandat{% else %}Nouveau mandat{% endif %} · UrbiaBail{% endblock %}
+{% block titre %}{% if mandat %}Modifier le mandat{% else %}Nouveau mandat{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <p><a href="{% if mandat %}{{ mandat.get_absolute_url }}{% else %}{% url 'mandats:registre' %}{% endif %}">← Retour</a></p>
 <h1>{% if mandat %}Modifier le mandat n° {{ mandat.numero }}{% else %}Nouveau mandat{% endif %}</h1>

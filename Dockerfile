@@ -1,4 +1,4 @@
-# Image de l'application UrbiaBail (Django + Gunicorn).
+# Image de l'application Urbia Gestion (Django + Gunicorn).
 FROM python:3.12-slim-bookworm
 RUN useradd --create-home --uid 1000 urbiabail
 ENV PYTHONDONTWRITEBYTECODE=1 \

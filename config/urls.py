@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path
@@ -5,8 +6,8 @@ from django.urls import include, path
 from comptes import views as comptes_views
 from core import views
 
-admin.site.site_header = "UrbiaBail · administration"
-admin.site.site_title = "UrbiaBail"
+admin.site.site_header = f"{settings.NOM_APPLICATION} · administration"
+admin.site.site_title = settings.NOM_APPLICATION
 
 urlpatterns = [
     path("", views.accueil, name="accueil"),

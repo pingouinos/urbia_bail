@@ -1,0 +1,5 @@
+<ol class="etapes" aria-label="Étapes de rédaction du bail">
+  <li{% if etape == 1 %} aria-current="step"{% elif etape > 1 %} class="faite"{% endif %}><span>1</span> Logement</li>
+  <li{% if etape == 2 %} aria-current="step"{% elif etape > 2 %} class="faite"{% endif %}><span>2</span> Locataires et conditions</li>
+  <li{% if etape == 3 %} aria-current="step"{% endif %}><span>3</span> Document</li>
+</ol>

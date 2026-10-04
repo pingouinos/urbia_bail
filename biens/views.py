@@ -87,14 +87,14 @@ def bailleur_editer(request, pk=None):
 
 def modele(request):
     reponse = HttpResponse(tableur.classeur(), content_type=XLSX)
-    reponse["Content-Disposition"] = 'attachment; filename="modele-biens-urbiabail.xlsx"'
+    reponse["Content-Disposition"] = 'attachment; filename="modele-biens-urbia-gestion.xlsx"'
     return reponse
 
 
 def exporter(request):
     biens = _biens_filtres(request)
     reponse = HttpResponse(tableur.classeur(biens), content_type=XLSX)
-    nom = f"biens-urbiabail-{timezone.localdate():%Y-%m-%d}.xlsx"
+    nom = f"biens-urbia-gestion-{timezone.localdate():%Y-%m-%d}.xlsx"
     reponse["Content-Disposition"] = f'attachment; filename="{nom}"'
     return reponse
 

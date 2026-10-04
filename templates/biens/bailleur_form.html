@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titre %}{% if bailleur %}Modifier le bailleur{% else %}Nouveau bailleur{% endif %} · UrbiaBail{% endblock %}
+{% block titre %}{% if bailleur %}Modifier le bailleur{% else %}Nouveau bailleur{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <p><a href="{% if bailleur %}{{ bailleur.get_absolute_url }}{% else %}{% url 'biens:bailleurs' %}{% endif %}">← Retour</a></p>
 <h1>{% if bailleur %}Modifier {{ bailleur }}{% else %}Nouveau bailleur{% endif %}</h1>

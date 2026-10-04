@@ -1,20 +1,44 @@
 {% extends "base.html" %}
-{% block titre %}Nouveau bail · UrbiaBail{% endblock %}
+{% block titre %}Nouveau bail · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'baux:liste' %}">← Baux</a></p>
 <h1>Nouveau bail</h1>
-<form method="get" class="formulaire">
-  <fieldset>
-    <legend>Logement loué</legend>
-    <div class="champ">
-      <label for="bien">Bien</label>
-      <select name="bien" id="bien" required>
-        <option value="">Choisir un logement</option>
-        {% for bien in biens %}<option value="{{ bien.pk }}">{{ bien }} · {{ bien.bailleur }}</option>{% endfor %}
-      </select>
-      <small class="discret">Le bail est prérempli avec la fiche du bien et les honoraires de son mandat en cours.</small>
-    </div>
-  </fieldset>
-  <button type="submit">Continuer</button>
-</form>
+{% include "baux/_etapes.html" with etape=1 %}
+
+<section class="carte">
+  <h2>Quel logement est loué ?</h2>
+  <form method="get" class="recherche">
+    <input type="search" name="q" value="{{ q }}" placeholder="Adresse, ville, référence ICS ou nom du propriétaire" aria-label="Rechercher un logement" autofocus>
+    <button type="submit">Rechercher</button>
+  </form>
+  {% if biens %}
+  <ul class="choix">
+    {% for bien in biens %}
+    <li>
+      <a href="{% url 'baux:creer' %}?bien={{ bien.pk }}">
+        <strong>{{ bien }}</strong>
+        <span class="discret">{{ bien.designation }} · {{ bien.bailleur }}{% if bien.ref_ics %} · réf. {{ bien.ref_ics }}{% endif %}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if nb_biens > biens|length %}<p class="discret">{{ biens|length }} logements affichés sur {{ nb_biens }} : précisez la recherche.</p>{% endif %}
+  {% elif q %}
+  <p>Aucun logement ne correspond à « {{ q }} ».</p>
+  {% else %}
+  <p class="discret">Aucun logement au référentiel pour l'instant.</p>
+  {% endif %}
+  <p class="separateur"><a class="bouton secondaire" href="{% url 'baux:nouveau_logement' %}">Le logement n'est pas dans la liste : le créer</a></p>
+</section>
+
+{% if candidatures %}
+<section class="carte">
+  <h2>Ou partir d'une candidature retenue</h2>
+  <p class="discret">Le logement, la date d'entrée et les locataires sont repris de la candidature.</p>
+  <ul class="choix">
+    {% for candidature in candidatures %}
+    <li><a href="{% url 'baux:creer' %}?candidature={{ candidature.pk }}"><strong>{{ candidature.noms|default:"Candidature" }}</strong><span class="discret">{{ candidature.bien }}{% if candidature.date_entree_souhaitee %} · entrée le {{ candidature.date_entree_souhaitee|date:"d/m/Y" }}{% endif %}</span></a></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 {% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titre %}{{ bien.adresse }} · UrbiaBail{% endblock %}
+{% block titre %}{{ bien.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <p><a href="{% url 'biens:liste' %}">← Biens</a></p>
 <div class="titre-actions">
