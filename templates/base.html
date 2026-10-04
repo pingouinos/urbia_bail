@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block titre %}UrbiaBail{% endblock %}</title>
+  <title>{% block titre %}{{ nom_application }}{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
 <body>
   <header class="entete">
-    <a class="marque" href="{% url 'accueil' %}">UrbiaBail</a>
+    <a class="marque" href="{% url 'accueil' %}">{{ nom_application }}</a>
     {% if user.is_authenticated %}
     <nav>
       <a href="{% url 'biens:liste' %}">Biens</a>

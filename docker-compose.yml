@@ -1,4 +1,4 @@
-# Déploiement UrbiaBail sur un VPS : Caddy (HTTPS automatique), application,
+# Déploiement Urbia Gestion sur un VPS : Caddy (HTTPS automatique), application,
 # base PostgreSQL et conversion PDF. Seul Caddy est exposé sur Internet.
 services:
   caddy:

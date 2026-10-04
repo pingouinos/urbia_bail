@@ -1,4 +1,4 @@
-# UrbiaBail · test sur le NAS Synology, accessible seulement depuis le réseau
+# Urbia Gestion · test sur le NAS Synology, accessible seulement depuis le réseau
 # local en HTTP (http://<IP du NAS>:8080). La production reste le VPS
 # (docker-compose.yml à la racine, avec Caddy et HTTPS).
 #

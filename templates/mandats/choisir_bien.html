@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titre %}Nouveau mandat · UrbiaBail{% endblock %}
+{% block titre %}Nouveau mandat · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <p><a href="{% url 'mandats:registre' %}">← Registre des mandats</a></p>
 <h1>Nouveau mandat</h1>

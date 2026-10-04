@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titre %}Candidature · {{ candidature.bien.adresse }} · UrbiaBail{% endblock %}
+{% block titre %}Candidature · {{ candidature.bien.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <p><a href="{% url 'candidatures:liste' %}?bien={{ candidature.bien.pk }}">← Candidatures pour ce logement</a></p>
 <div class="titre-actions">

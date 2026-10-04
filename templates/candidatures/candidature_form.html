@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titre %}{% if candidature %}Modifier la candidature{% else %}Nouvelle candidature{% endif %} · UrbiaBail{% endblock %}
+{% block titre %}{% if candidature %}Modifier la candidature{% else %}Nouvelle candidature{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <p><a href="{% if candidature %}{{ candidature.get_absolute_url }}{% else %}{% url 'candidatures:liste' %}{% endif %}">← Retour</a></p>
 <h1>{% if candidature %}Modifier la candidature{% else %}Nouvelle candidature{% endif %}</h1>
