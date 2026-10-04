@@ -1,0 +1,57 @@
+# UrbiaBail · essai sur un ordinateur (Windows, Mac ou Linux) avec Docker
+# Desktop, gratuit. L'application s'ouvre sur http://localhost:8080, depuis cet
+# ordinateur seulement. Rien à remplacer : la clé et le mot de passe ci-dessous
+# ne servent qu'à cet essai local.
+#
+# Dans le dossier qui contient ce fichier :
+#   docker compose up -d        démarre (le premier lancement télécharge ~1 Go)
+#   docker compose exec web python manage.py createsuperuser
+#   docker compose down         arrête (les données restent)
+services:
+  web:
+    image: ghcr.io/pingouinos/urbia_bail:main
+    # L'image est construite pour les processeurs Intel/AMD ; les Mac récents
+    # la font tourner en émulation.
+    platform: linux/amd64
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: "essai-local-uniquement-ne-pas-utiliser-en-production"
+      DATABASE_URL: "postgres://urbiabail:essai@db:5432/urbiabail"
+      CSRF_TRUSTED_ORIGINS: "http://localhost:8080"
+      HTTPS: "false"
+      MFA_OBLIGATOIRE: "true"
+      DOCUMENTS_DIR: /documents
+      GOTENBERG_URL: http://gotenberg:3000
+      GUNICORN_WORKERS: "2"
+    ports:
+      # 127.0.0.1 : invisible des autres postes du réseau.
+      - "127.0.0.1:8080:8000"
+    volumes:
+      - documents:/documents
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: urbiabail
+      POSTGRES_USER: urbiabail
+      POSTGRES_PASSWORD: "essai"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U urbiabail"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+
+volumes:
+  documents:
+  postgres:
