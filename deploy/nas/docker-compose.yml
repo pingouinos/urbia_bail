@@ -1,24 +1,29 @@
-# Déploiement de TEST sur le NAS Synology de l'agence (DS220+, 2 Go de RAM),
-# accessible uniquement depuis le réseau local en HTTP : http://<IP du NAS>:8080
-# La production reste le VPS (docker-compose.yml à la racine, avec Caddy).
+# UrbiaBail · test sur le NAS Synology, accessible seulement depuis le réseau
+# local en HTTP (http://<IP du NAS>:8080). La production reste le VPS
+# (docker-compose.yml à la racine, avec Caddy et HTTPS).
 #
-# Différences avec le VPS : pas de Caddy ni de HTTPS, mémoire de chaque
-# conteneur bornée. Consommation mesurée : environ 160 Mo au repos, 310 Mo
-# une fois le premier PDF produit (LibreOffice démarre à la première
-# conversion et reste ensuite en mémoire).
-name: urbiabail
-
+# À coller dans Container Manager (Projet > Créer > Créer docker-compose.yml) :
+# le NAS ne construit rien, il télécharge l'image publiée par GitHub à chaque
+# fusion sur main. Mémoire de chaque conteneur bornée ; environ 160 Mo au repos,
+# 310 Mo une fois le premier PDF produit.
+#
+# Avant de coller, remplacer :
+#   - CHANGER-CETTE-CLE (une fois) par une cinquantaine de caractères aléatoires ;
+#   - MOTDEPASSE (deux fois, à l'identique) par un mot de passe sans @ : / ;
+#   - 192.168.1.10 (deux fois) par l'adresse IP du NAS.
 services:
   web:
-    # Image construite et publiée par GitHub à chaque fusion sur main : le
-    # NAS la télécharge au lieu de la construire (la construction sur le
-    # Synology n'atteignait pas le dépôt des paquets Python).
     image: ghcr.io/pingouinos/urbia_bail:main
+    # Télécharge la dernière image publiée à chaque (re)création du projet.
     pull_policy: always
     restart: unless-stopped
-    env_file: .env
     environment:
-      DATABASE_URL: postgres://urbiabail:${POSTGRES_PASSWORD}@db:5432/urbiabail
+      SECRET_KEY: "CHANGER-CETTE-CLE"
+      DATABASE_URL: "postgres://urbiabail:MOTDEPASSE@db:5432/urbiabail"
+      ALLOWED_HOSTS: "192.168.1.10"
+      CSRF_TRUSTED_ORIGINS: "http://192.168.1.10:8080"
+      HTTPS: "false"
+      MFA_OBLIGATOIRE: "true"
       DOCUMENTS_DIR: /documents
       GOTENBERG_URL: http://gotenberg:3000
       GUNICORN_WORKERS: "2"
@@ -30,21 +35,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/sante/')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
 
   db:
     image: postgres:16-alpine
     restart: unless-stopped
-    # Réglages PostgreSQL réduits pour tenir dans 256 Mo.
     command: postgres -c shared_buffers=64MB -c work_mem=4MB -c max_connections=20
     environment:
       POSTGRES_DB: urbiabail
       POSTGRES_USER: urbiabail
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: "MOTDEPASSE"
     volumes:
       - postgres:/var/lib/postgresql/data
     mem_limit: 256m
@@ -55,7 +54,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Conversion Word vers PDF des mandats et des baux.
   gotenberg:
     image: gotenberg/gotenberg:8
     restart: unless-stopped
