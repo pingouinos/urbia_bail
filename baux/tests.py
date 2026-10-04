@@ -150,8 +150,58 @@ class VuesTests(Donnees, TestCase):
         }
         reponse = self.client.post(reverse("baux:creer"), donnees)
         bail = Bail.objects.get()
-        self.assertRedirects(reponse, bail.get_absolute_url())
+        self.assertRedirects(reponse, bail.get_absolute_url(), fetch_redirect_response=False)
         self.assertEqual([str(l) for l in bail.locataires.all()], ["Julie MARTIN"])
+        # Fin du parcours : la page du bail le confirme une seule fois.
+        page = self.client.get(bail.get_absolute_url())
+        self.assertContains(page, "Bail enregistré.")
+        self.assertContains(page, "Télécharger le PDF")
+        self.assertNotContains(self.client.get(bail.get_absolute_url()), "Bail enregistré.")
+
+    def test_recherche_du_logement(self):
+        muret = self.creer_bien()
+        autre = self.creer_bien(adresse="3 rue Alsace-Lorraine", ref_ics="L-0042")
+        page = self.client.get(reverse("baux:creer"), {"q": "muret toulouse"})
+        self.assertContains(page, str(muret))
+        self.assertNotContains(page, str(autre))
+        page = self.client.get(reverse("baux:creer"), {"q": "L-0042"})
+        self.assertContains(page, str(autre))
+        self.assertNotContains(page, str(muret))
+        self.assertContains(self.client.get(reverse("baux:creer"), {"q": "introuvable"}), "Aucun logement")
+
+    LOGEMENT = {
+        "logement-adresse": "5 place du Capitole", "logement-code_postal": "31000", "logement-ville": "Toulouse",
+        "logement-type_habitat": "collectif", "logement-regime_juridique": "copropriete",
+        "logement-periode_construction": "avant_1949", "logement-surface": "45", "logement-nb_pieces": "2",
+        "logement-chauffage": "individuel", "logement-eau_chaude": "individuel", "logement-classe_dpe": "C",
+        "logement-dernier_loyer": "820", "logement-charges": "40",
+    }
+
+    def test_nouveau_logement_et_proprietaire(self):
+        reponse = self.client.post(reverse("baux:nouveau_logement"), {
+            **self.LOGEMENT, "proprietaire-type": "physique", "proprietaire-civilite": "M.",
+            "proprietaire-nom": "Garcia", "proprietaire-prenom": "Luis",
+        })
+        bien = Bien.objects.get()
+        self.assertRedirects(reponse, f"{reverse('baux:creer')}?bien={bien.pk}")
+        self.assertEqual((bien.bailleur.nom, bien.dernier_loyer, bien.ref_ics), ("Garcia", Decimal("820"), None))
+        self.assertEqual(bien.champs_manquants_pour_bail(), [])
+        self.assertContains(self.client.get(reponse.url), 'value="820.00"')
+
+    def test_nouveau_logement_proprietaire_existant(self):
+        bailleur = self.creer_bien().bailleur
+        reponse = self.client.post(reverse("baux:nouveau_logement"), {
+            **self.LOGEMENT, "logement-proprietaire": bailleur.pk,
+        })
+        self.assertEqual(reponse.status_code, 302)
+        self.assertEqual(Bailleur.objects.count(), 1)
+        self.assertEqual(bailleur.biens.count(), 2)
+
+    def test_nouveau_logement_sans_proprietaire_refuse(self):
+        reponse = self.client.post(reverse("baux:nouveau_logement"), self.LOGEMENT)
+        self.assertEqual(reponse.status_code, 200)
+        self.assertFalse(Bien.objects.exists())
+        self.assertContains(reponse, "Ce champ est obligatoire")
 
     def test_sans_locataire_refuse(self):
         bien = self.creer_bien()
@@ -175,6 +225,8 @@ class VuesTests(Donnees, TestCase):
             self.assertEqual(self.client.get(reverse("baux:pdf", args=[bail.pk])).content, b"%PDF-1.7")
         for url in [reverse("baux:liste"), reverse("baux:bail", args=[bail.pk]),
                     reverse("baux:modifier", args=[bail.pk]), reverse("biens:bien", args=[bail.bien.pk]),
-                    reverse("accueil")]:
+                    reverse("baux:nouveau_logement"), reverse("accueil")]:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
+        # L'accueil donne accès au PDF des derniers baux.
+        self.assertContains(self.client.get(reverse("accueil")), reverse("baux:pdf", args=[bail.pk]))

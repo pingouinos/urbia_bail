@@ -109,6 +109,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "fr-fr"
+# Application en français seulement, quelle que soit la langue du navigateur.
+LANGUAGES = [("fr", "Français")]
 TIME_ZONE = "Europe/Paris"
 USE_I18N = True
 USE_TZ = True

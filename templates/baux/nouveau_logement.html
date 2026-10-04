@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block titre %}Nouveau logement · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'baux:creer' %}">← Retour à la recherche</a></p>
+<h1>Nouveau bail</h1>
+{% include "baux/_etapes.html" with etape=1 %}
+<p class="discret">Les mentions demandées ici figurent dans le bail. Le reste de la fiche (étage, diagnostics, annexes…) se complète plus tard.</p>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ logement.non_field_errors }}
+  <fieldset>
+    <legend>Propriétaire</legend>
+    {% include "biens/_champ.html" with champ=logement.proprietaire %}
+    <div id="nouveau-proprietaire" class="pleine-largeur sous-grille">
+      <p class="pleine-largeur sous-titre">Nouveau propriétaire</p>
+      {% for champ in proprietaire %}{% include "biens/_champ.html" %}{% endfor %}
+    </div>
+  </fieldset>
+  {% for titre, champs in logement.sections %}
+  <fieldset>
+    <legend>{{ titre }}</legend>
+    {% for champ in champs %}{% include "biens/_champ.html" %}{% endfor %}
+  </fieldset>
+  {% endfor %}
+  <div class="barre-actions">
+    <button type="submit">Enregistrer et continuer</button>
+  </div>
+</form>
+<script>
+  // Les champs du nouveau propriétaire ne servent que si aucun propriétaire
+  // existant n'est choisi.
+  (function () {
+    var choix = document.getElementById("{{ logement.proprietaire.id_for_label }}");
+    var nouveau = document.getElementById("nouveau-proprietaire");
+    function majAffichage() { nouveau.hidden = Boolean(choix.value); }
+    choix.addEventListener("change", majAffichage);
+    majAffichage();
+  })();
+</script>
+{% endblock %}

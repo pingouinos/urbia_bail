@@ -1,18 +1,30 @@
 {% extends "base.html" %}
 {% block titre %}Bail · {{ bail.bien.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
+{% if vient_d_etre_cree %}
+{% include "baux/_etapes.html" with etape=3 %}
+{% else %}
 <p><a href="{% url 'baux:liste' %}">← Baux</a></p>
-<div class="titre-actions">
-  <h1>Bail · {{ bail.bien.adresse }}</h1>
-  <div class="actions">
-    <a href="{% url 'baux:word' bail.pk %}">Word</a>
-    <a href="{% url 'baux:pdf' bail.pk %}">PDF</a>
-    <a class="bouton-petit" href="{% url 'baux:modifier' bail.pk %}">Modifier</a>
-  </div>
-</div>
-<p class="discret">{{ bail.get_type_display }} · du {{ bail.date_effet|date:"d/m/Y" }} au {{ bail.date_fin|date:"d/m/Y" }}{% if bail.date_signature %} · signé le {{ bail.date_signature|date:"d/m/Y" }}{% endif %}{% if not bail.en_cours %} · terminé le {{ bail.date_fin_effective|date:"d/m/Y" }}{% endif %}</p>
+{% endif %}
 
-{% for alerte in bail.alertes %}<p class="message alerte-fond">{{ alerte }}</p>{% endfor %}
+<section class="carte document">
+  <div>
+    {% if vient_d_etre_cree %}<p class="succes">Bail enregistré.</p>{% endif %}
+    <h1>Bail · {{ bail.bien.adresse }}</h1>
+    <p class="discret">{% for locataire in bail.locataires.all %}{{ locataire }}{% if not forloop.last %}, {% endif %}{% endfor %} · {{ bail.get_type_display }} · du {{ bail.date_effet|date:"d/m/Y" }} au {{ bail.date_fin|date:"d/m/Y" }}{% if bail.date_signature %} · signé le {{ bail.date_signature|date:"d/m/Y" }}{% endif %}{% if not bail.en_cours %} · terminé le {{ bail.date_fin_effective|date:"d/m/Y" }}{% endif %}</p>
+    {% with alertes=bail.alertes %}{% if alertes %}
+    <div class="alertes">
+      <p><strong>À vérifier avant de faire signer</strong></p>
+      <ul>{% for alerte in alertes %}<li>{{ alerte }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}{% endwith %}
+  </div>
+  <div class="telechargements">
+    <a class="bouton bouton-principal" href="{% url 'baux:pdf' bail.pk %}">Télécharger le PDF</a>
+    <a class="bouton secondaire" href="{% url 'baux:word' bail.pk %}">Version Word, modifiable</a>
+    <a href="{% url 'baux:modifier' bail.pk %}">Modifier le bail</a>
+  </div>
+</section>
 
 <div class="grille">
   <section class="carte">
