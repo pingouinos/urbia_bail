@@ -56,12 +56,20 @@ Le domaine doit passer chez Cloudflare (ses serveurs DNS), ce qui touche aussi l
 
 1. Créer un compte sur [dash.cloudflare.com](https://dash.cloudflare.com) avec l'adresse de l'agence.
 2. *Onboard a domain* : `urbia-immobilier.fr`, offre **Free**. Cloudflare recherche les enregistrements existants, mais peut en oublier.
-3. Comparer sa liste, ligne à ligne, avec la zone DNS d'OVH (*Web Cloud* > *Noms de domaine* > `urbia-immobilier.fr` > onglet *Zone DNS*) et ajouter ce qui manque. Pour la messagerie Google, il faut retrouver :
-   - le ou les **MX** : `smtp.google.com` (priorité 1), ou les cinq `aspmx…` d'un compte plus ancien ;
-   - le **TXT** SPF `v=spf1 include:_spf.google.com ~all` ;
-   - le **TXT** `google._domainkey` (DKIM, valeur à recopier telle quelle), et `_dmarc` ou `google-site-verification` s'ils existent.
+3. Comparer sa liste, ligne à ligne, avec la zone DNS d'OVH (*Web Cloud* > *Noms de domaine* > `urbia-immobilier.fr` > onglet *Zone DNS*) et ajouter ce qui manque : il faut retrouver le MX, le SPF et le DKIM de la messagerie Google, ainsi que les lignes A du site.
 
-   Les enregistrements du site (`urbia-immobilier.fr`, `www`) passent en **DNS only** (nuage gris), pour que le site reste servi exactement comme aujourd'hui. MX et TXT sont toujours en DNS only.
+   Pour ajouter une ligne : bouton *Add record* ; dans *Name*, `@` désigne le domaine lui-même ; TTL sur *Auto* :
+
+   | Type | Name | Valeur | Autre |
+   |---|---|---|---|
+   | MX | `@` | *Mail server* : `smtp.google.com` | *Priority* : 1 |
+   | TXT | `@` | *Content* : `v=spf1 include:_spf.google.com ~all` | |
+   | TXT | `google._domainkey` | *Content* : `v=DKIM1; k=rsa; p=…`, recopié d'OVH | |
+   | TXT | `_dmarc` | recopié d'OVH, s'il existe | |
+   | TXT | `@` | `google-site-verification=…`, s'il existe | |
+   | A | `@` et `www` | *IPv4 address* du site, recopiée d'OVH | *Proxy status* : désactivé (nuage gris) |
+
+   Si OVH affiche les cinq `ASPMX…` au lieu de `smtp.google.com`, les recopier avec leurs priorités. Une ligne de type « SPF » chez OVH se crée en TXT chez Cloudflare. Si le site passe par un CNAME chez OVH, le recopier de la même façon. Les lignes du site restent en **DNS only** (nuage gris), pour que le site soit servi exactement comme aujourd'hui ; MX et TXT sont toujours en DNS only.
 4. Noter les deux serveurs de noms que Cloudflare indique (`….ns.cloudflare.com`).
 
 ### 2. OVH : confier le domaine à Cloudflare
