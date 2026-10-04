@@ -11,8 +11,8 @@
 </head>
 <body>
   <header class="entete{% if not user.is_authenticated %} entete-seule{% endif %}">
-    <a class="marque" href="{% url 'accueil' %}"><img src="{% static 'img/logo-urbia-gestion.png' %}" alt="{{ nom_application }}" width="117" height="48"></a>
     {% if user.is_authenticated %}
+    <a class="marque" href="{% url 'accueil' %}"><img src="{% static 'img/logo-urbia-gestion.png' %}" alt="{{ nom_application }}" width="117" height="48"></a>
     <a class="bouton-entete" href="{% url 'baux:creer' %}">Nouveau bail</a>
     <button type="button" class="bouton-menu" aria-expanded="false" aria-controls="menu-principal">
       <span class="icone-menu" aria-hidden="true"></span>
@@ -40,6 +40,8 @@
         });
       })();
     </script>
+    {% else %}
+    <span class="marque"><img src="{% static 'img/logo-urbia-gestion.png' %}" alt="URBIA Immobilier" width="117" height="48"></span>
     {% endif %}
   </header>
   <main>

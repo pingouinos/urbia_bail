@@ -70,10 +70,13 @@ def bail_editer(request, pk=None):
         if candidature:
             objet_initial.date_effet = candidature.date_entree_souhaitee
             initial = [
-                {champ: getattr(candidat, champ) for champ in (
-                    "civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone",
-                )}
-                for candidat in candidature.candidats.all()
+                {
+                    **{champ: getattr(candidat, champ) for champ in (
+                        "civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone",
+                    )},
+                    "garants": "\n".join(garant.ligne_bail for garant in candidat.garants.all()),
+                }
+                for candidat in candidature.candidats.prefetch_related("garants")
             ]
         form = BailForm(instance=objet_initial)
         locataires = LocataireFormSet(instance=objet_initial, initial=initial)

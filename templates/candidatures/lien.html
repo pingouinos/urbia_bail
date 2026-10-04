@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titre %}Lien pour le locataire · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{{ candidature.get_absolute_url }}">← Candidature</a></p>
+<h1>Lien pour le locataire</h1>
+<p class="discret">Pour {{ candidature.noms }} · {{ candidature.bien }}<br>Destinataire(s) : {{ destinataires|join:", "|default:"aucune adresse e-mail sur la fiche" }}</p>
+<p class="message">Le candidat y complète son identité, ses coordonnées et le lien de son dossier DossierFacile, sans compte ni mot de passe. Le lien est valable jusqu'au {{ candidature.lien_expire_le|date:"d/m/Y" }} et ne sert qu'une fois.</p>
+{% if local %}<p class="message alerte-fond">La page n'est pas encore ouverte sur Internet : ce lien ne fonctionne que depuis le réseau du bureau.</p>{% endif %}
+<section class="carte">
+  <h2>Lien</h2>
+  <div class="copie">
+    <input type="text" id="adresse-lien" value="{{ adresse }}" readonly aria-label="Lien pour le locataire">
+    <button type="button" class="bouton secondaire" data-copier="adresse-lien">Copier le lien</button>
+  </div>
+  <small class="discret">À coller dans un SMS si le candidat n'a pas d'e-mail.</small>
+</section>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  <fieldset>
+    <legend>Message</legend>
+    {% include "biens/_champ.html" with champ=form.texte %}
+  </fieldset>
+  <div class="actions-formulaire">
+    {% if envoi %}<button type="submit" name="action" value="envoyer">Envoyer l'e-mail</button>{% endif %}
+    {% if destinataires %}<a class="bouton{% if envoi %} secondaire{% endif %}" href="{{ mailto }}">Ouvrir dans ma messagerie</a>{% endif %}
+    <button type="button" class="bouton secondaire" data-copier="id_texte">Copier le message</button>
+  </div>
+</form>
+<script>
+  // Copie dans le presse-papiers, pour Gmail ou un SMS.
+  document.querySelectorAll("[data-copier]").forEach(function (bouton) {
+    bouton.addEventListener("click", function () {
+      var champ = document.getElementById(bouton.dataset.copier);
+      var libelle = bouton.textContent;
+      navigator.clipboard.writeText(champ.value).then(function () {
+        bouton.textContent = "Copié";
+        setTimeout(function () { bouton.textContent = libelle; }, 2000);
+      }, function () { champ.select(); });
+    });
+  });
+</script>
+{% endblock %}

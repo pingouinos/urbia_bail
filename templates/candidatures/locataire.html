@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titre %}Vos informations pour le bail · URBIA Immobilier{% endblock %}
+{% block contenu %}
+<h1>Vos informations pour le bail</h1>
+<p>Logement : <strong>{{ candidature.bien.adresse }}{% if candidature.bien.complement %}, {{ candidature.bien.complement }}{% endif %}, {{ candidature.bien.code_postal }} {{ candidature.bien.ville }}</strong></p>
+<p class="discret">Ces informations figureront sur votre bail. Vérifiez l'orthographe de vos noms, et indiquez votre lieu de naissance comme sur votre pièce d'identité.</p>
+<form method="post" class="formulaire" novalidate>
+  {% csrf_token %}
+  {{ candidats.management_form }}
+  {% for erreur in candidats.non_form_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
+  {% for sous_form in candidats %}
+  <fieldset>
+    <legend>{% if forloop.first %}Vous{% elif sous_form.instance.pk %}Locataire {{ forloop.counter }}{% else %}Second locataire, le cas échéant{% endif %}</legend>
+    {% if not forloop.first and not sous_form.instance.pk %}<p class="discret pleine-largeur">Conjoint ou colocataire qui signe le bail avec vous. Laissez vide si vous êtes seul.</p>{% endif %}
+    {% for erreur in sous_form.non_field_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
+    {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
+    {% for champ in sous_form.visible_fields %}{% include "biens/_champ.html" %}{% endfor %}
+    <details class="garants pleine-largeur"{% if sous_form.garants_ouverts %} open{% endif %}>
+      <summary>Garants{% if forloop.first %} qui se portent caution pour vous{% else %} de ce locataire{% endif %}, le cas échéant</summary>
+      <p class="discret">Deux au plus. Avec Visale, ou sans garant, laissez vide.</p>
+      {{ sous_form.garants.management_form }}
+      {% for erreur in sous_form.garants.non_form_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
+      {% for garant in sous_form.garants %}
+      <div class="sous-formulaire">
+        <p class="sous-titre">Garant {{ forloop.counter }}</p>
+        <div class="sous-grille">
+          {% for champ in garant.hidden_fields %}{{ champ }}{% endfor %}
+          {% for champ in garant.visible_fields %}{% if champ.name != "DELETE" or garant.instance.pk %}{% include "biens/_champ.html" %}{% endif %}{% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </details>
+  </fieldset>
+  {% endfor %}
+  <fieldset>
+    <legend>Pièces justificatives</legend>
+    {% include "biens/_champ.html" with champ=form.lien_dossierfacile %}
+  </fieldset>
+  <p class="discret">Vos informations servent uniquement à préparer votre bail avec URBIA Immobilier. Si aucun bail n'est signé, elles sont effacées dans les trois mois.</p>
+  <div class="barre-actions">
+    <button type="submit">Envoyer mes informations</button>
+  </div>
+</form>
+{% endblock %}

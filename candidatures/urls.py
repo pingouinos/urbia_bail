@@ -11,5 +11,6 @@ urlpatterns = [
     path("<int:pk>/modifier/", views.candidature_editer, name="modifier"),
     path("<int:pk>/decision/", views.decider, name="decider"),
     path("<int:pk>/reponse/", views.reponse, name="reponse"),
+    path("<int:pk>/lien/", views.lien, name="lien"),
     path("<int:pk>/effacer/", views.effacer, name="effacer"),
 ]

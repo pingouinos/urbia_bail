@@ -46,6 +46,56 @@ Le conteneur `urbia-sauvegarde-1` copie la base (`base-AAAA-MM-JJ.dump`) et les 
 
 Pour restaurer une base, depuis le terminal de `urbia-sauvegarde-1` : `pg_restore -h 127.0.0.1 -p 25432 -U urbiabail -d urbiabail --clean /sauvegardes/base-AAAA-MM-JJ.dump`.
 
+## Ouvrir le formulaire locataire sur Internet (Cloudflare Tunnel)
+
+Le candidat retenu complète ses informations par un lien personnel (`/locataire/…`). Pour qu'il l'ouvre depuis chez lui, Cloudflare Tunnel relie le NAS à l'adresse `https://locataire.urbia-immobilier.fr` sans ouvrir de port sur la box : le NAS se connecte à Cloudflare, qui ne lui transmet que les adresses `/locataire/` et `/static/`. L'application refuse de toute façon tout le reste sur cette adresse ; le reste de l'appli ne s'ouvre qu'au bureau. L'offre Free de Cloudflare et le tunnel sont gratuits ; le domaine reste payé chez OVH.
+
+Le domaine doit passer chez Cloudflare (ses serveurs DNS), ce qui touche aussi la messagerie Google et le site : les étapes 1 et 2 sont à faire posément, en recopiant tous les enregistrements.
+
+### 1. Cloudflare : ajouter le domaine
+
+1. Créer un compte sur [dash.cloudflare.com](https://dash.cloudflare.com) avec l'adresse de l'agence.
+2. *Onboard a domain* : `urbia-immobilier.fr`, offre **Free**. Cloudflare recherche les enregistrements existants, mais peut en oublier.
+3. Comparer sa liste, ligne à ligne, avec la zone DNS d'OVH (*Web Cloud* > *Noms de domaine* > `urbia-immobilier.fr` > onglet *Zone DNS*) et ajouter ce qui manque. Pour la messagerie Google, il faut retrouver :
+   - le ou les **MX** : `smtp.google.com` (priorité 1), ou les cinq `aspmx…` d'un compte plus ancien ;
+   - le **TXT** SPF `v=spf1 include:_spf.google.com ~all` ;
+   - le **TXT** `google._domainkey` (DKIM, valeur à recopier telle quelle), et `_dmarc` ou `google-site-verification` s'ils existent.
+
+   Les enregistrements du site (`urbia-immobilier.fr`, `www`) passent en **DNS only** (nuage gris), pour que le site reste servi exactement comme aujourd'hui. MX et TXT sont toujours en DNS only.
+4. Noter les deux serveurs de noms que Cloudflare indique (`….ns.cloudflare.com`).
+
+### 2. OVH : confier le domaine à Cloudflare
+
+1. **DNSSEC** : page *Informations générales* du domaine, cadre *Sécurité*, interrupteur « Délégation sécurisée - DNSSEC ». S'il est activé, le désactiver et attendre 24 heures avant la suite, sinon le domaine (site et e-mails) peut devenir injoignable.
+2. Onglet *Serveurs DNS* > *Modifier les serveurs DNS* : remplacer les serveurs d'OVH par les deux de Cloudflare, puis *Appliquer la configuration* et *Appliquer*.
+3. Attendre que Cloudflare affiche le domaine comme actif (souvent moins d'une heure, jusqu'à 48 heures). Vérifier alors qu'un e-mail envoyé depuis une adresse extérieure arrive bien et que le site s'affiche.
+
+### 3. Cloudflare : créer le tunnel
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) > *Networking* > *Tunnels* > *Create a tunnel* (type *Cloudflared* s'il est demandé), nom `urbia-nas`. Si Cloudflare demande d'abord de créer une organisation *Zero Trust* : choisir un nom d'équipe et l'offre **Free** ; il réclame une carte bancaire mais ne prélève rien.
+2. Choisir l'environnement **Docker** et copier le **jeton** : la longue suite de caractères après `--token`, qui commence par `eyJ`. Il donne accès au tunnel : ne pas l'envoyer par e-mail ni messagerie.
+3. Laisser cette page ouverte et faire l'étape 4 ; le tunnel apparaît ensuite connecté, puis *Continue*.
+4. Onglet *Routes* > *Add route* > *Published application* :
+   - *Subdomain* : `locataire` ; *Domain* : `urbia-immobilier.fr` ;
+   - *Path* : `^/(locataire|static)/` ;
+   - *Service URL* : `http://127.0.0.1:8080` (le port de l'application sur le NAS) ;
+   - *Add route*.
+
+### 4. NAS : lancer le tunnel
+
+1. File Station > dossier `docker` > *Créer un dossier* `urbia-tunnel`.
+2. Container Manager > *Projet* > *Créer* : nom `urbia-tunnel`, chemin `docker/urbia-tunnel`, *Créer docker-compose.yml*, puis coller le fichier [`tunnel/docker-compose.yml`](tunnel/docker-compose.yml) en remplaçant `JETON-DU-TUNNEL` par le jeton. *Suivant*, ne pas activer le portail Web Station, *Terminé*.
+
+C'est un projet à part : *Arrêter* `urbia-tunnel` ferme aussitôt le formulaire depuis Internet, l'application continuant de tourner au bureau.
+
+### 5. Application : donner l'adresse publique
+
+Projet `urbia` > *Action* > *Arrêter*, onglet *YAML* : dans le service `web`, renseigner `URL_LOCATAIRES: "https://locataire.urbia-immobilier.fr"`, enregistrer, puis *Construire*. Les liens envoyés aux candidats utilisent alors cette adresse.
+
+### 6. Tester
+
+Depuis un téléphone en 4G (Wi-Fi coupé) : `https://locataire.urbia-immobilier.fr/` affiche une page introuvable (erreur 404) : c'est normal, seul le formulaire est ouvert. Sur une candidature retenue, *Envoyer le lien au locataire*, puis ouvrir le lien sur le téléphone : le formulaire s'affiche.
+
 ## Mettre à jour
 
 *Projet* > `urbia` > *Action* > *Arrêter*, puis *Construire* : le NAS télécharge la dernière image publiée. Si le fichier `docker-compose.yml` a changé (nouveau conteneur, par exemple), coller d'abord le nouveau texte dans l'onglet *YAML* du projet, en gardant la clé, le mot de passe et l'IP déjà en place. Les migrations s'appliquent au démarrage ; les données restent dans les volumes Docker `urbia_postgres` et `urbia_documents`.

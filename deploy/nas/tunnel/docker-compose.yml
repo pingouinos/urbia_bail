@@ -1,0 +1,20 @@
+# Urbia Gestion · tunnel Cloudflare : ouvre sur Internet le seul formulaire
+# des candidats retenus (https://locataire.urbia-immobilier.fr/locataire/…),
+# sans ouvrir de port sur la box. Le tunnel part du NAS vers Cloudflare, qui
+# ne laisse passer que les adresses /locataire/ et /static/ ; l'application
+# refuse de toute façon le reste sur cette adresse.
+#
+# Projet séparé dans Container Manager (`urbia-tunnel`) : l'arrêter coupe
+# l'accès depuis Internet, l'application continue de tourner au bureau.
+#
+# Avant de coller, remplacer JETON-DU-TUNNEL par le jeton donné par Cloudflare
+# à la création du tunnel (voir ../README.md).
+services:
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    network_mode: host
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: "JETON-DU-TUNNEL"
+    mem_limit: 128m

@@ -6,6 +6,7 @@ d'environnement (fichier .env en local, voir .env.example).
 
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import environ
 from django.core.exceptions import ImproperlyConfigured
@@ -35,6 +36,16 @@ if not SECRET_KEY:
 # localhost reste autorisé pour la sonde de santé lancée dans le conteneur.
 ALLOWED_HOSTS = [*env("ALLOWED_HOSTS"), "localhost", "127.0.0.1"]
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+
+# Adresse publique du formulaire des candidats retenus (par exemple
+# https://locataire.urbia-immobilier.fr, servie par Cloudflare Tunnel). Sur
+# cette adresse, l'application ne répond qu'aux pages /locataire/.
+_url_locataires = urlparse(env("URL_LOCATAIRES", default=""))
+URL_LOCATAIRES = f"{_url_locataires.scheme}://{_url_locataires.netloc}" if _url_locataires.netloc else ""
+HOTE_LOCATAIRES = _url_locataires.hostname or ""
+if HOTE_LOCATAIRES:
+    ALLOWED_HOSTS.append(HOTE_LOCATAIRES)
+    CSRF_TRUSTED_ORIGINS.append(URL_LOCATAIRES)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

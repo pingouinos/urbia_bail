@@ -11,6 +11,7 @@ décision, comme le recommande le référentiel CNIL de la gestion locative
 """
 
 import datetime as dt
+import secrets
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -23,6 +24,9 @@ from baux.models import Bail
 from biens.models import Bailleur, Bien, Horodatage
 
 DUREE_CONSERVATION = dt.timedelta(days=90)
+# Durée de validité du lien envoyé au candidat retenu pour compléter ses
+# informations.
+DUREE_LIEN = dt.timedelta(days=14)
 
 
 def valider_lien_dossierfacile(valeur):
@@ -71,6 +75,13 @@ class Candidature(Horodatage):
     bail = models.OneToOneField(
         Bail, on_delete=models.SET_NULL, null=True, blank=True, related_name="candidature"
     )
+
+    # Lien personnel envoyé au candidat retenu : il y complète son identité,
+    # ses coordonnées et le lien de son dossier DossierFacile. Le jeton est
+    # effacé dès que le formulaire est envoyé.
+    jeton = models.CharField(max_length=64, null=True, blank=True, unique=True, editable=False)
+    lien_cree_le = models.DateTimeField("lien envoyé le", null=True, blank=True)
+    rempli_le = models.DateTimeField("rempli par le locataire le", null=True, blank=True)
 
     class Meta:
         ordering = ["-cree_le"]
@@ -137,6 +148,45 @@ class Candidature(Horodatage):
         self.decide_le = None if statut == self.Statut.A_ETUDIER else timezone.now()
         self.decide_par = None if statut == self.Statut.A_ETUDIER else utilisateur
         self.save(update_fields=["statut", "decide_le", "decide_par", "modifie_le"])
+
+    @property
+    def lien_expire_le(self):
+        return self.lien_cree_le + DUREE_LIEN if self.lien_cree_le else None
+
+    @property
+    def lien_valide(self):
+        return bool(
+            self.jeton and self.statut == self.Statut.RETENUE and not self.bail_id
+            and timezone.now() < self.lien_expire_le
+        )
+
+    def creer_lien(self):
+        """Nouveau lien pour le candidat ; l'ancien cesse de fonctionner."""
+        self.jeton = secrets.token_urlsafe(32)
+        self.lien_cree_le = timezone.now()
+        self.save(update_fields=["jeton", "lien_cree_le", "modifie_le"])
+
+    @classmethod
+    def par_jeton(cls, jeton):
+        """Candidature dont le lien est encore valable, ou None."""
+        candidature = cls.objects.select_related("bien").filter(jeton=jeton).first() if jeton else None
+        return candidature if candidature and candidature.lien_valide else None
+
+    def texte_lien(self, lien, signataire=""):
+        bien = self.bien
+        return (
+            "Bonjour,\n\n"
+            f"Votre candidature pour le logement situé {bien.adresse}, {bien.code_postal} {bien.ville} "
+            "a été retenue. Pour préparer votre bail, merci de compléter vos informations (identité, "
+            "coordonnées) et d'indiquer le lien de partage de votre dossier DossierFacile, à l'adresse "
+            "suivante :\n\n"
+            f"{lien}\n\n"
+            f"Ce lien vous est personnel et reste valable jusqu'au "
+            f"{timezone.localtime(self.lien_expire_le):%d/%m/%Y}.\n\n"
+            "Cordialement,\n"
+            + (f"{signataire}\n" if signataire else "")
+            + "URBIA Immobilier"
+        )
 
     @classmethod
     def a_effacer(cls, maintenant=None):
@@ -206,3 +256,30 @@ class Candidat(models.Model):
 
     def __str__(self):
         return f"{self.prenom} {self.nom.upper()}"
+
+
+class Garant(models.Model):
+    """Caution personne physique d'un candidat, déclarée par lui dans le
+    formulaire reçu par lien. Ses pièces sont dans le dossier DossierFacile."""
+
+    candidat = models.ForeignKey(Candidat, on_delete=models.CASCADE, related_name="garants")
+    civilite = models.CharField("civilité", max_length=5, choices=Bailleur.Civilite.choices, blank=True)
+    nom = models.CharField(max_length=100)
+    prenom = models.CharField("prénom", max_length=100)
+    adresse = models.CharField("adresse complète", max_length=255, help_text="Rue, code postal et ville.")
+    email = models.EmailField("e-mail", blank=True)
+    telephone = models.CharField("téléphone", max_length=30, blank=True)
+
+    class Meta:
+        ordering = ["pk"]
+        verbose_name = "garant"
+
+    def __str__(self):
+        return f"{self.prenom} {self.nom.upper()}"
+
+    @property
+    def ligne_bail(self):
+        """Désignation reprise dans le bail : « Madame BERNARD Claire, 3 rue
+        d'Alsace, 31000 Toulouse »."""
+        identite = " ".join(m for m in (self.get_civilite_display(), self.nom.upper(), self.prenom) if m)
+        return f"{identite}, {self.adresse}"

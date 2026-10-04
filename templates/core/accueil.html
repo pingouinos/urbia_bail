@@ -16,7 +16,7 @@
   <h2>Candidatures retenues sans bail</h2>
   <ul class="choix">
     {% for candidature in a_rediger %}
-    <li><a href="{% url 'baux:creer' %}?candidature={{ candidature.pk }}"><strong>Rédiger le bail de {{ candidature.noms|default:"la candidature" }}</strong><span class="discret">{{ candidature.bien }}{% if candidature.date_entree_souhaitee %} · entrée le {{ candidature.date_entree_souhaitee|date:"d/m/Y" }}{% endif %}</span></a></li>
+    <li><a href="{% url 'baux:creer' %}?candidature={{ candidature.pk }}"><strong>Rédiger le bail de {{ candidature.noms|default:"la candidature" }}</strong><span class="discret">{{ candidature.bien }}{% if candidature.date_entree_souhaitee %} · entrée le {{ candidature.date_entree_souhaitee|date:"d/m/Y" }}{% endif %}{% if candidature.rempli_le %} · informations reçues du locataire{% elif candidature.lien_cree_le %} · lien envoyé, en attente du locataire{% endif %}</span></a></li>
     {% endfor %}
   </ul>
 </section>
