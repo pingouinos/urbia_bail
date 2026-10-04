@@ -133,7 +133,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--acier); }
 .champ label { font-weight: 500; }
 label.case { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
 .en-erreur input, .en-erreur select, .en-erreur textarea { border-color: var(--erreur); }
-.sous-formulaire { border-bottom: 1px solid var(--bord); padding-bottom: 12px; }
+.sous-formulaire { border-bottom: 1px solid var(--bord); padding-bottom: 12px; margin-bottom: 12px; }
+.titre-locataire { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.titre-locataire .sous-titre { margin: 0; }
+.ajout-locataire { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.bouton-ajout { padding: 8px 14px; border: 1px dashed var(--acier); border-radius: 8px; background: var(--carte); color: var(--acier); font-weight: 600; }
+.bouton-ajout:hover { background: var(--melon-clair); }
 form.en-ligne { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .filtres { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0; }
 .filtres input[type=search] { flex: 1 1 260px; }

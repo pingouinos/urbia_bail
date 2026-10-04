@@ -44,7 +44,15 @@ class Bail(Horodatage):
         "usage mixte professionnel et d'habitation", default=False,
     )
     garant = models.CharField(
-        max_length=255, blank=True, help_text="Nom et adresse de la caution, le cas échéant."
+        "garant commun", max_length=255, blank=True,
+        help_text="Nom et adresse d'une caution qui garantit tous les locataires, le cas échéant.",
+    )
+    # Colocation au sens de l'article 8-1 de la loi du 6 juillet 1989 : plusieurs
+    # locataires qui ne sont pas un couple marié ou pacsé. La solidarité d'un
+    # colocataire qui part cesse alors au plus tard six mois après son congé.
+    colocation = models.BooleanField(
+        "colocation", default=False,
+        help_text="Plusieurs locataires qui ne sont ni mariés ni pacsés ensemble.",
     )
 
     # Durée
@@ -166,6 +174,8 @@ class Bail(Horodatage):
             alertes.append("Ce bien n'est pas à usage d'habitation : ce modèle de bail ne convient pas.")
         if self.mandat is None:
             alertes.append("Aucun mandat de gestion n'est rattaché à ce bail.")
+        if self.colocation and self.pk and self.locataires.count() < 2:
+            alertes.append("Colocation cochée avec un seul locataire : la clause de colocation ne s'appliquera pas.")
         if self.loyer and self.depot_garantie > self.loyer * self.mois_depot_max:
             alertes.append(
                 f"Dépôt de garantie supérieur à {self.mois_depot_max} mois de loyer hors charges "
@@ -187,6 +197,19 @@ class Bail(Horodatage):
             self.honoraires_edl_bailleur, self.honoraires_edl_locataire,
         )
         return alertes
+
+    def texte_solidarite(self, nb_locataires):
+        texte = ("Les locataires sont tenus solidairement et indivisiblement de l'ensemble des obligations "
+                 "découlant du présent contrat, notamment du paiement du loyer, des charges et des réparations "
+                 "locatives.")
+        if not (self.colocation and nb_locataires > 1):
+            return texte + (" Cette solidarité cesse dans les conditions prévues par l'article 8-1 de la loi "
+                            "n° 89-462 du 6 juillet 1989.")
+        return texte + (" Conformément à l'article 8-1 de la loi n° 89-462 du 6 juillet 1989, la solidarité "
+                        "d'un colocataire qui donne congé, et celle de la personne qui s'est portée caution "
+                        "pour lui, prennent fin à la date d'effet de son congé lorsqu'un nouveau colocataire "
+                        "figure au bail ; à défaut, elles s'éteignent au plus tard six mois après la date "
+                        "d'effet du congé.")
 
     def annexes(self):
         bien = self.bien
@@ -265,10 +288,13 @@ class Bail(Horodatage):
                     "designation": locataire.designation,
                     "naissance": locataire.naissance,
                     "email": locataire.email,
+                    "garant": locataire.garant,
                 }
                 for locataire in locataires
             ],
             "plusieurs_locataires": len(locataires) > 1,
+            "colocation": self.colocation and len(locataires) > 1,
+            "texte_solidarite": self.texte_solidarite(len(locataires)),
             "garant": self.garant,
             "adresse_logement": ", ".join(
                 m for m in [bien.adresse, bien.complement,
@@ -355,6 +381,10 @@ class Locataire(models.Model):
     lieu_naissance = models.CharField("lieu de naissance", max_length=100, blank=True)
     email = models.EmailField("e-mail", blank=True)
     telephone = models.CharField("téléphone", max_length=30, blank=True)
+    # En colocation, l'acte de caution doit désigner le colocataire garanti.
+    garant = models.CharField(
+        max_length=255, blank=True, help_text="Nom et adresse de la caution de ce locataire, le cas échéant."
+    )
 
     history = HistoricalRecords()
 
