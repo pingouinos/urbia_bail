@@ -24,7 +24,7 @@ Prérequis : DSM 7.2 ou plus récent et le paquet **Container Manager** install�
    - Source : *Créer docker-compose.yml*, puis coller le texte préparé ;
    - *Suivant*, ne pas activer le portail Web Station, puis *Terminé*.
 
-   La première fois, les téléchargements représentent environ 1 Go (quelques minutes). Le projet passe ensuite à *En cours d'exécution*, avec trois conteneurs `urbia-web-1`, `urbia-db-1` et `urbia-gotenberg-1`.
+   La première fois, les téléchargements représentent environ 1 Go (quelques minutes). Le projet passe ensuite à *En cours d'exécution*, avec quatre conteneurs `urbia-web-1`, `urbia-db-1`, `urbia-gotenberg-1` et `urbia-sauvegarde-1`.
 5. **Créer l'administrateur.** Container Manager > *Conteneur* > `urbia-web-1` > *Action* > *Ouvrir un terminal* > *Créer* > *Lancer avec commande* : `python manage.py createsuperuser`, puis répondre aux questions (identifiant, e-mail, mot de passe).
 6. **Tester.** Depuis un poste du bureau, ouvrir `http://<IP du NAS>:8080`, se connecter avec ce compte et scanner le QR code avec une application d'authentification (Google Authenticator, Microsoft Authenticator…). L'adresse `http://<IP du NAS>:8080/sante/` doit répondre `{"statut": "ok"}` ; au premier démarrage, compter quelques secondes pour la préparation de la base.
 7. **Essayer la chaîne complète.** Créer un bailleur puis un bien (ou les importer depuis Excel), créer le mandat depuis la fiche du bien et le télécharger en PDF, puis faire de même avec « Rédiger un bail ». Le premier PDF prend quelques secondes de plus, le temps que LibreOffice démarre.
@@ -38,6 +38,12 @@ Si le pare-feu de DSM est activé : *Panneau de configuration* > *Sécurité* > 
 - **Le journal parle de `Address already in use` ou `Address in use`** : un autre service du NAS occupe déjà le port (c'est le cas du 5433 sur le DS220+). Pour l'application, remplacer `8080` par un port libre (par exemple `8090`) dans la ligne `command` et dans `CSRF_TRUSTED_ORIGINS` ; pour la base, `25432` aux trois endroits (`DATABASE_URL`, `command` et test de santé de `db`) ; pour Gotenberg, `23300` dans `GOTENBERG_URL` et dans sa `command`.
 - **La page reste vide (« réponse vide », `NS_ERROR_NET_EMPTY_RESPONSE`)** : l'application n'écoute pas encore. Au premier démarrage, la préparation de la base prend jusqu'à une minute ; sinon, lire *Conteneur* > `urbia-web-1` > *Détails* > *Journal*. Un mot de passe différent entre `DATABASE_URL` et `POSTGRES_PASSWORD` fait redémarrer l'application en boucle. La base garde le mot de passe de sa création : pour en changer, supprimer le projet puis le recréer sous un autre nom, ce qui repart d'une base neuve.
 - **Le téléchargement de `ghcr.io/pingouinos/urbia_bail` est refusé (`denied` ou `unauthorized`)** : sur GitHub, ouvrir le paquet `urbia_bail` du compte, puis *Package settings* > *Change visibility* > *Public*.
+
+## Sauvegardes
+
+Le conteneur `urbia-sauvegarde-1` copie la base (`base-AAAA-MM-JJ.dump`) et les documents (`documents-AAAA-MM-JJ.tar.gz`) une fois par jour, la première fois dix minutes après le démarrage, dans le dossier `docker/urbia/sauvegardes` visible dans File Station. Il garde les 14 derniers jours. Ces copies restent sur le NAS : pour se protéger d'une panne de disque ou d'un vol, inclure ce dossier dans une tâche Hyper Backup vers un disque USB ou un stockage en ligne.
+
+Pour restaurer une base, depuis le terminal de `urbia-sauvegarde-1` : `pg_restore -h 127.0.0.1 -p 25432 -U urbiabail -d urbiabail --clean /sauvegardes/base-AAAA-MM-JJ.dump`.
 
 ## Mettre à jour
 
