@@ -6,7 +6,7 @@ Ce qui change par rapport au VPS : pas de HTTPS ni de Caddy (adresse `http://<IP
 
 Le NAS ne construit rien et n'a pas besoin du code : il télécharge l'image de l'application, publiée par GitHub à chaque fusion sur `main` (`ghcr.io/pingouinos/urbia_bail:main`), ainsi que PostgreSQL et Gotenberg. Tout tient dans le fichier [`docker-compose.yml`](docker-compose.yml) de ce dossier, à coller dans Container Manager.
 
-Les conteneurs utilisent directement le réseau du NAS (`network_mode: host`) plutôt que le réseau interne de Docker : sur le DS220+, ce dernier laisse ouvrir une connexion entre conteneurs mais n'y fait passer aucune donnée (l'application attend la base sans jamais l'atteindre). Seule l'application est visible depuis le bureau, sur le port 8080 ; la base (port 5433) et Gotenberg (port 3300) n'écoutent que sur le NAS lui-même.
+Les conteneurs utilisent directement le réseau du NAS (`network_mode: host`) plutôt que le réseau interne de Docker : sur le DS220+, ce dernier laisse ouvrir une connexion entre conteneurs mais n'y fait passer aucune donnée (l'application attend la base sans jamais l'atteindre). Seule l'application est visible depuis le bureau, sur le port 8080 ; la base (port 25432) et Gotenberg (port 23300) n'écoutent que sur le NAS lui-même.
 
 ## Mise en place dans Container Manager
 
@@ -34,8 +34,8 @@ Si le pare-feu de DSM est activé : *Panneau de configuration* > *Sécurité* > 
 ## Dépannage
 
 - **Le message parle de `pip install` ou de `Step 6/12`, ou le journal de `urbia-web-1` affiche `server closed the connection unexpectedly`** : le projet utilise un ancien fichier (construction sur le NAS, ou réseau interne de Docker). Arrêter et supprimer le projet, puis le recréer en collant le fichier actuel (étapes 2 à 4).
-- **La création s'arrête sur `dependency failed to start: container urbia-db-1 is unhealthy`** : la base a mis plus de cinq minutes à se créer au premier démarrage. *Projet* > `urbia` > *Action* > *Démarrer* la relance ; si l'erreur revient, le journal de `urbia-db-1` en donne la cause.
-- **Le journal parle de `Address already in use`** : un autre service du NAS occupe déjà le port. Pour l'application, remplacer `8080` par un port libre (par exemple `8090`) dans la ligne `command` et dans `CSRF_TRUSTED_ORIGINS` ; pour la base, `5433` aux trois endroits (`DATABASE_URL`, `command` et test de santé de `db`) ; pour Gotenberg, `3300` dans `GOTENBERG_URL` et dans sa `command`.
+- **La création s'arrête sur `dependency failed to start: container urbia-db-1 is unhealthy`** : la base n'a pas démarré ; le journal de `urbia-db-1` en donne la cause (souvent `Address in use`, ci-dessous).
+- **Le journal parle de `Address already in use` ou `Address in use`** : un autre service du NAS occupe déjà le port (c'est le cas du 5433 sur le DS220+). Pour l'application, remplacer `8080` par un port libre (par exemple `8090`) dans la ligne `command` et dans `CSRF_TRUSTED_ORIGINS` ; pour la base, `25432` aux trois endroits (`DATABASE_URL`, `command` et test de santé de `db`) ; pour Gotenberg, `23300` dans `GOTENBERG_URL` et dans sa `command`.
 - **La page reste vide (« réponse vide », `NS_ERROR_NET_EMPTY_RESPONSE`)** : l'application n'écoute pas encore. Au premier démarrage, la préparation de la base prend jusqu'à une minute ; sinon, lire *Conteneur* > `urbia-web-1` > *Détails* > *Journal*. Un mot de passe différent entre `DATABASE_URL` et `POSTGRES_PASSWORD` fait redémarrer l'application en boucle. La base garde le mot de passe de sa création : pour en changer, supprimer le projet puis le recréer sous un autre nom, ce qui repart d'une base neuve.
 - **Le téléchargement de `ghcr.io/pingouinos/urbia_bail` est refusé (`denied` ou `unauthorized`)** : sur GitHub, ouvrir le paquet `urbia_bail` du compte, puis *Package settings* > *Change visibility* > *Public*.
 

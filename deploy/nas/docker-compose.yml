@@ -10,7 +10,7 @@
 # Les trois conteneurs utilisent directement le réseau du NAS (network_mode:
 # host) : sur le DS220+, le réseau Docker interne laisse ouvrir une connexion
 # entre conteneurs mais n'y fait passer aucune donnée. Seule l'application
-# (port 8080) est visible du bureau ; la base (5433) et Gotenberg (3300)
+# (port 8080) est visible du bureau ; la base (25432) et Gotenberg (23300)
 # n'écoutent que sur le NAS lui-même.
 #
 # Avant de coller, remplacer :
@@ -27,13 +27,13 @@ services:
     command: sh -c "python manage.py migrate --noinput && gunicorn config.wsgi --bind 0.0.0.0:8080 --workers 2 --access-logfile -"
     environment:
       SECRET_KEY: "CHANGER-CETTE-CLE"
-      DATABASE_URL: "postgres://urbiabail:MOTDEPASSE@127.0.0.1:5433/urbiabail"
+      DATABASE_URL: "postgres://urbiabail:MOTDEPASSE@127.0.0.1:25432/urbiabail"
       ALLOWED_HOSTS: "192.168.1.10"
       CSRF_TRUSTED_ORIGINS: "http://192.168.1.10:8080"
       HTTPS: "false"
       MFA_OBLIGATOIRE: "true"
       DOCUMENTS_DIR: /documents
-      GOTENBERG_URL: http://127.0.0.1:3300
+      GOTENBERG_URL: http://127.0.0.1:23300
     volumes:
       - documents:/documents
     mem_limit: 384m
@@ -45,10 +45,10 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     network_mode: host
-    # Port 5433 (DSM peut déjà utiliser le 5432 pour sa propre base), écoute
+    # Port peu courant (le 5433 est déjà pris sur le DS220+), écoute
     # limitée au NAS lui-même, réglages réduits ; huge_pages=off évite un arrêt
     # brutal de la base sur certains noyaux Synology.
-    command: postgres -c port=5433 -c listen_addresses=127.0.0.1 -c shared_buffers=64MB -c work_mem=4MB -c max_connections=20 -c huge_pages=off
+    command: postgres -c port=25432 -c listen_addresses=127.0.0.1 -c shared_buffers=64MB -c work_mem=4MB -c max_connections=20 -c huge_pages=off
     environment:
       POSTGRES_DB: urbiabail
       POSTGRES_USER: urbiabail
@@ -58,9 +58,9 @@ services:
     shm_size: 128m
     healthcheck:
       # Par le réseau, pour n'être prête qu'une fois la vraie base démarrée.
-      # Au tout premier démarrage, la création de la base peut dépasser la minute
-      # sur le NAS : les échecs des 5 premières minutes ne comptent pas.
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5433 -U urbiabail"]
+      # Au tout premier démarrage, la base se crée avant d'écouter : les échecs
+      # des 5 premières minutes ne comptent pas.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 25432 -U urbiabail"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -70,7 +70,7 @@ services:
     image: gotenberg/gotenberg:8
     restart: unless-stopped
     network_mode: host
-    command: gotenberg --api-port=3300 --api-bind-ip=127.0.0.1
+    command: gotenberg --api-port=23300 --api-bind-ip=127.0.0.1
     mem_limit: 768m
 
 volumes:
