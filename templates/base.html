@@ -7,12 +7,18 @@
   <link rel="icon" type="image/png" href="{% static 'img/favicon-32.png' %}">
   <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script>document.documentElement.classList.add("js");</script>
 </head>
 <body>
   <header class="entete{% if not user.is_authenticated %} entete-seule{% endif %}">
     <a class="marque" href="{% url 'accueil' %}"><img src="{% static 'img/logo-urbia-gestion.png' %}" alt="{{ nom_application }}" width="117" height="48"></a>
     {% if user.is_authenticated %}
-    <nav class="menu" aria-label="Menu principal">
+    <a class="bouton-entete" href="{% url 'baux:creer' %}">Nouveau bail</a>
+    <button type="button" class="bouton-menu" aria-expanded="false" aria-controls="menu-principal">
+      <span class="icone-menu" aria-hidden="true"></span>
+      Menu
+    </button>
+    <nav class="menu" id="menu-principal" aria-label="Menu principal">
       <a href="{% url 'baux:liste' %}"{% if rubrique == "baux" %} aria-current="page"{% endif %}>Baux</a>
       <a href="{% url 'candidatures:liste' %}"{% if rubrique == "candidatures" %} aria-current="page"{% endif %}>Candidatures</a>
       <a href="{% url 'biens:liste' %}"{% if rubrique == "biens" %} aria-current="page"{% endif %}>Biens</a>
@@ -20,11 +26,20 @@
       <a href="{% url 'mandats:registre' %}"{% if rubrique == "mandats" %} aria-current="page"{% endif %}>Mandats</a>
     </nav>
     <div class="compte">
-      <a class="bouton-entete" href="{% url 'baux:creer' %}">Nouveau bail</a>
       <span>{{ user.get_full_name|default:user.username }}</span>
       {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administration</a>{% endif %}
       <form method="post" action="{% url 'deconnexion' %}">{% csrf_token %}<button type="submit" class="lien">Se déconnecter</button></form>
     </div>
+    <script>
+      // Sur téléphone, le menu et le compte se déplient sous l'en-tête.
+      (function () {
+        var bouton = document.querySelector(".bouton-menu");
+        bouton.addEventListener("click", function () {
+          var ouvert = document.querySelector(".entete").classList.toggle("ouvert");
+          bouton.setAttribute("aria-expanded", ouvert);
+        });
+      })();
+    </script>
     {% endif %}
   </header>
   <main>
