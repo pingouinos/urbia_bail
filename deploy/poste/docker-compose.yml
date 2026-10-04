@@ -47,6 +47,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5m
 
   gotenberg:
     image: gotenberg/gotenberg:8
