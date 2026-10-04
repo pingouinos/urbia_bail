@@ -51,7 +51,7 @@
   <a class="carte" href="{% url 'biens:liste' %}"><strong>Biens</strong><span class="discret">{{ nb_biens }} lot(s) actif(s)</span></a>
   <a class="carte" href="{% url 'mandats:registre' %}"><strong>Mandats</strong><span class="discret">{{ nb_mandats }} en cours</span></a>
   <a class="carte" href="{% url 'biens:importer' %}"><strong>Importer des biens</strong><span class="discret">Depuis un fichier Excel</span></a>
-  {% if est_admin %}<a class="carte" href="{% url 'documents:modeles' %}"><strong>Modèles Word</strong><span class="discret">Bail et mandat</span></a>{% endif %}
+  {% if est_admin %}<a class="carte" href="{% url 'documents:modeles' %}"><strong>Modèles des documents</strong><span class="discret">Bail et mandat, depuis Google Docs</span></a>{% endif %}
 </div>
 <p class="discret">Connecté en tant que {% if est_admin %}administrateur{% else %}gestionnaire{% endif %}.</p>
 {% endblock %}
