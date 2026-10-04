@@ -58,10 +58,13 @@ services:
     shm_size: 128m
     healthcheck:
       # Par le réseau, pour n'être prête qu'une fois la vraie base démarrée.
+      # Au tout premier démarrage, la création de la base peut dépasser la minute
+      # sur le NAS : les échecs des 5 premières minutes ne comptent pas.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5433 -U urbiabail"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5m
 
   gotenberg:
     image: gotenberg/gotenberg:8
