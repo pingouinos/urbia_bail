@@ -1,0 +1,10 @@
+<div class="sous-formulaire pleine-largeur">
+  <div class="titre-locataire">
+    <p class="sous-titre">Locataire {{ numero }}</p>
+    {% if nouveau or numero != 1 and not sous_form.instance.pk %}<button type="button" class="lien retirer-locataire">Retirer</button>{% endif %}
+  </div>
+  <div class="sous-grille">
+    {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
+    {% for champ in sous_form.visible_fields %}{% if champ.name != "DELETE" or sous_form.instance.pk %}{% include "biens/_champ.html" %}{% endif %}{% endfor %}
+  </div>
+</div>

@@ -127,12 +127,15 @@ class ProprietaireForm(forms.ModelForm):
 class LocataireForm(forms.ModelForm):
     class Meta:
         model = Locataire
-        fields = ["civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone"]
+        fields = [
+            "civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone", "garant",
+        ]
         widgets = {"date_naissance": DATE}
 
 
+# Une ligne au départ ; le bouton « Ajouter un locataire » en ajoute d'autres.
 LocataireFormSet = forms.inlineformset_factory(
-    Bail, Locataire, form=LocataireForm, extra=1, max_num=4, validate_max=True,
+    Bail, Locataire, form=LocataireForm, extra=0, max_num=6, validate_max=True,
     min_num=1, validate_min=True, can_delete=True,
 )
 

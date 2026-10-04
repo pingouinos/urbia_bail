@@ -28,13 +28,15 @@
     <legend>Locataires</legend>
     {{ locataires.management_form }}
     {% for erreur in locataires.non_form_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
-    {% for sous_form in locataires %}
-    <div class="sous-formulaire pleine-largeur sous-grille">
-      {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
-      {% for champ in sous_form.visible_fields %}{% if champ.name != "DELETE" or sous_form.instance.pk %}{% include "biens/_champ.html" %}{% endif %}{% endfor %}
+    <div id="locataires" class="pleine-largeur">
+      {% for sous_form in locataires %}{% include "baux/_locataire.html" with numero=forloop.counter %}{% endfor %}
     </div>
-    {% endfor %}
-    <small class="discret pleine-largeur">Jusqu'à quatre locataires ; enregistrez pour ajouter une ligne vide.</small>
+    <template id="modele-locataire">{% include "baux/_locataire.html" with sous_form=locataires.empty_form numero="__numero__" nouveau=True %}</template>
+    <div class="pleine-largeur ajout-locataire">
+      <button type="button" class="bouton-ajout" id="ajouter-locataire" hidden>+ Ajouter un locataire</button>
+      <small class="discret">Jusqu'à six locataires, qui signent le même bail.</small>
+    </div>
+    <div id="champ-colocation" class="pleine-largeur">{% include "biens/_champ.html" with champ=form.colocation %}</div>
   </fieldset>
   {% for section in form.sections %}
   {% if section.repliee %}
@@ -55,4 +57,41 @@
     <button type="submit">{% if bail %}Enregistrer{% else %}Enregistrer et passer au document{% endif %}</button>
   </div>
 </form>
+<script>
+  // Ajout d'un locataire sans recharger la page : copie du modèle vide du
+  // formulaire, numérotée à la suite.
+  (function () {
+    var total = document.getElementById("id_locataires-TOTAL_FORMS");
+    var maximum = parseInt(document.getElementById("id_locataires-MAX_NUM_FORMS").value, 10);
+    var liste = document.getElementById("locataires");
+    var modele = document.getElementById("modele-locataire");
+    var bouton = document.getElementById("ajouter-locataire");
+    var colocation = document.getElementById("champ-colocation");
+    function nombre() { return liste.querySelectorAll(".sous-formulaire:not([hidden])").length; }
+    function majAffichage() {
+      bouton.hidden = parseInt(total.value, 10) >= maximum;
+      colocation.hidden = nombre() < 2 && !colocation.querySelector("input").checked;
+    }
+    bouton.addEventListener("click", function () {
+      var index = parseInt(total.value, 10);
+      liste.insertAdjacentHTML("beforeend",
+        modele.innerHTML.replace(/__prefix__/g, index).replace(/__numero__/g, nombre() + 1));
+      total.value = index + 1;
+      liste.lastElementChild.querySelector("select, input:not([type=hidden])").focus();
+      majAffichage();
+    });
+    liste.addEventListener("click", function (evenement) {
+      if (!evenement.target.classList.contains("retirer-locataire")) return;
+      // Une ligne vidée est ignorée à l'enregistrement.
+      var bloc = evenement.target.closest(".sous-formulaire");
+      bloc.querySelectorAll("input:not([type=hidden]), select").forEach(function (champ) { champ.value = ""; });
+      bloc.hidden = true;
+      liste.querySelectorAll(".sous-formulaire:not([hidden]) .sous-titre").forEach(function (titre, i) {
+        titre.textContent = "Locataire " + (i + 1);
+      });
+      majAffichage();
+    });
+    majAffichage();
+  })();
+</script>
 {% endblock %}

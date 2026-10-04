@@ -105,6 +105,9 @@ class BailTests(Donnees, TestCase):
         self.assertIn("Locataire : Monsieur MARTIN Paul, né(e) le 02/04/1995 à Albi", texte)
         self.assertIn("Locataire : Monsieur BERNARD Paul", texte)
         self.assertIn("CLAUSE DE SOLIDARITÉ", texte)
+        self.assertIn("Cette solidarité cesse dans les conditions prévues par l'article 8-1", texte)
+        self.assertNotIn("colocation", texte)
+        self.assertNotIn("six mois après la date d'effet du congé", texte)
         self.assertIn("Durée du contrat : 3 ans, soit jusqu'au 31/10/2029", texte)
         self.assertIn("Montant du loyer mensuel : 700 € hors charges", texte)
         self.assertIn("Cuisine équipée", texte)
@@ -125,6 +128,25 @@ class BailTests(Donnees, TestCase):
         self.assertIn("ne peut excéder deux mois", texte)
         self.assertIn("inventaire et état détaillé du mobilier", texte)
         self.assertNotIn("CLAUSE DE SOLIDARITÉ", texte)
+
+    def test_document_colocation(self):
+        bail = self.creer_bail(locataires=("Martin", "Bernard"), colocation=True)
+        bail.locataires.filter(nom="Bernard").update(garant="Mme Claire Bernard, 3 rue Alsace, 31000 Toulouse")
+        texte = texte_docx(generation.generer_docx("bail_habitation.docx", bail.contexte_document()))
+        self.assertNotIn("{{", texte)
+        self.assertNotIn("{%", texte)
+        self.assertIn("Le logement est loué en colocation, au sens de l'article 8-1", texte)
+        self.assertIn("Garant de ce locataire : Mme Claire Bernard, 3 rue Alsace, 31000 Toulouse", texte)
+        self.assertEqual(texte.count("Garant de ce locataire"), 1)
+        self.assertIn("prennent fin à la date d'effet de son congé lorsqu'un nouveau colocataire figure au bail", texte)
+        self.assertIn("au plus tard six mois après la date d'effet du congé", texte)
+        self.assertNotIn("Colocation cochée", " ".join(bail.alertes))
+
+    def test_colocation_avec_un_seul_locataire(self):
+        bail = self.creer_bail(colocation=True)
+        self.assertIn("Colocation cochée avec un seul locataire", " ".join(bail.alertes))
+        texte = texte_docx(generation.generer_docx("bail_habitation.docx", bail.contexte_document()))
+        self.assertNotIn("loué en colocation", texte)
 
 
 @override_settings(MFA_OBLIGATOIRE=False)
@@ -196,6 +218,52 @@ class VuesTests(Donnees, TestCase):
         self.assertEqual(reponse.status_code, 302)
         self.assertEqual(Bailleur.objects.count(), 1)
         self.assertEqual(bailleur.biens.count(), 2)
+
+    def donnees_bail(self, bien, noms):
+        donnees = {
+            "bien": bien.pk, "type": "nu", "date_effet": "2026-11-01", "lieu_signature": "Toulouse",
+            "loyer": "700", "mode_charges": "provision", "charges": "50", "jour_paiement": "1",
+            "depot_garantie": "700", "irl_trimestre": "2e trimestre 2026", "irl_valeur": "146.68",
+            "honoraires_bail_bailleur": "0", "honoraires_bail_locataire": "0",
+            "honoraires_edl_bailleur": "0", "honoraires_edl_locataire": "0",
+            "locataires-TOTAL_FORMS": str(len(noms)), "locataires-INITIAL_FORMS": "0",
+            "locataires-MIN_NUM_FORMS": "1", "locataires-MAX_NUM_FORMS": "6",
+        }
+        for i, nom in enumerate(noms):
+            donnees[f"locataires-{i}-nom"] = nom
+            donnees[f"locataires-{i}-prenom"] = "Léa" if nom else ""
+        return donnees
+
+    def test_formulaire_un_locataire_et_bouton_ajouter(self):
+        reponse = self.client.get(reverse("baux:creer"), {"bien": self.creer_bien().pk})
+        self.assertContains(reponse, 'name="locataires-TOTAL_FORMS" value="1"')
+        self.assertContains(reponse, 'name="locataires-0-nom"')
+        self.assertNotContains(reponse, 'name="locataires-1-nom"')
+        self.assertContains(reponse, 'name="locataires-__prefix__-nom"')
+        self.assertContains(reponse, "+ Ajouter un locataire")
+        self.assertContains(reponse, 'name="colocation"')
+
+    def test_creation_colocation(self):
+        bien = self.creer_bien()
+        donnees = self.donnees_bail(bien, ["Martin", "Bernard", "", "Petit", "Roux", "Faure"])
+        donnees["colocation"] = "on"
+        donnees["locataires-1-garant"] = "M. Jean Bernard, 5 rue Riquet, 31000 Toulouse"
+        reponse = self.client.post(reverse("baux:creer"), donnees)
+        bail = Bail.objects.get()
+        self.assertRedirects(reponse, bail.get_absolute_url(), fetch_redirect_response=False)
+        self.assertTrue(bail.colocation)
+        # La ligne retirée (vidée) est ignorée.
+        self.assertEqual(bail.locataires.count(), 5)
+        self.assertEqual(bail.locataires.get(nom="Bernard").garant, "M. Jean Bernard, 5 rue Riquet, 31000 Toulouse")
+        page = self.client.get(bail.get_absolute_url())
+        self.assertContains(page, "Colocation, bail unique")
+        self.assertContains(page, "Garant : M. Jean Bernard")
+
+    def test_pas_plus_de_six_locataires(self):
+        bien = self.creer_bien()
+        reponse = self.client.post(reverse("baux:creer"), self.donnees_bail(bien, ["A", "B", "C", "D", "E", "F", "G"]))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertFalse(Bail.objects.exists())
 
     def test_nouveau_logement_sans_proprietaire_refuse(self):
         reponse = self.client.post(reverse("baux:nouveau_logement"), self.LOGEMENT)

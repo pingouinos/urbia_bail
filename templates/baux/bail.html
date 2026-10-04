@@ -34,8 +34,9 @@
   </section>
   <section class="carte">
     <h2>Locataires</h2>
-    <ul>{% for locataire in bail.locataires.all %}<li>{{ locataire.designation }}{{ locataire.naissance }}{% if locataire.email %}<br><span class="discret">{{ locataire.email }} {{ locataire.telephone }}</span>{% endif %}</li>{% endfor %}</ul>
-    {% if bail.garant %}<p class="discret">Garant : {{ bail.garant }}</p>{% endif %}
+    {% if bail.colocation %}<p class="discret">Colocation, bail unique</p>{% endif %}
+    <ul>{% for locataire in bail.locataires.all %}<li>{{ locataire.designation }}{{ locataire.naissance }}{% if locataire.email %}<br><span class="discret">{{ locataire.email }} {{ locataire.telephone }}</span>{% endif %}{% if locataire.garant %}<br><span class="discret">Garant : {{ locataire.garant }}</span>{% endif %}</li>{% endfor %}</ul>
+    {% if bail.garant %}<p class="discret">Garant commun : {{ bail.garant }}</p>{% endif %}
   </section>
   <section class="carte">
     <h2>Loyer</h2>
