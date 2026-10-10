@@ -77,9 +77,9 @@ class Candidature(Horodatage):
     )
 
     # Lien personnel envoyé au candidat, dès l'étude de sa candidature ou une
-    # fois retenu : il y complète son identité, ses coordonnées et le lien de
-    # son dossier DossierFacile. Le jeton est effacé dès que le formulaire est
-    # envoyé.
+    # fois retenu : il y complète son identité, ses coordonnées, son activité,
+    # ses revenus et le lien de son dossier DossierFacile. Le jeton est effacé
+    # dès que le formulaire est envoyé.
     jeton = models.CharField(max_length=64, null=True, blank=True, unique=True, editable=False)
     lien_cree_le = models.DateTimeField("lien envoyé le", null=True, blank=True)
     rempli_le = models.DateTimeField("rempli par le locataire le", null=True, blank=True)
@@ -186,7 +186,7 @@ class Candidature(Horodatage):
         return (
             "Bonjour,\n\n"
             f"{debut}, merci de compléter vos informations (identité, "
-            "coordonnées) et d'indiquer le lien de partage de votre dossier DossierFacile, à l'adresse "
+            "coordonnées, activité et revenus) et d'indiquer le lien de partage de votre dossier DossierFacile, à l'adresse "
             "suivante :\n\n"
             f"{lien}\n\n"
             f"Ce lien vous est personnel et reste valable jusqu'au "

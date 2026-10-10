@@ -62,11 +62,15 @@ def candidature_editer(request, pk=None):
     form = CandidatureForm(request.POST or None, instance=objet, initial=initial)
     candidats = CandidatFormSet(request.POST or None, instance=form.instance)
     if request.method == "POST" and form.is_valid() and candidats.is_valid():
+        creation = objet is None
         with transaction.atomic():
             objet = form.save()
             candidats.instance = objet
             candidats.save()
-        messages.success(request, "Candidature enregistrée.")
+        if creation:
+            messages.success(request, "Candidature enregistrée. Envoyez le lien au candidat pour qu'il complète son dossier.")
+        else:
+            messages.success(request, "Candidature enregistrée.")
         return redirect(objet)
     return render(request, "candidatures/candidature_form.html", {
         "form": form, "candidats": candidats, "candidature": objet,

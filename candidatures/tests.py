@@ -123,6 +123,28 @@ class VuesTests(Donnees, TestCase):
         self.assertRedirects(reponse, candidature.get_absolute_url())
         self.assertEqual(candidature.noms, "Julie MARTIN")
 
+    def test_creation_avec_le_nom_seul(self):
+        """Le candidat complète le reste par son lien : l'état civil,
+        l'activité et les revenus sont repliés, et facultatifs."""
+        bien = self.creer_bien()
+        page = self.client.get(reverse("candidatures:creer"), {"bien": bien.pk})
+        self.assertContains(page, "<summary>État civil, activité et revenus</summary>")
+        self.assertNotContains(page, "<details class=\"garants\" open>")
+        donnees = {
+            "bien": bien.pk, "garantie": "aucune",
+            "candidats-TOTAL_FORMS": "1", "candidats-INITIAL_FORMS": "0",
+            "candidats-MIN_NUM_FORMS": "1", "candidats-MAX_NUM_FORMS": "4",
+            "candidats-0-nom": "Martin", "candidats-0-prenom": "Julie", "candidats-0-email": "julie@exemple.fr",
+        }
+        reponse = self.client.post(reverse("candidatures:creer"), donnees, follow=True)
+        self.assertContains(reponse, "Envoyez le lien au candidat")
+        candidature = Candidature.objects.get()
+        self.assertEqual(candidature.email, "julie@exemple.fr")
+        # Une fois l'activité connue, la section s'ouvre à la modification.
+        candidature.candidats.update(revenus_mensuels=2100)
+        page = self.client.get(reverse("candidatures:modifier", args=[candidature.pk]))
+        self.assertContains(page, "<details class=\"garants\" open>")
+
     def test_refus_sans_candidat_ou_lien_etranger(self):
         bien = self.creer_bien()
         self.assertEqual(self.client.post(reverse("candidatures:creer"),
@@ -242,7 +264,9 @@ class LienLocataireTests(Donnees, TestCase):
             "candidats-0-id": str(candidat.pk), "candidats-0-civilite": "Mme", "candidats-0-nom": "Martin-Roux",
             "candidats-0-prenom": "Julie", "candidats-0-date_naissance": "1996-03-08",
             "candidats-0-lieu_naissance": "Albi (Tarn)", "candidats-0-email": "julie@exemple.fr",
-            "candidats-0-telephone": "06 12 34 56 78",
+            "candidats-0-telephone": "06 12 34 56 78", "candidats-0-profession": "Infirmière",
+            "candidats-0-employeur": "CHU de Toulouse", "candidats-0-contrat": "cdi",
+            "candidats-0-date_embauche": "2022-09-01", "candidats-0-revenus_mensuels": "2150",
             "candidats-1-nom": "", "candidats-1-prenom": "",
         }
         for i in (0, 1):
@@ -308,17 +332,20 @@ class LienLocataireTests(Donnees, TestCase):
         self.assertIsNone(self.candidature.jeton)
 
     def test_formulaire_rempli_par_le_locataire(self):
+        Candidature.objects.filter(pk=self.candidature.pk).update(notes="Visite le 12, dossier fragile")
         formulaire = self.creer_lien()
         self.client.logout()
         page = self.client.get(formulaire)
         self.assertContains(page, "12 avenue de Muret")
         self.assertContains(page, 'value="Martin"')
         self.assertContains(page, "Second locataire, le cas échéant")
-        self.assertNotContains(page, "1500")  # rien d'interne : revenus, notes
+        self.assertContains(page, "Situation professionnelle")
+        self.assertNotContains(page, "dossier fragile")  # rien d'interne
         donnees = self.donnees(**{"candidats-1-civilite": "M.", "candidats-1-nom": "Roux",
                                   "candidats-1-prenom": "Hugo", "candidats-1-date_naissance": "1995-01-20",
                                   "candidats-1-lieu_naissance": "Toulouse", "candidats-1-email": "hugo@exemple.fr",
-                                  "candidats-1-telephone": "07 00 00 00 00"})
+                                  "candidats-1-telephone": "07 00 00 00 00", "candidats-1-contrat": "etudiant",
+                                  "candidats-1-revenus_mensuels": "0"})
         self.assertRedirects(self.client.post(formulaire, donnees), reverse("formulaire_locataire_merci"))
         self.candidature.refresh_from_db()
         self.assertIsNone(self.candidature.jeton)
@@ -327,8 +354,10 @@ class LienLocataireTests(Donnees, TestCase):
         self.assertEqual(self.candidature.lien_dossierfacile, "https://locataire.dossierfacile.logement.gouv.fr/file/9b7c")
         julie, hugo = self.candidature.candidats.all()
         self.assertEqual((julie.nom, julie.lieu_naissance, julie.telephone), ("Martin-Roux", "Albi (Tarn)", "06 12 34 56 78"))
-        self.assertEqual(julie.revenus_mensuels, Decimal("1500"))  # les données internes restent
-        self.assertEqual((hugo.prenom, hugo.email), ("Hugo", "hugo@exemple.fr"))
+        self.assertEqual((julie.profession, julie.contrat, julie.revenus_mensuels),
+                         ("Infirmière", "cdi", Decimal("2150")))
+        self.assertEqual((hugo.prenom, hugo.email, hugo.revenus_mensuels), ("Hugo", "hugo@exemple.fr", Decimal("0")))
+        self.assertEqual(self.candidature.revenus, Decimal("2150"))
         # Le lien ne sert qu'une fois.
         self.assertContains(self.client.get(formulaire), "plus valable", status_code=404)
         # Le bail reprend les informations complétées.
@@ -341,8 +370,10 @@ class LienLocataireTests(Donnees, TestCase):
         formulaire = self.creer_lien()
         self.client.logout()
         reponse = self.client.post(formulaire, self.donnees(**{"candidats-0-lieu_naissance": "",
+                                                               "candidats-0-revenus_mensuels": "",
                                                                "lien_dossierfacile": "https://exemple.fr/x"}))
         self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(len(reponse.context["candidats"].forms[0].errors), 2)
         self.assertContains(reponse, "Indiquer le lien de partage fourni par DossierFacile.")
         self.candidature.refresh_from_db()
         self.assertIsNotNone(self.candidature.jeton)

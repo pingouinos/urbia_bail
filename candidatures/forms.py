@@ -26,13 +26,31 @@ class CandidatureForm(forms.ModelForm):
 
 
 class CandidatForm(forms.ModelForm):
+    # De quoi identifier le candidat et lui envoyer son lien ; il complète
+    # lui-même le reste, que le collaborateur ne saisit que pour un dossier
+    # remis autrement.
+    ESSENTIELS = ("nom", "prenom", "email", "telephone")
+
     class Meta:
         model = Candidat
         fields = [
-            "civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone",
+            "nom", "prenom", "email", "telephone", "civilite", "date_naissance", "lieu_naissance",
             "profession", "employeur", "contrat", "date_embauche", "revenus_mensuels",
         ]
         widgets = {"date_naissance": DATE, "date_embauche": DATE}
+
+    @property
+    def champs_essentiels(self):
+        return [self[nom] for nom in self.ESSENTIELS]
+
+    @property
+    def champs_detail(self):
+        return [champ for champ in self.visible_fields() if champ.name not in (*self.ESSENTIELS, "DELETE")]
+
+    @property
+    def detail_ouvert(self):
+        """Déplié si une de ces informations est déjà saisie ou en erreur."""
+        return any(champ.value() or champ.errors for champ in self.champs_detail)
 
 
 CandidatFormSet = forms.inlineformset_factory(
@@ -45,8 +63,9 @@ class ReponseForm(forms.Form):
     texte = forms.CharField(label="Message", widget=forms.Textarea(attrs={"rows": 14}))
 
 
-# Formulaire ouvert au candidat, par le lien qu'il a reçu : il ne
-# touche qu'à son identité, ses coordonnées et son lien DossierFacile.
+# Formulaire ouvert au candidat, par le lien qu'il a reçu : il ne touche
+# qu'à son identité, ses coordonnées, son activité, ses revenus et son lien
+# DossierFacile.
 class DossierLocataireForm(forms.ModelForm):
     class Meta:
         model = Candidature
@@ -64,17 +83,25 @@ class DossierLocataireForm(forms.ModelForm):
 
 
 class CandidatLocataireForm(forms.ModelForm):
-    OBLIGATOIRES = ("date_naissance", "lieu_naissance", "email", "telephone")
+    OBLIGATOIRES = ("date_naissance", "lieu_naissance", "email", "telephone", "contrat", "revenus_mensuels")
 
     class Meta:
         model = Candidat
-        fields = ["civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone"]
-        widgets = {"date_naissance": DATE}
+        fields = [
+            "civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone",
+            "profession", "employeur", "contrat", "date_embauche", "revenus_mensuels",
+        ]
+        widgets = {"date_naissance": DATE, "date_embauche": DATE}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for nom in self.OBLIGATOIRES:
             self.fields[nom].required = True
+        self.fields["contrat"].label = "Situation professionnelle"
+        self.fields["employeur"].help_text = "Ou établissement, pour un étudiant."
+        self.fields["revenus_mensuels"].help_text = (
+            "Salaires, pensions, bourses et allocations, avant impôt. Indiquez 0 si vous n'avez pas de revenus."
+        )
 
 
 def candidat_locataire_formset(candidature, data=None):

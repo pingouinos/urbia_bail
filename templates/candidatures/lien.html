@@ -4,7 +4,7 @@
 <p><a href="{{ candidature.get_absolute_url }}">← Candidature</a></p>
 <h1>Lien pour le candidat</h1>
 <p class="discret">Pour {{ candidature.noms }} · {{ candidature.bien }}<br>Destinataire(s) : {{ destinataires|join:", "|default:"aucune adresse e-mail sur la fiche" }}</p>
-<p class="message">Le candidat y complète son identité, ses coordonnées et le lien de son dossier DossierFacile, sans compte ni mot de passe. Le lien est valable jusqu'au {{ candidature.lien_expire_le|date:"d/m/Y" }} et ne sert qu'une fois.</p>
+<p class="message">Le candidat y complète son identité, ses coordonnées, son activité, ses revenus et le lien de son dossier DossierFacile, sans compte ni mot de passe. Le lien est valable jusqu'au {{ candidature.lien_expire_le|date:"d/m/Y" }} et ne sert qu'une fois.</p>
 {% if local %}<p class="message alerte-fond">La page n'est pas encore ouverte sur Internet : ce lien ne fonctionne que depuis le réseau du bureau.</p>{% endif %}
 <section class="carte">
   <h2>Lien</h2>
