@@ -132,6 +132,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--acier); }
 .champ input:not([type=checkbox]):not([type=radio]), .champ select, .champ textarea { width: 100%; }
 .sous-titre { margin: 4px 0 0; font-weight: 700; }
 .champ label { font-weight: 500; }
+/* Champ obligatoire : libellé en gras suivi d'une étoile rouge. */
+.champ.obligatoire > label { font-weight: 700; }
+.champ.obligatoire > label::after { content: " *"; color: var(--erreur); font-weight: 700; }
+.etoile { color: var(--erreur); font-weight: 700; }
+.etapes-dossier { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
 label.case { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
 .en-erreur input, .en-erreur select, .en-erreur textarea { border-color: var(--erreur); }
 .sous-formulaire { border-bottom: 1px solid var(--bord); padding-bottom: 12px; margin-bottom: 12px; }

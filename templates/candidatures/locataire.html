@@ -4,14 +4,17 @@
 <h1>{% if candidature.statut == "retenue" %}Vos informations pour le bail{% else %}Votre candidature{% endif %}</h1>
 <p>Logement : <strong>{{ candidature.bien.adresse }}{% if candidature.bien.complement %}, {{ candidature.bien.complement }}{% endif %}, {{ candidature.bien.code_postal }} {{ candidature.bien.ville }}</strong></p>
 <p class="discret">{% if candidature.statut == "retenue" %}Votre identité figurera sur votre bail.{% else %}Si votre candidature est retenue, votre identité figurera sur votre bail.{% endif %} Vérifiez l'orthographe de vos noms, et indiquez votre lieu de naissance comme sur votre pièce d'identité.</p>
+{% if candidats.nombre > 1 %}<p>Le bail sera signé par {{ candidats.nombre }} locataires : renseignez les informations de chacun.</p>{% endif %}
+<p class="message">Avant de commencer, munissez-vous du lien de votre dossier DossierFacile : il est demandé en fin de formulaire, et rien n'est enregistré avant l'envoi. <a href="#dossierfacile">Comment l'obtenir</a></p>
+<p class="discret">Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
 <form method="post" class="formulaire" novalidate>
   {% csrf_token %}
   {{ candidats.management_form }}
   {% for erreur in candidats.non_form_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
   {% for sous_form in candidats %}
   <fieldset>
-    <legend>{% if forloop.first %}Vous{% elif sous_form.instance.pk %}Locataire {{ forloop.counter }}{% else %}Second locataire, le cas échéant{% endif %}</legend>
-    {% if not forloop.first and not sous_form.instance.pk %}<p class="discret pleine-largeur">Conjoint ou colocataire qui signe le bail avec vous. Laissez vide si vous êtes seul.</p>{% endif %}
+    <legend>{% if forloop.first %}Vous{% elif sous_form.facultatif %}Second locataire, le cas échéant{% else %}Locataire {{ forloop.counter }}{% endif %}</legend>
+    {% if sous_form.facultatif %}<p class="discret pleine-largeur">Conjoint ou colocataire qui signe le bail avec vous. Laissez vide si vous êtes seul.</p>{% endif %}
     {% for erreur in sous_form.non_field_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
     {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
     {% for champ in sous_form.visible_fields %}{% include "biens/_champ.html" %}{% endfor %}
@@ -32,8 +35,16 @@
     </details>
   </fieldset>
   {% endfor %}
-  <fieldset>
-    <legend>Pièces justificatives</legend>
+  <fieldset id="dossierfacile">
+    <legend>Pièces justificatives : votre dossier DossierFacile</legend>
+    <p class="pleine-largeur">Vous ne nous envoyez aucun justificatif directement. Vous les déposez sur <a href="https://www.dossierfacile.logement.gouv.fr/" target="_blank" rel="noopener noreferrer">DossierFacile</a>, le service gratuit de l'État : il protège vos documents par un filigrane, puis vous donne un lien à nous transmettre.</p>
+    <ol class="etapes-dossier pleine-largeur">
+      <li><strong>Créez votre compte</strong> sur <a href="https://www.dossierfacile.logement.gouv.fr/" target="_blank" rel="noopener noreferrer">dossierfacile.logement.gouv.fr</a>. En couple ou en colocation, choisissez ce type de dossier : chaque personne y dépose ses propres pièces.</li>
+      <li><strong>Déposez vos pièces</strong> : pièce d'identité, justificatifs de situation d'hébergement, de situation professionnelle et de ressources, avis d'imposition. Ajoutez celles de vos garants si vous en avez.</li>
+      <li><strong>Attendez la validation</strong> de votre dossier par DossierFacile : un e-mail vous prévient.</li>
+      <li><strong>Copiez le lien de partage</strong> : depuis l'accueil de votre compte, « Voir mes partages de dossier », créez un partage par lien <strong>avec les documents justificatifs</strong>, puis collez ce lien ci-dessous. Il expire au bout de 30 jours par défaut.</li>
+    </ol>
+    <p class="discret pleine-largeur">Une question sur les pièces ou sur le partage ? Consultez l'<a href="https://aide.dossierfacile.logement.gouv.fr/fr/" target="_blank" rel="noopener noreferrer">aide de DossierFacile</a>.</p>
     {% include "biens/_champ.html" with champ=form.lien_dossierfacile %}
   </fieldset>
   <p class="discret">Vos informations servent uniquement à {% if candidature.statut == "retenue" %}préparer votre bail{% else %}étudier votre candidature et, si elle est retenue, à préparer votre bail{% endif %} avec URBIA Immobilier. Si aucun bail n'est signé, elles sont effacées dans les trois mois.</p>

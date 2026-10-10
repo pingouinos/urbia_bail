@@ -3,6 +3,7 @@
 {% block contenu %}
 <p><a href="{% if candidature %}{{ candidature.get_absolute_url }}{% else %}{% url 'candidatures:liste' %}{% endif %}">← Retour</a></p>
 <h1>{% if candidature %}Modifier la candidature{% else %}Nouvelle candidature{% endif %}</h1>
+<p class="discret">Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
 <form method="post" class="formulaire">
   {% csrf_token %}
   {{ form.non_field_errors }}
@@ -14,7 +15,7 @@
     <legend>Candidats</legend>
     {{ candidats.management_form }}
     {% for erreur in candidats.non_form_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
-    <p class="discret pleine-largeur">Le nom et une adresse e-mail suffisent : le candidat complète lui-même son état civil, son activité, ses revenus et son lien DossierFacile par le lien que vous lui envoyez ensuite. Ne pas recueillir de coordonnées bancaires, de situation de famille ni de nationalité : la loi interdit de les exiger ou d'en faire un critère de choix.</p>
+    <p class="discret pleine-largeur">Indiquez seulement le candidat qui recevra le lien : son nom et son adresse e-mail suffisent. Il renseigne lui-même l'état civil, l'activité et les revenus de chaque locataire annoncé plus haut, ainsi que le lien DossierFacile. Ne pas recueillir de coordonnées bancaires, de situation de famille ni de nationalité : la loi interdit de les exiger ou d'en faire un critère de choix.</p>
     {% for sous_form in candidats %}
     <div class="sous-formulaire pleine-largeur">
       {% for erreur in sous_form.non_field_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}

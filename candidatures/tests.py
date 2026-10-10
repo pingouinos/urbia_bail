@@ -105,7 +105,8 @@ class VuesTests(Donnees, TestCase):
 
     def donnees_formulaire(self, bien, candidats):
         donnees = {
-            "bien": bien.pk, "lien_dossierfacile": LIEN, "garantie": "visale", "date_entree_souhaitee": "2026-11-01",
+            "bien": bien.pk, "nombre_locataires": "1", "lien_dossierfacile": LIEN, "garantie": "visale",
+            "date_entree_souhaitee": "2026-11-01",
             "candidats-TOTAL_FORMS": str(len(candidats)), "candidats-INITIAL_FORMS": "0",
             "candidats-MIN_NUM_FORMS": "1", "candidats-MAX_NUM_FORMS": "4",
         }
@@ -131,7 +132,7 @@ class VuesTests(Donnees, TestCase):
         self.assertContains(page, "<summary>État civil, activité et revenus</summary>")
         self.assertNotContains(page, "<details class=\"garants\" open>")
         donnees = {
-            "bien": bien.pk, "garantie": "aucune",
+            "bien": bien.pk, "nombre_locataires": "1", "garantie": "aucune",
             "candidats-TOTAL_FORMS": "1", "candidats-INITIAL_FORMS": "0",
             "candidats-MIN_NUM_FORMS": "1", "candidats-MAX_NUM_FORMS": "4",
             "candidats-0-nom": "Martin", "candidats-0-prenom": "Julie", "candidats-0-email": "julie@exemple.fr",
@@ -317,6 +318,49 @@ class LienLocataireTests(Donnees, TestCase):
         self.assertEqual(self.candidature.statut, Candidature.Statut.A_ETUDIER)
         self.assertEqual(self.candidature.lien_dossierfacile, "https://locataire.dossierfacile.logement.gouv.fr/file/9b7c")
         self.assertFalse(self.candidature.dossier_verifie)
+
+    def test_colocation_un_bloc_par_locataire(self):
+        """Le nombre de locataires annoncé à l'enregistrement fixe le nombre
+        de blocs à remplir, tous obligatoires."""
+        Candidature.objects.filter(pk=self.candidature.pk).update(nombre_locataires=3)
+        formulaire = self.creer_lien()
+        page = self.client.get(reverse("candidatures:lien", args=[self.candidature.pk]))
+        self.assertIn("chacun des 3 locataires", page.context["form"].initial["texte"])
+        self.client.logout()
+        page = self.client.get(formulaire)
+        self.assertContains(page, "signé par 3 locataires")
+        self.assertContains(page, "<legend>Locataire 2</legend>")
+        self.assertContains(page, "<legend>Locataire 3</legend>")
+        self.assertNotContains(page, "le cas échéant</legend>")
+        donnees = self.donnees(**{"candidats-TOTAL_FORMS": "3", "candidats-MAX_NUM_FORMS": "3"})
+        for i, prenom in ((1, "Hugo"), (2, "Lina")):
+            donnees.update({f"candidats-{i}-civilite": "M.", f"candidats-{i}-nom": "Roux", f"candidats-{i}-prenom": prenom,
+                            f"candidats-{i}-date_naissance": "1995-01-20", f"candidats-{i}-lieu_naissance": "Toulouse",
+                            f"candidats-{i}-email": f"{prenom.lower()}@exemple.fr",
+                            f"candidats-{i}-telephone": "07 00 00 00 00", f"candidats-{i}-contrat": "etudiant",
+                            f"candidats-{i}-revenus_mensuels": "600"})
+        donnees.update({"garants-2-TOTAL_FORMS": "2", "garants-2-INITIAL_FORMS": "0",
+                        "garants-2-MIN_NUM_FORMS": "0", "garants-2-MAX_NUM_FORMS": "2"})
+        # Un colocataire laissé vide : le formulaire est refusé.
+        incomplet = {cle: valeur for cle, valeur in donnees.items() if not cle.startswith("candidats-2-")}
+        reponse = self.client.post(formulaire, incomplet)
+        self.assertEqual(reponse.status_code, 200)
+        self.assertIn("nom", reponse.context["candidats"].forms[2].errors)
+        self.assertEqual(self.candidature.candidats.count(), 1)
+        self.assertRedirects(self.client.post(formulaire, donnees), reverse("formulaire_locataire_merci"))
+        self.assertEqual([c.prenom for c in self.candidature.candidats.all()], ["Julie", "Hugo", "Lina"])
+        self.assertEqual(self.candidature.revenus, Decimal("3350"))
+
+    def test_champs_obligatoires_signales(self):
+        formulaire = self.creer_lien()
+        self.client.logout()
+        page = self.client.get(formulaire)
+        self.assertContains(page, "sont obligatoires")
+        # Mini-tutoriel DossierFacile, avec les liens officiels.
+        self.assertContains(page, 'href="https://www.dossierfacile.logement.gouv.fr/"')
+        self.assertContains(page, 'href="https://aide.dossierfacile.logement.gouv.fr/fr/"')
+        self.assertContains(page, "avec les documents justificatifs")
+        self.assertContains(page, '<div class="champ obligatoire">\n  \n  <label for="id_candidats-0-nom">', html=False)
 
     def test_pas_de_lien_apres_un_refus(self):
         formulaire = self.creer_lien()

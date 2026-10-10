@@ -17,6 +17,7 @@
     <dl>
       <dt>Loyer HC</dt><dd>{% if candidature.bien.dernier_loyer %}{{ candidature.bien.dernier_loyer }} €{% else %}—{% endif %}</dd>
       <dt>Charges</dt><dd>{% if candidature.bien.charges %}{{ candidature.bien.charges }} €{% else %}—{% endif %}</dd>
+      <dt>Locataires</dt><dd>{{ candidature.locataires_attendus }}</dd>
       <dt>Entrée souhaitée</dt><dd>{{ candidature.date_entree_souhaitee|date:"d/m/Y"|default:"—" }}</dd>
     </dl>
   </section>

@@ -2,7 +2,7 @@ from django import forms
 
 from biens.models import Bien
 
-from .models import Candidat, Candidature, Garant
+from .models import MAX_LOCATAIRES, Candidat, Candidature, Garant
 
 DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
@@ -10,8 +10,12 @@ DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 class CandidatureForm(forms.ModelForm):
     class Meta:
         model = Candidature
-        fields = ["bien", "lien_dossierfacile", "dossier_verifie", "garantie", "date_entree_souhaitee", "notes"]
+        fields = [
+            "bien", "nombre_locataires", "lien_dossierfacile", "dossier_verifie", "garantie",
+            "date_entree_souhaitee", "notes",
+        ]
         widgets = {
+            "nombre_locataires": forms.NumberInput(attrs={"min": 1, "max": MAX_LOCATAIRES}),
             "date_entree_souhaitee": DATE,
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
@@ -54,7 +58,7 @@ class CandidatForm(forms.ModelForm):
 
 
 CandidatFormSet = forms.inlineformset_factory(
-    Candidature, Candidat, form=CandidatForm, extra=1, max_num=4, validate_max=True,
+    Candidature, Candidat, form=CandidatForm, extra=1, max_num=MAX_LOCATAIRES, validate_max=True,
     min_num=1, validate_min=True, can_delete=True,
 )
 
@@ -76,10 +80,7 @@ class DossierLocataireForm(forms.ModelForm):
         champ = self.fields["lien_dossierfacile"]
         champ.required = True
         champ.label = "Lien de votre dossier DossierFacile"
-        champ.help_text = (
-            "Sur dossierfacile.logement.gouv.fr, ouvrez votre dossier puis copiez son lien de partage : "
-            "il donne accès à vos pièces justificatives."
-        )
+        champ.help_text = "Collez ici le lien de partage copié à l'étape 4."
 
 
 class CandidatLocataireForm(forms.ModelForm):
@@ -105,14 +106,23 @@ class CandidatLocataireForm(forms.ModelForm):
 
 
 def candidat_locataire_formset(candidature, data=None):
-    """Une ligne par candidat déjà connu, plus une ligne facultative pour un
-    second locataire s'il n'y en a qu'un."""
-    nombre = candidature.candidats.count()
+    """Une ligne à remplir par locataire annoncé sur la candidature (ou déjà
+    connu), plus une ligne facultative pour un second locataire s'il n'y en a
+    qu'un."""
+    connus = candidature.candidats.count()
+    nombre = candidature.locataires_attendus
+    lignes = max(nombre, 2)
     classe = forms.inlineformset_factory(
-        Candidature, Candidat, form=CandidatLocataireForm, extra=1 if nombre < 2 else 0,
-        max_num=max(nombre, 2), validate_max=True, min_num=1, validate_min=True, can_delete=False,
+        Candidature, Candidat, form=CandidatLocataireForm, extra=lignes - max(connus, 1),
+        max_num=lignes, validate_max=True, min_num=1, validate_min=True, can_delete=False,
     )
     formset = classe(data, instance=candidature)
+    formset.nombre = nombre
+    for i, form in enumerate(formset.forms):
+        # Une ligne annoncée ne peut pas rester vide.
+        form.facultatif = i >= nombre
+        if not form.facultatif:
+            form.empty_permitted = False
     # Le navigateur du candidat peut remplir sa propre ligne, pas celle d'un autre.
     for nom, valeur in [("nom", "family-name"), ("prenom", "given-name"), ("date_naissance", "bday"),
                         ("email", "email"), ("telephone", "tel")]:

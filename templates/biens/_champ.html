@@ -1,4 +1,4 @@
-<div class="champ{% if champ.errors %} en-erreur{% endif %}">
+<div class="champ{% if champ.errors %} en-erreur{% endif %}{% if champ.field.required %} obligatoire{% endif %}">
   {% if champ.widget_type == "checkbox" %}
   <label class="case">{{ champ }} {{ champ.label }}</label>
   {% else %}
