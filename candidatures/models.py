@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -27,6 +28,7 @@ DUREE_CONSERVATION = dt.timedelta(days=90)
 # Durée de validité du lien envoyé au candidat pour compléter ses
 # informations.
 DUREE_LIEN = dt.timedelta(days=14)
+MAX_LOCATAIRES = 4
 
 
 def valider_lien_dossierfacile(valeur):
@@ -50,6 +52,11 @@ class Candidature(Horodatage):
         AUTRE = "autre", "Autre garantie"
 
     bien = models.ForeignKey(Bien, on_delete=models.PROTECT, related_name="candidatures")
+    nombre_locataires = models.PositiveSmallIntegerField(
+        "nombre de locataires", default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(MAX_LOCATAIRES)],
+        help_text="Colocataires ou couple : le formulaire envoyé au candidat demande les informations de chacun.",
+    )
     lien_dossierfacile = models.URLField(
         "lien DossierFacile", blank=True, validators=[valider_lien_dossierfacile],
         help_text="Lien de partage envoyé par le candidat.",
@@ -132,6 +139,12 @@ class Candidature(Horodatage):
         return alertes
 
     @property
+    def locataires_attendus(self):
+        """Nombre annoncé à l'enregistrement, ou celui des candidats déjà
+        saisis s'il est plus grand."""
+        return max(self.nombre_locataires, self.candidats.count())
+
+    @property
     def decidee(self):
         return self.statut != self.Statut.A_ETUDIER
 
@@ -189,7 +202,12 @@ class Candidature(Horodatage):
             "coordonnées, activité et revenus) et d'indiquer le lien de partage de votre dossier DossierFacile, à l'adresse "
             "suivante :\n\n"
             f"{lien}\n\n"
-            f"Ce lien vous est personnel et reste valable jusqu'au "
+            "Si vous n'avez pas encore de dossier DossierFacile, créez-le gratuitement sur "
+            "https://www.dossierfacile.logement.gouv.fr : le formulaire explique comment obtenir son lien "
+            "de partage.\n\n"
+            + (f"Le formulaire demande les informations de chacun des {self.locataires_attendus} locataires.\n\n"
+               if self.locataires_attendus > 1 else "")
+            + f"Ce lien vous est personnel et reste valable jusqu'au "
             f"{timezone.localtime(self.lien_expire_le):%d/%m/%Y}.\n\n"
             "Cordialement,\n"
             + (f"{signataire}\n" if signataire else "")
