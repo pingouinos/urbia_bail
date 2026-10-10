@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from biens.models import Bien
 
 from .forms import (
-    CandidatFormSet, CandidatureForm, DossierLocataireForm, ReponseForm, candidat_locataire_formset,
+    CandidatureForm, DossierLocataireForm, ReponseForm, candidat_formset, candidat_locataire_formset,
 )
 from .models import Candidature, Garant
 
@@ -60,7 +60,7 @@ def candidature_editer(request, pk=None):
     objet = get_object_or_404(Candidature, pk=pk) if pk else None
     initial = {"bien": request.GET["bien"]} if objet is None and request.GET.get("bien") else {}
     form = CandidatureForm(request.POST or None, instance=objet, initial=initial)
-    candidats = CandidatFormSet(request.POST or None, instance=form.instance)
+    candidats = candidat_formset(request.POST or None, form.instance)
     if request.method == "POST" and form.is_valid() and candidats.is_valid():
         creation = objet is None
         with transaction.atomic():

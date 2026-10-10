@@ -131,6 +131,9 @@ class VuesTests(Donnees, TestCase):
         page = self.client.get(reverse("candidatures:creer"), {"bien": bien.pk})
         self.assertContains(page, "<summary>État civil, activité et revenus</summary>")
         self.assertNotContains(page, "<details class=\"garants\" open>")
+        # Une seule ligne à la création : le candidat qui recevra le lien.
+        self.assertEqual(len(page.context["candidats"].forms), 1)
+        self.assertNotContains(page, "Autre candidat, le cas échéant")
         donnees = {
             "bien": bien.pk, "nombre_locataires": "1", "garantie": "aucune",
             "candidats-TOTAL_FORMS": "1", "candidats-INITIAL_FORMS": "0",
@@ -145,6 +148,8 @@ class VuesTests(Donnees, TestCase):
         candidature.candidats.update(revenus_mensuels=2100)
         page = self.client.get(reverse("candidatures:modifier", args=[candidature.pk]))
         self.assertContains(page, "<details class=\"garants\" open>")
+        self.assertEqual(len(page.context["candidats"].forms), 2)
+        self.assertContains(page, "Autre candidat, le cas échéant")
 
     def test_refus_sans_candidat_ou_lien_etranger(self):
         bien = self.creer_bien()
@@ -415,9 +420,11 @@ class LienLocataireTests(Donnees, TestCase):
         self.client.logout()
         reponse = self.client.post(formulaire, self.donnees(**{"candidats-0-lieu_naissance": "",
                                                                "candidats-0-revenus_mensuels": "",
+                                                               "candidats-0-civilite": "",
                                                                "lien_dossierfacile": "https://exemple.fr/x"}))
         self.assertEqual(reponse.status_code, 200)
-        self.assertEqual(len(reponse.context["candidats"].forms[0].errors), 2)
+        self.assertEqual(sorted(reponse.context["candidats"].forms[0].errors),
+                         ["civilite", "lieu_naissance", "revenus_mensuels"])
         self.assertContains(reponse, "Indiquer le lien de partage fourni par DossierFacile.")
         self.candidature.refresh_from_db()
         self.assertIsNotNone(self.candidature.jeton)

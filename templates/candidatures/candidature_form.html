@@ -17,7 +17,8 @@
     {% for erreur in candidats.non_form_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
     <p class="discret pleine-largeur">Indiquez seulement le candidat qui recevra le lien : son nom et son adresse e-mail suffisent. Il renseigne lui-même l'état civil, l'activité et les revenus de chaque locataire annoncé plus haut, ainsi que le lien DossierFacile. Ne pas recueillir de coordonnées bancaires, de situation de famille ni de nationalité : la loi interdit de les exiger ou d'en faire un critère de choix.</p>
     {% for sous_form in candidats %}
-    <div class="sous-formulaire pleine-largeur">
+    <div class="sous-formulaire pleine-largeur{% if sous_form.facultatif %} facultatif{% endif %}">
+      {% if sous_form.facultatif %}<p class="sous-titre">Autre candidat, le cas échéant</p>{% endif %}
       {% for erreur in sous_form.non_field_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
       {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
       <div class="sous-grille">
@@ -33,7 +34,7 @@
       </details>
     </div>
     {% endfor %}
-    <small class="discret pleine-largeur">Jusqu'à quatre candidats (colocataires, couple) ; enregistrez pour ajouter une ligne vide.</small>
+    <small class="discret pleine-largeur">{% if candidature %}Jusqu'à quatre candidats (colocataires, couple) ; enregistrez pour ajouter une ligne vide.{% else %}Pour saisir vous-même un autre candidat (dossier papier), enregistrez puis modifiez la candidature.{% endif %}</small>
   </fieldset>
   <button type="submit">Enregistrer</button>
 </form>
