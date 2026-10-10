@@ -140,11 +140,11 @@ def adresse_lien(request, jeton):
 
 
 def lien(request, pk):
-    """Lien personnel du candidat retenu, et message pour le lui envoyer."""
+    """Lien personnel du candidat, et message pour le lui envoyer."""
     objet = get_object_or_404(Candidature.objects.select_related("bien"), pk=pk)
     if request.method == "POST" and request.POST.get("action") == "creer":
-        if objet.statut != Candidature.Statut.RETENUE or objet.bail_id:
-            messages.error(request, "Le lien s'envoie à une candidature retenue, avant la rédaction du bail.")
+        if not objet.lien_possible:
+            messages.error(request, "Le lien s'envoie à une candidature à l'étude ou retenue, avant la rédaction du bail.")
             return redirect(objet)
         objet.creer_lien()
         return redirect("candidatures:lien", pk=objet.pk)
@@ -155,7 +155,10 @@ def lien(request, pk):
     texte = objet.texte_lien(adresse, request.user.get_full_name())
     form = ReponseForm(request.POST or None, initial={"texte": texte})
     destinataires = sorted({c.email for c in objet.candidats.all() if c.email})
-    sujet = f"Votre bail pour le logement {objet.bien.adresse}, {objet.bien.ville}"
+    sujet = (
+        f"Votre {'bail' if objet.statut == Candidature.Statut.RETENUE else 'candidature'} "
+        f"pour le logement {objet.bien.adresse}, {objet.bien.ville}"
+    )
     if request.method == "POST" and request.POST.get("action") == "envoyer" and form.is_valid():
         if envoi_configure() and destinataires:
             EmailMessage(subject=sujet, body=form.cleaned_data["texte"], to=destinataires).send()

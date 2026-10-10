@@ -34,7 +34,7 @@ services:
       MFA_OBLIGATOIRE: "true"
       DOCUMENTS_DIR: /documents
       GOTENBERG_URL: http://127.0.0.1:23300
-      # Adresse publique du formulaire des candidats retenus, une fois le
+      # Adresse publique du formulaire des candidats, une fois le
       # tunnel Cloudflare en place (README, « Ouvrir le formulaire locataire
       # sur Internet ») ; vide, le lien ne fonctionne qu'au bureau.
       URL_LOCATAIRES: ""

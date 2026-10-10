@@ -48,20 +48,31 @@ Pour restaurer une base, depuis le terminal de `urbia-sauvegarde-1` : `pg_restor
 
 ## Ouvrir le formulaire locataire sur Internet (Cloudflare Tunnel)
 
-Le candidat retenu complète ses informations par un lien personnel (`/locataire/…`). Pour qu'il l'ouvre depuis chez lui, Cloudflare Tunnel relie le NAS à l'adresse `https://locataire.urbia-immobilier.fr` sans ouvrir de port sur la box : le NAS se connecte à Cloudflare, qui ne lui transmet que les adresses `/locataire/` et `/static/`. L'application refuse de toute façon tout le reste sur cette adresse ; le reste de l'appli ne s'ouvre qu'au bureau. L'offre Free de Cloudflare et le tunnel sont gratuits ; le domaine reste payé chez OVH.
+Le candidat complète ses informations par un lien personnel (`/locataire/…`). Pour qu'il l'ouvre depuis chez lui, Cloudflare Tunnel relie le NAS à l'adresse `https://locataire.urbia-immobilier.fr` sans ouvrir de port sur la box : le NAS se connecte à Cloudflare, qui ne lui transmet que les adresses `/locataire/` et `/static/`. L'application refuse de toute façon tout le reste sur cette adresse ; le reste de l'appli ne s'ouvre qu'au bureau. L'offre Free de Cloudflare et le tunnel sont gratuits ; le domaine reste payé chez OVH.
 
-Le domaine doit passer chez Cloudflare (ses serveurs DNS), ce qui touche aussi la messagerie Google et le site : les étapes 1 et 2 sont à faire posément, en recopiant tous les enregistrements.
+Le domaine doit passer chez Cloudflare (ses serveurs DNS), ce qui touche aussi la messagerie et le site : les étapes 1 et 2 sont à faire posément, en recopiant tous les enregistrements.
 
 ### 1. Cloudflare : ajouter le domaine
 
 1. Créer un compte sur [dash.cloudflare.com](https://dash.cloudflare.com) avec l'adresse de l'agence.
 2. *Onboard a domain* : `urbia-immobilier.fr`, offre **Free**. Cloudflare recherche les enregistrements existants, mais peut en oublier.
-3. Comparer sa liste, ligne à ligne, avec la zone DNS d'OVH (*Web Cloud* > *Noms de domaine* > `urbia-immobilier.fr` > onglet *Zone DNS*) et ajouter ce qui manque. Pour la messagerie Google, il faut retrouver :
-   - le ou les **MX** : `smtp.google.com` (priorité 1), ou les cinq `aspmx…` d'un compte plus ancien ;
-   - le **TXT** SPF `v=spf1 include:_spf.google.com ~all` ;
-   - le **TXT** `google._domainkey` (DKIM, valeur à recopier telle quelle), et `_dmarc` ou `google-site-verification` s'ils existent.
+3. Comparer sa liste, ligne à ligne, avec la zone DNS d'OVH (*Web Cloud* > *Noms de domaine* > `urbia-immobilier.fr` > onglet *Zone DNS*) et ajouter ce qui manque. Cloudflare doit reprendre **exactement** la zone d'OVH d'aujourd'hui, sans rien ajouter ni retirer : les mails et le site continuent alors comme avant, que la messagerie soit encore chez OVH Exchange ou déjà chez Google.
 
-   Les enregistrements du site (`urbia-immobilier.fr`, `www`) passent en **DNS only** (nuage gris), pour que le site reste servi exactement comme aujourd'hui. MX et TXT sont toujours en DNS only.
+   Pour ajouter une ligne : bouton *Add record* ; dans *Name*, `@` désigne le domaine lui-même ; TTL sur *Auto*. Les lignes à ne pas oublier :
+
+   | Type | Name | Valeur, recopiée d'OVH | Autre |
+   |---|---|---|---|
+   | MX | `@` | *Mail server* : `…mail.ovh.net` tant que la messagerie est chez OVH Exchange, `smtp.google.com` une fois chez Google | *Priority* : celle d'OVH |
+   | TXT | `@` | *Content* : la ligne SPF (`v=spf1 …`) telle qu'elle est | |
+   | CNAME | `autodiscover` | *Target* : le serveur OVH indiqué (Exchange) | *Proxy status* : désactivé |
+   | SRV | `_autodiscover._tcp` | les mêmes valeurs qu'OVH (Exchange), s'il existe | |
+   | TXT | `google._domainkey`, `_dmarc` | *Content* : `v=DKIM1; …`, `v=DMARC1; …`, s'ils existent | |
+   | TXT | `@` | `google-site-verification=…`, s'il existe | |
+   | A | `@` et `www` | *IPv4 address* du site | *Proxy status* : désactivé |
+
+   Une ligne de type « SPF » chez OVH se crée en TXT chez Cloudflare. Si le site passe par un CNAME chez OVH, le recopier de la même façon. Toutes ces lignes restent en **DNS only** (nuage gris) : le site et la messagerie sont servis exactement comme aujourd'hui.
+
+   Quand la migration vers Google sera terminée, c'est chez Cloudflare (et non plus chez OVH) qu'il faudra remplacer les MX et le SPF par ceux de Google.
 4. Noter les deux serveurs de noms que Cloudflare indique (`….ns.cloudflare.com`).
 
 ### 2. OVH : confier le domaine à Cloudflare
@@ -94,7 +105,7 @@ Projet `urbia` > *Action* > *Arrêter*, onglet *YAML* : dans le service `web`, r
 
 ### 6. Tester
 
-Depuis un téléphone en 4G (Wi-Fi coupé) : `https://locataire.urbia-immobilier.fr/` affiche une page introuvable (erreur 404) : c'est normal, seul le formulaire est ouvert. Sur une candidature retenue, *Envoyer le lien au locataire*, puis ouvrir le lien sur le téléphone : le formulaire s'affiche.
+Depuis un téléphone en 4G (Wi-Fi coupé) : `https://locataire.urbia-immobilier.fr/` affiche une page introuvable (erreur 404) : c'est normal, seul le formulaire est ouvert. Sur une candidature, *Envoyer le lien au candidat*, puis ouvrir le lien sur le téléphone : le formulaire s'affiche.
 
 ## Mettre à jour
 

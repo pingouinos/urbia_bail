@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from .google import BACKEND
 
-# Formulaire du candidat retenu, accessible par son lien personnel. Seules
+# Formulaire du candidat, accessible par son lien personnel. Seules
 # pages servies sur l'adresse publique URL_LOCATAIRES.
 CHEMINS_LOCATAIRES = ("/locataire/", "/static/")
 # Pages accessibles sans être connecté.
