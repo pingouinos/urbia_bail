@@ -24,7 +24,7 @@ from baux.models import Bail
 from biens.models import Bailleur, Bien, Horodatage
 
 DUREE_CONSERVATION = dt.timedelta(days=90)
-# Durée de validité du lien envoyé au candidat retenu pour compléter ses
+# Durée de validité du lien envoyé au candidat pour compléter ses
 # informations.
 DUREE_LIEN = dt.timedelta(days=14)
 
@@ -76,9 +76,10 @@ class Candidature(Horodatage):
         Bail, on_delete=models.SET_NULL, null=True, blank=True, related_name="candidature"
     )
 
-    # Lien personnel envoyé au candidat retenu : il y complète son identité,
-    # ses coordonnées et le lien de son dossier DossierFacile. Le jeton est
-    # effacé dès que le formulaire est envoyé.
+    # Lien personnel envoyé au candidat, dès l'étude de sa candidature ou une
+    # fois retenu : il y complète son identité, ses coordonnées et le lien de
+    # son dossier DossierFacile. Le jeton est effacé dès que le formulaire est
+    # envoyé.
     jeton = models.CharField(max_length=64, null=True, blank=True, unique=True, editable=False)
     lien_cree_le = models.DateTimeField("lien envoyé le", null=True, blank=True)
     rempli_le = models.DateTimeField("rempli par le locataire le", null=True, blank=True)
@@ -154,11 +155,14 @@ class Candidature(Horodatage):
         return self.lien_cree_le + DUREE_LIEN if self.lien_cree_le else None
 
     @property
+    def lien_possible(self):
+        """Le candidat peut recevoir un lien tant que sa candidature est à
+        l'étude ou retenue, et que le bail n'est pas rédigé."""
+        return self.statut in (self.Statut.A_ETUDIER, self.Statut.RETENUE) and not self.bail_id
+
+    @property
     def lien_valide(self):
-        return bool(
-            self.jeton and self.statut == self.Statut.RETENUE and not self.bail_id
-            and timezone.now() < self.lien_expire_le
-        )
+        return bool(self.jeton and self.lien_possible and timezone.now() < self.lien_expire_le)
 
     def creer_lien(self):
         """Nouveau lien pour le candidat ; l'ancien cesse de fonctionner."""
@@ -174,10 +178,14 @@ class Candidature(Horodatage):
 
     def texte_lien(self, lien, signataire=""):
         bien = self.bien
+        logement = f"le logement situé {bien.adresse}, {bien.code_postal} {bien.ville}"
+        if self.statut == self.Statut.RETENUE:
+            debut = f"Votre candidature pour {logement} a été retenue. Pour préparer votre bail"
+        else:
+            debut = f"Vous êtes candidat à la location pour {logement}. Pour que nous étudiions votre dossier"
         return (
             "Bonjour,\n\n"
-            f"Votre candidature pour le logement situé {bien.adresse}, {bien.code_postal} {bien.ville} "
-            "a été retenue. Pour préparer votre bail, merci de compléter vos informations (identité, "
+            f"{debut}, merci de compléter vos informations (identité, "
             "coordonnées) et d'indiquer le lien de partage de votre dossier DossierFacile, à l'adresse "
             "suivante :\n\n"
             f"{lien}\n\n"

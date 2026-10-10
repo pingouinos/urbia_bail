@@ -1,5 +1,5 @@
 # Urbia Gestion · tunnel Cloudflare : ouvre sur Internet le seul formulaire
-# des candidats retenus (https://locataire.urbia-immobilier.fr/locataire/…),
+# des candidats (https://locataire.urbia-immobilier.fr/locataire/…),
 # sans ouvrir de port sur la box. Le tunnel part du NAS vers Cloudflare, qui
 # ne laisse passer que les adresses /locataire/ et /static/ ; l'application
 # refuse de toute façon le reste sur cette adresse.

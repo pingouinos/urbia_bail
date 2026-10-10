@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block titre %}Vos informations pour le bail · URBIA Immobilier{% endblock %}
+{% block titre %}{% if candidature.statut == "retenue" %}Vos informations pour le bail{% else %}Votre candidature{% endif %} · URBIA Immobilier{% endblock %}
 {% block contenu %}
-<h1>Vos informations pour le bail</h1>
+<h1>{% if candidature.statut == "retenue" %}Vos informations pour le bail{% else %}Votre candidature{% endif %}</h1>
 <p>Logement : <strong>{{ candidature.bien.adresse }}{% if candidature.bien.complement %}, {{ candidature.bien.complement }}{% endif %}, {{ candidature.bien.code_postal }} {{ candidature.bien.ville }}</strong></p>
-<p class="discret">Ces informations figureront sur votre bail. Vérifiez l'orthographe de vos noms, et indiquez votre lieu de naissance comme sur votre pièce d'identité.</p>
+<p class="discret">{% if candidature.statut == "retenue" %}Ces informations figureront sur votre bail.{% else %}Si votre candidature est retenue, ces informations figureront sur votre bail.{% endif %} Vérifiez l'orthographe de vos noms, et indiquez votre lieu de naissance comme sur votre pièce d'identité.</p>
 <form method="post" class="formulaire" novalidate>
   {% csrf_token %}
   {{ candidats.management_form }}
@@ -36,7 +36,7 @@
     <legend>Pièces justificatives</legend>
     {% include "biens/_champ.html" with champ=form.lien_dossierfacile %}
   </fieldset>
-  <p class="discret">Vos informations servent uniquement à préparer votre bail avec URBIA Immobilier. Si aucun bail n'est signé, elles sont effacées dans les trois mois.</p>
+  <p class="discret">Vos informations servent uniquement à {% if candidature.statut == "retenue" %}préparer votre bail{% else %}étudier votre candidature et, si elle est retenue, à préparer votre bail{% endif %} avec URBIA Immobilier. Si aucun bail n'est signé, elles sont effacées dans les trois mois.</p>
   <div class="barre-actions">
     <button type="submit">Envoyer mes informations</button>
   </div>

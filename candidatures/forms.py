@@ -45,7 +45,7 @@ class ReponseForm(forms.Form):
     texte = forms.CharField(label="Message", widget=forms.Textarea(attrs={"rows": 14}))
 
 
-# Formulaire ouvert au candidat retenu, par le lien qu'il a reçu : il ne
+# Formulaire ouvert au candidat, par le lien qu'il a reçu : il ne
 # touche qu'à son identité, ses coordonnées et son lien DossierFacile.
 class DossierLocataireForm(forms.ModelForm):
     class Meta:

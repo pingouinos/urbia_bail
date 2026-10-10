@@ -37,7 +37,7 @@ if not SECRET_KEY:
 ALLOWED_HOSTS = [*env("ALLOWED_HOSTS"), "localhost", "127.0.0.1"]
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 
-# Adresse publique du formulaire des candidats retenus (par exemple
+# Adresse publique du formulaire des candidats (par exemple
 # https://locataire.urbia-immobilier.fr, servie par Cloudflare Tunnel). Sur
 # cette adresse, l'application ne répond qu'aux pages /locataire/.
 _url_locataires = urlparse(env("URL_LOCATAIRES", default=""))

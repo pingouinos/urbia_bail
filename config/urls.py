@@ -18,7 +18,7 @@ urlpatterns = [
     path("candidatures/", include("candidatures.urls")),
     path("baux/", include("baux.urls")),
     path("modeles/", include("documents.urls")),
-    # Formulaire du candidat retenu, seule partie ouverte sans connexion.
+    # Formulaire du candidat, seule partie ouverte sans connexion.
     path("locataire/merci/", candidatures_views.formulaire_locataire_merci, name="formulaire_locataire_merci"),
     path("locataire/<str:jeton>/", candidatures_views.formulaire_locataire, name="formulaire_locataire"),
     path(

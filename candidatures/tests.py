@@ -217,7 +217,7 @@ class VuesTests(Donnees, TestCase):
 
 
 class LienLocataireTests(Donnees, TestCase):
-    """Lien envoyé au candidat retenu pour qu'il complète lui-même ses
+    """Lien envoyé au candidat pour qu'il complète lui-même ses
     informations."""
 
     def setUp(self):
@@ -253,7 +253,7 @@ class LienLocataireTests(Donnees, TestCase):
 
     def test_lien_et_message(self):
         page = self.client.get(self.candidature.get_absolute_url())
-        self.assertContains(page, "Envoyer le lien au locataire")
+        self.assertContains(page, "Envoyer le lien au candidat")
         formulaire = self.creer_lien()
         page = self.client.get(reverse("candidatures:lien", args=[self.candidature.pk]))
         self.assertContains(page, f"http://testserver{formulaire}")
@@ -264,6 +264,8 @@ class LienLocataireTests(Donnees, TestCase):
         self.assertEqual(mail.outbox[0].to, ["martin@exemple.fr"])
         self.assertIn(f"http://testserver{formulaire}", mail.outbox[0].body)
         self.assertIn("valable jusqu'au", mail.outbox[0].body)
+        self.assertIn("a été retenue", mail.outbox[0].body)
+        self.assertIn("Votre bail", mail.outbox[0].subject)
 
     @override_settings(URL_LOCATAIRES="https://locataire.urbia.example")
     def test_adresse_publique(self):
@@ -272,8 +274,35 @@ class LienLocataireTests(Donnees, TestCase):
         self.assertContains(page, f"https://locataire.urbia.example{formulaire}")
         self.assertNotContains(page, "réseau du bureau")
 
-    def test_seulement_candidature_retenue_sans_bail(self):
+    def test_lien_avant_la_decision(self):
+        """Le dossier se demande avant de retenir le candidat."""
         self.candidature.decider(Candidature.Statut.A_ETUDIER, None)
+        self.assertContains(self.client.get(self.candidature.get_absolute_url()), "Envoyer le lien au candidat")
+        formulaire = self.creer_lien()
+        page = self.client.get(reverse("candidatures:lien", args=[self.candidature.pk]))
+        texte = page.context["form"].initial["texte"]
+        self.assertIn("Pour que nous étudiions votre dossier", texte)
+        self.assertNotIn("retenue", texte)
+        self.assertContains(page, "Votre%20candidature%20pour%20le%20logement")
+        self.client.logout()
+        page = self.client.get(formulaire)
+        self.assertContains(page, "<h1>Votre candidature</h1>")
+        self.assertContains(page, "Si votre candidature est retenue")
+        self.assertRedirects(self.client.post(formulaire, self.donnees()), reverse("formulaire_locataire_merci"))
+        self.candidature.refresh_from_db()
+        self.assertEqual(self.candidature.statut, Candidature.Statut.A_ETUDIER)
+        self.assertEqual(self.candidature.lien_dossierfacile, "https://locataire.dossierfacile.logement.gouv.fr/file/9b7c")
+        self.assertFalse(self.candidature.dossier_verifie)
+
+    def test_pas_de_lien_apres_un_refus(self):
+        formulaire = self.creer_lien()
+        for statut in (Candidature.Statut.NON_RETENUE, Candidature.Statut.DESISTEMENT):
+            with self.subTest(statut=statut):
+                self.candidature.decider(statut, None)
+                self.assertEqual(self.client.get(formulaire).status_code, 404)
+                self.assertNotContains(self.client.get(self.candidature.get_absolute_url()), "Envoyer le lien")
+        self.candidature.jeton = None
+        self.candidature.save()
         self.client.post(reverse("candidatures:lien", args=[self.candidature.pk]), {"action": "creer"})
         self.candidature.refresh_from_db()
         self.assertIsNone(self.candidature.jeton)

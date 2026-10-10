@@ -48,7 +48,7 @@ Pour restaurer une base, depuis le terminal de `urbia-sauvegarde-1` : `pg_restor
 
 ## Ouvrir le formulaire locataire sur Internet (Cloudflare Tunnel)
 
-Le candidat retenu complète ses informations par un lien personnel (`/locataire/…`). Pour qu'il l'ouvre depuis chez lui, Cloudflare Tunnel relie le NAS à l'adresse `https://locataire.urbia-immobilier.fr` sans ouvrir de port sur la box : le NAS se connecte à Cloudflare, qui ne lui transmet que les adresses `/locataire/` et `/static/`. L'application refuse de toute façon tout le reste sur cette adresse ; le reste de l'appli ne s'ouvre qu'au bureau. L'offre Free de Cloudflare et le tunnel sont gratuits ; le domaine reste payé chez OVH.
+Le candidat complète ses informations par un lien personnel (`/locataire/…`). Pour qu'il l'ouvre depuis chez lui, Cloudflare Tunnel relie le NAS à l'adresse `https://locataire.urbia-immobilier.fr` sans ouvrir de port sur la box : le NAS se connecte à Cloudflare, qui ne lui transmet que les adresses `/locataire/` et `/static/`. L'application refuse de toute façon tout le reste sur cette adresse ; le reste de l'appli ne s'ouvre qu'au bureau. L'offre Free de Cloudflare et le tunnel sont gratuits ; le domaine reste payé chez OVH.
 
 Le domaine doit passer chez Cloudflare (ses serveurs DNS), ce qui touche aussi la messagerie et le site : les étapes 1 et 2 sont à faire posément, en recopiant tous les enregistrements.
 
@@ -105,7 +105,7 @@ Projet `urbia` > *Action* > *Arrêter*, onglet *YAML* : dans le service `web`, r
 
 ### 6. Tester
 
-Depuis un téléphone en 4G (Wi-Fi coupé) : `https://locataire.urbia-immobilier.fr/` affiche une page introuvable (erreur 404) : c'est normal, seul le formulaire est ouvert. Sur une candidature retenue, *Envoyer le lien au locataire*, puis ouvrir le lien sur le téléphone : le formulaire s'affiche.
+Depuis un téléphone en 4G (Wi-Fi coupé) : `https://locataire.urbia-immobilier.fr/` affiche une page introuvable (erreur 404) : c'est normal, seul le formulaire est ouvert. Sur une candidature, *Envoyer le lien au candidat*, puis ouvrir le lien sur le téléphone : le formulaire s'affiche.
 
 ## Mettre à jour
 
