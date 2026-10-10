@@ -136,6 +136,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--acier); }
 .champ.obligatoire > label { font-weight: 700; }
 .champ.obligatoire > label::after { content: " *"; color: var(--erreur); font-weight: 700; }
 .etoile { color: var(--erreur); font-weight: 700; }
+/* Bloc facultatif : ses champs ne sont exigés que s'il est rempli. */
+.facultatif .champ.obligatoire > label, .garants .champ.obligatoire > label { font-weight: 500; }
+.facultatif .champ.obligatoire > label::after, .garants .champ.obligatoire > label::after { content: none; }
 .etapes-dossier { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
 label.case { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
 .en-erreur input, .en-erreur select, .en-erreur textarea { border-color: var(--erreur); }

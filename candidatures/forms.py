@@ -57,10 +57,18 @@ class CandidatForm(forms.ModelForm):
         return any(champ.value() or champ.errors for champ in self.champs_detail)
 
 
-CandidatFormSet = forms.inlineformset_factory(
-    Candidature, Candidat, form=CandidatForm, extra=1, max_num=MAX_LOCATAIRES, validate_max=True,
-    min_num=1, validate_min=True, can_delete=True,
-)
+def candidat_formset(data, candidature):
+    """À la création, une seule ligne : le candidat qui recevra le lien. À la
+    modification, une ligne vide en plus pour saisir soi-même un autre
+    candidat (dossier papier)."""
+    classe = forms.inlineformset_factory(
+        Candidature, Candidat, form=CandidatForm, extra=1 if candidature.pk else 0, max_num=MAX_LOCATAIRES,
+        validate_max=True, min_num=1, validate_min=True, can_delete=True,
+    )
+    formset = classe(data, instance=candidature)
+    for i, form in enumerate(formset.forms):
+        form.facultatif = i > 0 and not form.instance.pk
+    return formset
 
 
 class ReponseForm(forms.Form):
@@ -84,7 +92,9 @@ class DossierLocataireForm(forms.ModelForm):
 
 
 class CandidatLocataireForm(forms.ModelForm):
-    OBLIGATOIRES = ("date_naissance", "lieu_naissance", "email", "telephone", "contrat", "revenus_mensuels")
+    OBLIGATOIRES = (
+        "civilite", "date_naissance", "lieu_naissance", "email", "telephone", "contrat", "revenus_mensuels",
+    )
 
     class Meta:
         model = Candidat

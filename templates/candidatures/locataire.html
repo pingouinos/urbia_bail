@@ -12,7 +12,7 @@
   {{ candidats.management_form }}
   {% for erreur in candidats.non_form_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
   {% for sous_form in candidats %}
-  <fieldset>
+  <fieldset{% if sous_form.facultatif %} class="facultatif"{% endif %}>
     <legend>{% if forloop.first %}Vous{% elif sous_form.facultatif %}Second locataire, le cas échéant{% else %}Locataire {{ forloop.counter }}{% endif %}</legend>
     {% if sous_form.facultatif %}<p class="discret pleine-largeur">Conjoint ou colocataire qui signe le bail avec vous. Laissez vide si vous êtes seul.</p>{% endif %}
     {% for erreur in sous_form.non_field_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
