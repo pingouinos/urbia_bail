@@ -16,7 +16,7 @@ class BailForm(forms.ModelForm):
         widgets = {
             **{nom: DATE for nom in (
                 "date_effet", "precedent_date_versement", "precedent_date_revision",
-                "date_signature", "date_fin_effective",
+                "date_signature", "conge_recu_le", "date_depart_prevue", "date_fin_effective",
             )},
             "garants": forms.Textarea(attrs={"rows": 2}),
             "travaux": forms.Textarea(attrs={"rows": 2}),
@@ -27,7 +27,7 @@ class BailForm(forms.ModelForm):
     # sont facultatives ou déjà préremplies ; elles s'ouvrent en cas d'erreur.
     SECTIONS = [
         ("Bail", ["bien", "type", "usage_mixte", "garants"], False),
-        ("Dates", ["date_effet", "lieu_signature", "date_signature", "date_fin_effective"], False),
+        ("Dates", ["date_effet", "lieu_signature", "date_signature"], False),
         ("Loyer et charges", [
             "loyer", "mode_charges", "charges", "jour_paiement", "a_echoir", "depot_garantie",
             "irl_trimestre", "irl_valeur",
@@ -40,7 +40,9 @@ class BailForm(forms.ModelForm):
             "precedent_loyer", "precedent_date_versement", "precedent_date_revision", "travaux",
         ], True),
         ("Conditions particulières", ["conditions_particulieres"], True),
+        ("Fin du bail", ["conge_recu_le", "date_depart_prevue", "date_fin_effective"], True),
     ]
+    FIN = ("conge_recu_le", "date_depart_prevue", "date_fin_effective")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -54,12 +56,15 @@ class BailForm(forms.ModelForm):
             # Le logement est choisi à l'étape précédente, et un bail en cours
             # de rédaction n'a pas encore de fin.
             self.fields["bien"].widget = forms.HiddenInput()
-            del self.fields["date_fin_effective"]
+            for nom in self.FIN:
+                del self.fields[nom]
 
     def sections(self):
         sections = []
         for titre, noms, repliee in self.SECTIONS:
             champs = [self[nom] for nom in noms if nom in self.fields and not self[nom].is_hidden]
+            if not champs:
+                continue
             sections.append({
                 "titre": titre, "champs": champs, "repliee": repliee,
                 "en_erreur": any(champ.errors for champ in champs),
@@ -77,6 +82,19 @@ class BailForm(forms.ModelForm):
         bien, mandat = donnees.get("bien") or self.instance.bien, donnees.get("mandat")
         if mandat and bien and mandat.bien_id != bien.pk:
             self.add_error("mandat", "Ce mandat concerne un autre bien.")
+        conge, depart = donnees.get("conge_recu_le"), donnees.get("date_depart_prevue")
+        if conge and not depart:
+            self.add_error("date_depart_prevue", "Indiquer la date de fin du préavis.")
+        elif depart and not conge:
+            self.add_error("conge_recu_le", "Indiquer la date de réception du congé.")
+        elif conge and depart and depart < conge:
+            self.add_error("date_depart_prevue", "Le départ ne peut pas précéder le congé.")
+        # Un logement déjà loué ne se reloue qu'une fois le congé reçu, et
+        # après le départ du locataire en place.
+        if bien and donnees.get("date_effet"):
+            empechement = Bail.empechement(bien, donnees["date_effet"], sauf=self.instance.pk)
+            if empechement:
+                self.add_error("date_effet", empechement[1])
         return donnees
 
 

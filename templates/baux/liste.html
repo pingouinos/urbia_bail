@@ -25,7 +25,7 @@
       <td>{{ bail.get_type_display }}</td>
       <td>{{ bail.date_effet|date:"d/m/Y" }}</td>
       <td>{{ bail.loyer }} €</td>
-      <td>{% if not bail.en_cours %}terminé{% elif bail.alertes %}<span class="alerte">à vérifier</span>{% elif bail.date_signature %}signé{% else %}à signer{% endif %}</td>
+      <td>{% if not bail.en_cours %}terminé{% elif bail.conge_recu_le %}préavis, départ le {{ bail.date_depart_prevue|date:"d/m/Y" }}{% elif bail.alertes %}<span class="alerte">à vérifier</span>{% elif bail.date_signature %}signé{% else %}à signer{% endif %}</td>
     </tr>
   {% empty %}
     <tr><td colspan="6" class="discret">Aucun bail. Un bail se rédige depuis la fiche d'un bien ou avec « Nouveau bail ».</td></tr>

@@ -272,6 +272,50 @@ class VuesTests(Donnees, TestCase):
         self.assertEqual(reponse.status_code, 200)
         self.assertFalse(Bail.objects.exists())
 
+    def test_logement_deja_loue_sans_conge(self):
+        """Pas de nouveau bail tant que le locataire en place n'a pas donné
+        son préavis, ni avant son départ."""
+        bien = self.creer_bien()
+        en_place = self.creer_bail(bien=bien, date_effet=dt.date(2024, 9, 1))
+        # Dès le choix du logement, renvoi vers le bail en cours.
+        reponse = self.client.get(reverse("baux:creer"), {"bien": bien.pk}, follow=True)
+        self.assertRedirects(reponse, en_place.get_absolute_url())
+        self.assertContains(reponse, "Ce logement est déjà loué (Paul MARTIN, bail du 01/09/2024)")
+        # Et à l'enregistrement, si le formulaire est envoyé quand même.
+        reponse = self.client.post(reverse("baux:creer"), self.donnees_bail(bien, ["Roux"]))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertIn("aucun congé", reponse.context["form"].errors["date_effet"][0])
+        self.assertEqual(Bail.objects.count(), 1)
+
+        # Congé reçu : le bail se rédige, mais pas avant le départ prévu.
+        donnees = self.donnees_bail(bien, ["Martin"])
+        donnees.update({"locataires-INITIAL_FORMS": "1", "locataires-0-id": en_place.locataires.get().pk,
+                        "date_effet": "2024-09-01", "conge_recu_le": "2026-10-05"})
+        reponse = self.client.post(reverse("baux:modifier", args=[en_place.pk]), donnees)
+        self.assertIn("date_depart_prevue", reponse.context["form"].errors)
+        donnees["date_depart_prevue"] = "2026-11-05"
+        self.assertRedirects(self.client.post(reverse("baux:modifier", args=[en_place.pk]), donnees),
+                             en_place.get_absolute_url())
+        self.assertContains(self.client.get(en_place.get_absolute_url()),
+                            "congé reçu le 05/10/2026, départ prévu le 05/11/2026")
+        self.assertEqual(self.client.get(reverse("baux:creer"), {"bien": bien.pk}).status_code, 200)
+        reponse = self.client.post(reverse("baux:creer"), self.donnees_bail(bien, ["Roux"]))  # effet le 01/11
+        self.assertIn("prend fin le 05/11/2026", reponse.context["form"].errors["date_effet"][0])
+        donnees_nouveau = self.donnees_bail(bien, ["Roux"])
+        donnees_nouveau["date_effet"] = "2026-11-06"
+        self.client.post(reverse("baux:creer"), donnees_nouveau)
+        self.assertEqual(Bail.objects.count(), 2)
+        # Le bail en place reste modifiable malgré le suivant.
+        self.assertRedirects(self.client.post(reverse("baux:modifier", args=[en_place.pk]), donnees),
+                             en_place.get_absolute_url())
+
+    def test_logement_libere(self):
+        bien = self.creer_bien()
+        self.creer_bail(bien=bien, date_effet=dt.date(2024, 9, 1), date_fin_effective=dt.date(2026, 10, 15))
+        self.assertEqual(self.client.get(reverse("baux:creer"), {"bien": bien.pk}).status_code, 200)
+        self.client.post(reverse("baux:creer"), self.donnees_bail(bien, ["Roux"]))
+        self.assertEqual(Bail.objects.count(), 2)
+
     def test_nouveau_logement_sans_proprietaire_refuse(self):
         reponse = self.client.post(reverse("baux:nouveau_logement"), self.LOGEMENT)
         self.assertEqual(reponse.status_code, 200)

@@ -65,6 +65,10 @@ def bail_editer(request, pk=None):
         bien = candidature.bien if candidature else get_object_or_404(
             Bien.objects.select_related("bailleur"), pk=request.GET["bien"]
         )
+        empechement = Bail.empechement(bien)
+        if empechement and empechement[0].en_cours and not empechement[0].conge_recu_le:
+            messages.error(request, empechement[1])
+            return redirect(empechement[0])
         objet_initial = Bail.depuis_bien(bien)
         initial = []
         if candidature:
