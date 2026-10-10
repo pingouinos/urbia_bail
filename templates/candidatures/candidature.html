@@ -78,7 +78,7 @@
   {% if candidature.lien_valide %}
   <p>Lien envoyé le {{ candidature.lien_cree_le|date:"d/m/Y" }}, valable jusqu'au {{ candidature.lien_expire_le|date:"d/m/Y" }}. <a href="{% url 'candidatures:lien' candidature.pk %}">Revoir le lien et le message</a></p>
   {% elif not candidature.rempli_le %}
-  <p class="discret">Le candidat complète lui-même son identité, ses coordonnées et le lien de son dossier DossierFacile, par un lien personnel valable 14 jours.</p>
+  <p class="discret">Le candidat complète lui-même son identité, ses coordonnées, son activité, ses revenus et le lien de son dossier DossierFacile, par un lien personnel valable 14 jours.</p>
   {% endif %}
   <form method="post" action="{% url 'candidatures:lien' candidature.pk %}" class="en-ligne">
     {% csrf_token %}
