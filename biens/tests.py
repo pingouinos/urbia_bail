@@ -50,6 +50,21 @@ class ImportTests(TestCase):
         self.assertEqual(str(bien.date_dpe), "2024-03-15")
         self.assertEqual(bien.bailleur.ref_ics, "B01")
 
+    def test_import_sans_reference_ics(self):
+        """La référence ICS est facultative : le lot se retrouve alors par
+        son adresse, son complément et son code postal."""
+        rapport = tableur.importer("biens.xlsx", xlsx(
+            ligne(None), ligne(None, **{"Complément": "Bât. B", "Réf. ICS bailleur": None})))
+        self.assertEqual((rapport.erreurs, rapport.crees), ([], 2))
+        self.assertEqual(Bien.objects.filter(ref_ics__isnull=True).count(), 2)
+        rapport = tableur.importer("biens.xlsx", xlsx(ligne(None, **{"Classe DPE": "C"})))
+        self.assertEqual((rapport.crees, rapport.mis_a_jour), (0, 1))
+        self.assertEqual(Bien.objects.get(complement="Bât. A, 2e étage").classe_dpe, "C")
+        # La référence peut être ajoutée plus tard sur le même lot.
+        rapport = tableur.importer("biens.xlsx", xlsx(ligne("L001")))
+        self.assertEqual((rapport.crees, rapport.mis_a_jour), (0, 1))
+        self.assertEqual(Bien.objects.get(ref_ics="L001").complement, "Bât. A, 2e étage")
+
     def test_reimport_met_a_jour_sans_effacer_les_cellules_vides(self):
         tableur.importer("biens.xlsx", xlsx(ligne()))
         rapport = tableur.importer("biens.xlsx", xlsx(ligne(**{"Surface (m²)": None, "Classe DPE": "C"})))
@@ -81,7 +96,8 @@ class ImportTests(TestCase):
 
     def test_colonne_obligatoire_absente(self):
         rapport = tableur.importer("biens.xlsx", xlsx(["X"], entetes=["Adresse"]))
-        self.assertIn("Réf. ICS lot", rapport.erreurs[0][1])
+        self.assertIn("Code postal", rapport.erreurs[0][1])
+        self.assertNotIn("Réf. ICS lot", rapport.erreurs[0][1])
 
     def test_csv_excel_francais(self):
         contenu = (

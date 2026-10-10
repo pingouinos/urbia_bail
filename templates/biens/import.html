@@ -5,7 +5,7 @@
 <h1>Importer des biens</h1>
 {% if not rapport %}
 <section class="carte">
-  <p>Partez du <a href="{% url 'biens:modele' %}">modèle Excel</a> (une ligne par lot), complété par exemple à partir d'une extraction ICS. Un lot déjà présent (même « Réf. ICS lot ») est mis à jour ; une cellule vide ne remplace pas la valeur existante.</p>
+  <p>Partez du <a href="{% url 'biens:modele' %}">modèle Excel</a> (une ligne par lot), complété par exemple à partir d'une extraction ICS. Un lot déjà présent (même « Réf. ICS lot » ou, sans référence, même adresse, complément et code postal) est mis à jour ; une cellule vide ne remplace pas la valeur existante.</p>
   <p>Le fichier est d'abord vérifié sans rien enregistrer ; vous confirmez ensuite l'import.</p>
   <form method="post" enctype="multipart/form-data" class="formulaire">
     {% csrf_token %}

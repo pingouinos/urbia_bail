@@ -34,7 +34,7 @@ class Colonne:
 
 
 COLONNES = [
-    Colonne("Réf. ICS lot", "ref_ics", obligatoire=True, largeur=14),
+    Colonne("Réf. ICS lot", "ref_ics", largeur=14),
     Colonne("Réf. ICS bailleur", "ref_ics", modele=Bailleur, largeur=14),
     Colonne("Type de bailleur", "type", "choix", modele=Bailleur, largeur=20),
     Colonne("Bailleur (nom ou raison sociale)", "nom", modele=Bailleur, obligatoire=True, largeur=28),
@@ -268,8 +268,7 @@ def _importer_ligne(cellules, index, rapport):
     bailleur.full_clean()
     bailleur.save()
 
-    ref = valeurs[Bien]["ref_ics"]
-    bien = Bien.objects.filter(ref_ics=ref).first()
+    bien = _trouver_bien(valeurs[Bien])
     nouveau = bien is None
     if nouveau:
         bien = Bien()
@@ -282,6 +281,21 @@ def _importer_ligne(cellules, index, rapport):
         rapport.crees += 1
     else:
         rapport.mis_a_jour += 1
+
+
+def _trouver_bien(valeurs):
+    """Lot déjà présent : même référence ICS, sinon même adresse, complément
+    et code postal. Une ligne qui porte une référence nouvelle ne rejoint par
+    l'adresse qu'un lot encore sans référence : deux lots référencés à la même
+    adresse restent distincts."""
+    memes_lieux = Bien.objects.filter(
+        adresse__iexact=valeurs["adresse"], complement__iexact=valeurs.get("complement", ""),
+        code_postal=valeurs["code_postal"],
+    )
+    if valeurs.get("ref_ics"):
+        trouve = Bien.objects.filter(ref_ics=valeurs["ref_ics"]).first()
+        return trouve or memes_lieux.filter(ref_ics__isnull=True).first()
+    return memes_lieux.first()
 
 
 def _trouver_bailleur(valeurs):
@@ -354,7 +368,8 @@ def classeur(biens=()):
     aide.append(["Obligatoire", "Colonnes surlignées : " + ", ".join(
         c.entete for c in COLONNES if c.obligatoire
     )])
-    aide.append(["Mise à jour", "Un lot déjà connu (même Réf. ICS lot) est mis à jour ; "
+    aide.append(["Mise à jour", "Un lot déjà connu (même Réf. ICS lot ou, sans référence, même adresse, complément et "
+                 "code postal) est mis à jour ; "
                  "une cellule vide ne remplace pas la valeur existante."])
 
     flux = io.BytesIO()
