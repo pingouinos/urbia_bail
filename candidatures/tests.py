@@ -38,6 +38,12 @@ class Donnees(DonneesBaux):
 
 
 class CandidatureTests(Donnees, TestCase):
+    def test_alerte_logement_deja_loue(self):
+        candidature = self.creer_candidature()
+        self.assertEqual(candidature.alertes, [])
+        self.creer_bail(bien=candidature.bien, date_effet=dt.date(2024, 9, 1))
+        self.assertIn("Ce logement est déjà loué", candidature.alertes[0])
+
     def test_lien_dossierfacile(self):
         for lien in [LIEN, "https://dossierfacile.fr/file/abc"]:
             valider_lien_dossierfacile(lien)

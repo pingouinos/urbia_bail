@@ -136,6 +136,10 @@ class Candidature(Horodatage):
             )
         if self.bien.location_interdite:
             alertes.append("Logement classé G au DPE : il ne peut plus être loué comme résidence principale.")
+        if not self.bail_id:
+            empechement = Bail.empechement(self.bien, self.date_entree_souhaitee)
+            if empechement:
+                alertes.append(empechement[1])
         return alertes
 
     @property

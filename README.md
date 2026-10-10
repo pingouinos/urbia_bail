@@ -44,6 +44,8 @@ Les candidatures non retenues, abandonnées, retenues sans bail ou restées sans
 
 Un bail se rédige depuis la fiche d'un logement : il reprend la fiche du bien et les honoraires du mandat en cours, puis on saisit les locataires (jusqu'à quatre), la date de prise d'effet, le loyer, les charges, le dépôt de garantie et l'IRL de référence. Le document suit le contrat type du décret n° 2015-587 (annexe 1 pour le logement nu, annexe 2 pour le meublé, y compris le bail étudiant de neuf mois), complété des clauses propres à l'agence et de la liste des réparations locatives. La durée (3 ou 6 ans en nu selon le bailleur, 1 an en meublé), la clause de solidarité et la liste des annexes s'adaptent toutes seules.
 
+Un logement déjà loué ne peut pas recevoir de nouveau bail tant que le congé du locataire en place n'est pas enregistré sur son bail (« Modifier le bail », section « Fin du bail » : congé reçu le, départ prévu le, fin effective), et le nouveau bail ne peut prendre effet qu'après son départ. La candidature le signale dès l'étude.
+
 Avant signature, la fiche du bail signale : logement classé G, fiche du bien incomplète, absence de mandat, dépôt de garantie supérieur au maximum légal, loyer supérieur à celui du précédent locataire en zone tendue ou pour un logement classé F ou G, honoraires non conformes.
 
 ## Modèles Word

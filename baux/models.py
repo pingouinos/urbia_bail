@@ -98,6 +98,16 @@ class Bail(Horodatage):
     conditions_particulieres = models.TextField("autres conditions particulières", blank=True)
     lieu_signature = models.CharField("lieu de signature", max_length=100, default="Toulouse")
     date_signature = models.DateField("date de signature", null=True, blank=True)
+    # Fin du bail : le congé reçu ouvre le préavis, au terme duquel le
+    # locataire part. Tant qu'aucun congé n'est enregistré, le logement ne
+    # peut pas faire l'objet d'un nouveau bail.
+    conge_recu_le = models.DateField(
+        "congé reçu le", null=True, blank=True,
+        help_text="Préavis donné par le locataire, ou congé donné par le bailleur.",
+    )
+    date_depart_prevue = models.DateField(
+        "départ prévu le", null=True, blank=True, help_text="Fin du préavis.",
+    )
     date_fin_effective = models.DateField(
         "fin effective", null=True, blank=True, help_text="Date de départ du locataire."
     )
@@ -158,6 +168,35 @@ class Bail(Horodatage):
     @property
     def en_cours(self):
         return self.date_fin_effective is None
+
+    @property
+    def noms_locataires(self):
+        return ", ".join(str(locataire) for locataire in self.locataires.all())
+
+    @classmethod
+    def empechement(cls, bien, date_effet=None, sauf=None):
+        """Raison pour laquelle le logement ne peut pas être loué à la date
+        donnée, ou None : il est déjà loué sans congé enregistré, ou le
+        locataire en place n'est pas encore parti. Renvoie (bail, message).
+        Seuls comptent les baux qui ont pris effet avant."""
+        precedents = bien.baux.exclude(pk=sauf).prefetch_related("locataires").order_by("-date_effet")
+        if date_effet:
+            precedents = precedents.filter(date_effet__lte=date_effet)
+        for bail in precedents:
+            qui = bail.noms_locataires or "locataire à renseigner"
+            if bail.en_cours and not bail.conge_recu_le:
+                return bail, (
+                    f"Ce logement est déjà loué ({qui}, bail du {bail.date_effet:%d/%m/%Y}) et aucun congé "
+                    "n'est enregistré. Enregistrez d'abord le préavis du locataire sur ce bail, ou sa fin "
+                    "effective s'il est parti."
+                )
+            depart = bail.date_fin_effective or bail.date_depart_prevue
+            if date_effet and depart and date_effet <= depart:
+                return bail, (
+                    f"Le bail précédent ({qui}) {'a pris' if bail.date_fin_effective else 'prend'} fin le "
+                    f"{depart:%d/%m/%Y} : le nouveau bail ne peut prendre effet qu'après cette date."
+                )
+        return None
 
     @property
     def total_mensuel(self):
