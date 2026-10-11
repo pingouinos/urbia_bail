@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}{% if bailleur %}Modifier le bailleur{% else %}Nouveau bailleur{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% if bailleur %}{{ bailleur.get_absolute_url }}{% else %}{% url 'proprietes:bailleurs' %}{% endif %}">← Retour</a></p>
+<p><a href="{% if bailleur %}{{ bailleur.get_absolute_url }}{% else %}{% url 'contacts:liste' %}?categorie=bailleur{% endif %}">← Retour</a></p>
 <h1>{% if bailleur %}Modifier {{ bailleur }}{% else %}Nouveau bailleur{% endif %}</h1>
 <form method="post" class="formulaire">
   {% csrf_token %}

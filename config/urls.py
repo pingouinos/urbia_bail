@@ -18,6 +18,7 @@ urlpatterns = [
     path("mandats/", include("mandats.urls")),
     path("candidatures/", include("candidatures.urls")),
     path("contrats/", include("contrats.urls")),
+    path("contacts/", include("contacts.urls")),
     path("modeles/", include("documents.urls")),
     # Anciennes adresses, pour les favoris et les liens déjà envoyés.
     re_path(r"^biens/(?P<suite>.*)$", RedirectView.as_view(url="/proprietes/%(suite)s", query_string=True)),

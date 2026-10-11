@@ -3,9 +3,10 @@ import base64
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -171,12 +172,10 @@ def propriete_editer(request, pk=None):
 
 
 def bailleurs(request):
-    q = request.GET.get("q", "").strip()
-    liste_ = Bailleur.objects.annotate(nb_proprietes=Count("proprietes"))
-    if q:
-        liste_ = liste_.filter(Q(nom__icontains=q) | Q(prenom__icontains=q) | Q(ref_ics__icontains=q))
-    page = Paginator(liste_, 50).get_page(request.GET.get("page"))
-    return render(request, "proprietes/bailleurs.html", {"page": page, "q": q})
+    """Les bailleurs se consultent dans les contacts, par leur catégorie."""
+    parametres = request.GET.copy()
+    parametres["categorie"] = "bailleur"
+    return redirect(f"{reverse('contacts:liste')}?{parametres.urlencode()}")
 
 
 def bailleur(request, pk):
