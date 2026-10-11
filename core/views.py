@@ -1,7 +1,9 @@
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.db.models import Q
-from django.http import JsonResponse
-from django.shortcuts import render
+from django.http import FileResponse, Http404, JsonResponse
+from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from contrats.models import Bail
@@ -9,6 +11,9 @@ from proprietes.models import Propriete
 from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from mandats.models import Mandat
+
+from .forms import OrganisationForm, type_image
+from .models import Organisation
 
 
 def locations_en_cours():
@@ -64,8 +69,10 @@ def locations_en_cours():
 def accueil(request):
     """Page d'accueil centrée sur les mises en location en cours, puis les
     derniers baux."""
+    est_admin = est_administrateur(request.user)
     return render(request, "core/accueil.html", {
-        "est_admin": est_administrateur(request.user),
+        "est_admin": est_admin,
+        "agence_manquants": Organisation.courante().manquants if est_admin else [],
         "derniers_baux": Bail.objects.select_related("propriete").prefetch_related("locataires").order_by("-modifie_le")[:8],
         "locations": locations_en_cours(),
         "nb_proprietes": Propriete.objects.filter(actif=True).count(),
@@ -73,6 +80,39 @@ def accueil(request):
         "nb_candidatures": Candidature.objects.filter(statut=Candidature.Statut.A_ETUDIER).count(),
         "nb_mandats": Mandat.objects.filter(date_fin__isnull=True).count(),
     })
+
+
+def agence(request):
+    """Fiche de l'agence, tenue par les administrateurs : ses mentions figurent
+    sur les mandats et les baux."""
+    if not est_administrateur(request.user):
+        raise PermissionDenied
+    organisation = Organisation.courante()
+    form = OrganisationForm(request.POST or None, request.FILES or None, instance=organisation)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Fiche de l'agence enregistrée.")
+        return redirect("agence")
+    return render(request, "core/agence.html", {
+        "form": form, "organisation": organisation, "balises": list(organisation.contexte_document()),
+        "historique": organisation.history.select_related("history_user")[:10],
+    })
+
+
+def logo_agence(request):
+    """Logo déposé par l'agence. Public : il figure sur le formulaire du candidat."""
+    logo = Organisation.courante().logo
+    if not logo:
+        raise Http404
+    try:
+        fichier = logo.open("rb")
+    except FileNotFoundError:
+        raise Http404
+    type_ = type_image(fichier.read(12)) or "application/octet-stream"
+    fichier.seek(0)
+    reponse = FileResponse(fichier, content_type=type_)
+    reponse["X-Content-Type-Options"] = "nosniff"
+    return reponse
 
 
 def sante(request):

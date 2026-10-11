@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titre %}Agence · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'accueil' %}">← Tableau de bord</a></p>
+<h1>Agence</h1>
+<p class="discret">Ces informations figurent sur les mandats et les baux, et signent les messages aux candidats. Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
+{% if organisation.manquants %}<p class="message alerte-fond">À renseigner pour que les documents soient complets : {{ organisation.manquants|join:", " }}.</p>{% endif %}
+<form method="post" enctype="multipart/form-data" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for titre, champs in form.sections %}
+  <fieldset>
+    <legend>{{ titre }}</legend>
+    {% if titre == "Identité" and organisation.logo %}<p class="pleine-largeur"><img class="logo-agence" src="{% url 'logo_agence' %}" alt="Logo actuel"></p>{% endif %}
+    {% for champ in champs %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  {% endfor %}
+  <div class="actions-formulaire"><button type="submit" class="bouton-corail">Enregistrer</button></div>
+</form>
+<section class="carte">
+  <h2>Balises pour les modèles Word</h2>
+  <p class="discret">À écrire telles quelles dans un modèle de bail ou de mandat ; ajouter <code>|upper</code> pour des majuscules, par exemple <code>{% templatetag openvariable %} agence.nom|upper {% templatetag closevariable %}</code>.</p>
+  <p class="balises">{% for balise in balises %}<code>{% templatetag openvariable %} agence.{{ balise }} {% templatetag closevariable %}</code> {% endfor %}</p>
+</section>
+{% if historique %}
+<section class="carte">
+  <h2>Historique</h2>
+  <ul class="historique">
+  {% for version in historique %}
+    <li>{{ version.history_date|date:"d/m/Y H:i" }} · {{ version.get_history_type_display }} par {{ version.history_user|default:"import ou système" }}</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

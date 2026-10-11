@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titre %}{% if candidature.statut == "retenue" %}Vos informations pour le bail{% else %}Votre candidature{% endif %} · URBIA Immobilier{% endblock %}
+{% block titre %}{% if candidature.statut == "retenue" %}Vos informations pour le bail{% else %}Votre candidature{% endif %} · {{ agence.designation }}{% endblock %}
 {% block contenu %}
 <h1>{% if candidature.statut == "retenue" %}Vos informations pour le bail{% else %}Votre candidature{% endif %}</h1>
 <p>Logement : <strong>{{ candidature.propriete.adresse }}{% if candidature.propriete.complement %}, {{ candidature.propriete.complement }}{% endif %}, {{ candidature.propriete.code_postal }} {{ candidature.propriete.ville }}</strong></p>
@@ -47,7 +47,7 @@
     <p class="discret pleine-largeur">Une question sur les pièces ou sur le partage ? Consultez l'<a href="https://aide.dossierfacile.logement.gouv.fr/fr/" target="_blank" rel="noopener noreferrer">aide de DossierFacile</a>.</p>
     {% include "proprietes/_champ.html" with champ=form.lien_dossierfacile %}
   </fieldset>
-  <p class="discret">Vos informations servent uniquement à {% if candidature.statut == "retenue" %}préparer votre bail{% else %}étudier votre candidature et, si elle est retenue, à préparer votre bail{% endif %} avec URBIA Immobilier. Si aucun bail n'est signé, elles sont effacées dans les trois mois.</p>
+  <p class="discret">Vos informations servent uniquement à {% if candidature.statut == "retenue" %}préparer votre bail{% else %}étudier votre candidature et, si elle est retenue, à préparer votre bail{% endif %} avec {{ agence.designation }}. Si aucun bail n'est signé, elles sont effacées dans les trois mois.</p>
   <div class="barre-actions">
     <button type="submit">Envoyer mes informations</button>
   </div>
