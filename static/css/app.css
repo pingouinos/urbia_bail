@@ -156,7 +156,7 @@ button.bouton-corail[type=submit]:hover { background: #cf463d; border-color: #cf
 .actions-location { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin: 16px 0 8px; }
 
 /* Accueil */
-.accroche { display: grid; grid-template-columns: 1fr auto; gap: 16px 32px; align-items: center; padding: 28px 32px; border-radius: var(--rayon); background: var(--melon-clair); border: 1px solid #fbd9cb; }
+.accroche { display: grid; grid-template-columns: 1fr; gap: 16px 32px; align-items: center; padding: 28px 32px; border-radius: var(--rayon); background: var(--melon-clair); border: 1px solid #fbd9cb; }
 .accroche h1 { margin-bottom: 4px; }
 .accroche p { margin: 0; }
 .raccourcis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 16px; }
@@ -354,3 +354,6 @@ dd { margin: 0; }
 .dossier form.en-ligne { margin: 0; }
 .dossier input[type=file] { max-width: 260px; }
 .dossier input[type=date] { width: auto; }
+
+/* Entrée « Administration » du panneau, quand on s'y trouve. */
+.lien-admin[aria-current=page] { background: var(--melon-clair); color: var(--acier); font-weight: 600; }

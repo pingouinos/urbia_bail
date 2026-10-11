@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titre %}Administration · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<h1>Administration</h1>
+<p class="discret">Réservée aux administrateurs.</p>
+{% if organisation.manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ organisation.manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux.</p>{% endif %}
+<div class="grille raccourcis">
+  <a class="carte" href="{% url 'agence' %}"><strong>Agence</strong><span class="discret">{{ organisation.nom|default:"Coordonnées à renseigner" }} · carte professionnelle, garantie financière, logo</span></a>
+  <a class="carte" href="{% url 'utilisateurs' %}"><strong>Utilisateurs</strong><span class="discret">{{ nb_utilisateurs }} compte{{ nb_utilisateurs|pluralize }} actif{{ nb_utilisateurs|pluralize }} · rôles, accès, double authentification</span></a>
+  <a class="carte" href="{% url 'documents:modeles' %}"><strong>Modèles des documents</strong><span class="discret">Bail et mandat, depuis Google Docs ou un fichier Word</span></a>
+  <a class="carte" href="{% url 'proprietes:importer' %}"><strong>Importer des propriétés</strong><span class="discret">Depuis un fichier Excel</span></a>
+</div>
+{% if user.is_superuser %}<p class="discret">Dépannage technique : <a href="{% url 'admin:index' %}">console Django</a>, à n'utiliser que pour une intervention sur les données.</p>{% endif %}
+{% endblock %}

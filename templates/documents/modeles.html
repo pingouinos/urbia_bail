@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Modèles des documents · {{ nom_application }}{% endblock %}
 {% block contenu %}
+<p><a href="{% url 'administration' %}">← Administration</a></p>
 <h1>Modèles des documents</h1>
 <section class="carte">
   <h2>Modifier un modèle dans Google Docs</h2>

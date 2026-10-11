@@ -166,8 +166,9 @@ class VuesTests(Donnees, TestCase):
         page = self.client.get(reverse("contrats:choisir"))
         self.assertContains(page, reverse("mandats:creer"))
         self.assertContains(page, reverse("contrats:creer"))
-        for url in (reverse("accueil"), reverse("contrats:liste")):
-            self.assertContains(self.client.get(url), f'href="{reverse("contrats:choisir")}">+ Nouveau contrat')
+        self.assertContains(self.client.get(reverse("contrats:liste")), f'href="{reverse("contrats:choisir")}">+ Nouveau contrat')
+        # Le tableau de bord ne propose plus de création : elle part des listes ou du menu « Ajouter ».
+        self.assertNotContains(self.client.get(reverse("accueil")), "+ Nouveau contrat")
 
     def test_creation_avec_locataires(self):
         propriete = self.creer_propriete()

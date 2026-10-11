@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Agence · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'accueil' %}">← Tableau de bord</a></p>
+<p><a href="{% url 'administration' %}">← Administration</a></p>
 <h1>Agence</h1>
 <p class="discret">Ces informations figurent sur les mandats et les baux, et signent les messages aux candidats. Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
 {% if organisation.manquants %}<p class="message alerte-fond">À renseigner pour que les documents soient complets : {{ organisation.manquants|join:", " }}.</p>{% endif %}

@@ -6,7 +6,7 @@ from django.db import connection
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from comptes.roles import ADMINISTRATEURS, GESTIONNAIRES, attribuer_role
+from comptes.roles import ADMINISTRATEURS, GESTIONNAIRES, attribuer_role, est_administrateur
 from mandats.models import Mandat
 from proprietes.models import Bailleur, Propriete
 
@@ -66,6 +66,7 @@ class OrganisationTests(TestCase):
         utilisateur = User.objects.create_user(role.lower(), password="x")
         attribuer_role(utilisateur, role)
         self.client.force_login(utilisateur)
+        return utilisateur
 
     def test_fiche_vide_puis_remplie(self):
         self.assertEqual(Organisation.objects.count(), 0)
@@ -125,3 +126,50 @@ class OrganisationTests(TestCase):
         self.assertContains(self.client.get(reverse("connexion")), "js/telephone.js")
         self.connecter(ADMINISTRATEURS)
         self.assertContains(self.client.get(reverse("agence")), "js/adresse.js")
+
+    def test_administration_dans_l_application(self):
+        """Les administrateurs gèrent l'agence et les comptes depuis
+        l'application ; un gestionnaire n'y a pas accès."""
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        pages = [reverse("administration"), reverse("utilisateurs"), reverse("utilisateur_creer")]
+        gestionnaire = self.connecter(GESTIONNAIRES)
+        for page in pages:
+            self.assertEqual(self.client.get(page).status_code, 403)
+        self.assertNotContains(self.client.get(reverse("accueil")), reverse("administration"))
+        admin = self.connecter(ADMINISTRATEURS)
+        accueil = self.client.get(reverse("accueil"))
+        self.assertContains(accueil, reverse("administration"))
+        self.assertNotContains(accueil, reverse("admin:index"))
+        for page in pages:
+            self.assertEqual(self.client.get(page).status_code, 200)
+        self.assertContains(self.client.get(reverse("administration")), reverse("agence"))
+        # Création d'un compte : l'adresse sert d'identifiant.
+        donnees = {"first_name": "Lina", "last_name": "Roux", "email": "Lina@Agence.fr", "is_active": "on",
+                   "role": GESTIONNAIRES, "mot_de_passe": "Un-mot-de-passe-solide-42"}
+        self.assertRedirects(self.client.post(reverse("utilisateur_creer"), donnees), reverse("utilisateurs"))
+        lina = User.objects.get(username="lina@agence.fr")
+        self.assertTrue(lina.check_password("Un-mot-de-passe-solide-42"))
+        self.assertFalse(est_administrateur(lina))
+        reponse = self.client.post(reverse("utilisateur_creer"), donnees)
+        self.assertContains(reponse, "Un compte existe déjà avec cette adresse.")
+        # Promotion, puis désactivation ; le mot de passe laissé vide ne change pas.
+        modifier = reverse("utilisateur_modifier", args=[lina.pk])
+        self.client.post(modifier, {**donnees, "role": ADMINISTRATEURS, "mot_de_passe": ""})
+        lina.refresh_from_db()
+        self.assertTrue(est_administrateur(lina) and lina.check_password("Un-mot-de-passe-solide-42"))
+        self.client.post(modifier, {**donnees, "role": GESTIONNAIRES, "mot_de_passe": "", "is_active": ""})
+        lina.refresh_from_db()
+        self.assertFalse(lina.is_active or est_administrateur(lina))
+        # On ne se retire pas ses propres droits, et il reste toujours un administrateur.
+        moi = reverse("utilisateur_modifier", args=[admin.pk])
+        reponse = self.client.post(moi, {"first_name": "A", "last_name": "B", "email": "a@agence.fr", "is_active": "on", "role": GESTIONNAIRES})
+        self.assertContains(reponse, "Vous ne pouvez pas retirer vos propres droits")
+        self.assertTrue(est_administrateur(User.objects.get(pk=admin.pk)))
+        # Dépannage : la double authentification se réinitialise.
+        TOTPDevice.objects.create(user=gestionnaire, name="téléphone", confirmed=True)
+        reponse = self.client.post(reverse("utilisateur_mfa", args=[gestionnaire.pk]), follow=True)
+        self.assertContains(reponse, "Double authentification de")
+        self.assertFalse(TOTPDevice.objects.filter(user=gestionnaire).exists())
+        self.assertEqual(self.client.post(reverse("utilisateur_debloquer", args=[gestionnaire.pk])).status_code, 302)
+        self.assertEqual(self.client.get(reverse("utilisateur_mfa", args=[gestionnaire.pk])).status_code, 405)

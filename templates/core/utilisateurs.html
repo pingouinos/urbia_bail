@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titre %}Utilisateurs · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'administration' %}">← Administration</a></p>
+<div class="titre-actions">
+  <h1>Utilisateurs</h1>
+  <div class="actions"><a class="bouton-petit bouton-corail" href="{% url 'utilisateur_creer' %}">+ Nouvel utilisateur</a></div>
+</div>
+{% if google_active %}<p class="discret">Un collaborateur qui se connecte avec son compte Google de l'agence obtient son compte tout seul, comme gestionnaire. Il suffit ensuite d'ajuster son rôle ici.</p>{% endif %}
+<table>
+  <thead><tr><th>Nom</th><th>Adresse e-mail</th><th>Rôle</th><th>Connexion</th><th>Dernière connexion</th></tr></thead>
+  <tbody>
+  {% for compte in comptes %}
+    <tr{% if not compte.is_active %} class="inactif"{% endif %}>
+      <td><a href="{% url 'utilisateur_modifier' compte.pk %}">{{ compte.get_full_name|default:compte.username }}</a>{% if compte.pk == user.pk %} <span class="discret">(vous)</span>{% endif %}</td>
+      <td>{{ compte.email|default:"—" }}</td>
+      <td><span class="pastille{% if compte.administrateur %} pastille-type-mandat{% endif %}">{% if compte.administrateur %}Administrateur{% else %}Gestionnaire{% endif %}</span>{% if not compte.is_active %} <span class="pastille pastille-libre">Désactivé</span>{% endif %}</td>
+      <td>{% if compte.google %}Google{% else %}Mot de passe{% if compte.mfa %} et code{% else %} <span class="discret">(code non configuré)</span>{% endif %}{% endif %}</td>
+      <td>{{ compte.last_login|date:"d/m/Y H:i"|default:"jamais" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -279,7 +279,7 @@ class VuesTests(TestCase):
         page = self.client.get(reverse("mandats:creer"))
         self.assertContains(page, reverse("proprietes:propriete_creer") + "?suite=mandat")
         self.assertContains(page, reverse("proprietes:immeuble_creer") + "?suite=mandat")
-        self.assertContains(self.client.get(reverse("proprietes:liste")), f'href="{reverse("mandats:creer")}">Nouvelle propriété')
+        self.assertContains(self.client.get(reverse("proprietes:liste")), f'href="{reverse("mandats:creer")}">+ Nouvelle propriété')
         reponse = self.client.post(reverse("proprietes:propriete_creer") + "?suite=mandat", {
             "usage": "habitation", "actif": "on", "adresse": "3 place du Capitole", "code_postal": "31000",
             "ville": "Toulouse", "bailleur-type": "physique", "bailleur-nom": "Garcia", "bailleur-prenom": "Ines",
