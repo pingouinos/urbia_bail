@@ -51,7 +51,9 @@ h1 a, h2 a { color: inherit; }
 .ouvert .bouton-menu { background: var(--melon-clair); }
 .icone-menu { width: 18px; height: 2px; margin: 6px 0; border-radius: 1px; background: currentColor; box-shadow: 0 -6px 0 currentColor, 0 6px 0 currentColor; }
 .avatar { flex: none; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--acier); color: #fff; font-weight: 700; font-size: 0.85rem; }
-.compte-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--texte); font-weight: 600; }
+.compte-nom { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.25; color: var(--texte); font-weight: 600; }
+.lien-admin { order: 4; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; color: var(--discret); text-decoration: none; font-weight: 500; }
+.lien-admin:hover { background: var(--melon-clair); color: var(--acier); }
 .bouton-icone, .compte button.bouton-icone[type=submit] { flex: none; display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--bord); border-radius: 50%; background: var(--carte); color: var(--acier); cursor: pointer; }
 .bouton-icone:hover, .compte button.bouton-icone[type=submit]:hover { background: var(--melon-clair); border-color: var(--melon); }
 .bouton-entete:hover { background: #ffad8f; }
@@ -240,6 +242,7 @@ dd { margin: 0; }
   .avec-panneau .ajouter-liste { position: static; width: auto; max-width: none; margin-top: 6px; box-shadow: none; }
   /* Le compte connecté sous le logo, en haut du panneau. */
   .avec-panneau .marque { order: 0; }
+  .avec-panneau .lien-admin { margin-top: auto; }
   .avec-panneau .compte { order: 0; flex-wrap: nowrap; gap: 8px; padding: 10px; border: 1px solid var(--bord); border-radius: var(--rayon); background: var(--fond); }
   .avec-panneau main { width: 100%; }
 }
@@ -251,10 +254,11 @@ dd { margin: 0; }
   .marque img { height: 40px; }
   .bouton-menu { display: flex; order: 3; }
   .ajouter-liste { left: auto; right: 0; }
+  .lien-admin { grid-column: 1 / -1; order: 6; border-top: 1px solid var(--bord); border-radius: 0; }
   .menu, .compte { grid-column: 1 / -1; flex-direction: column; align-items: stretch; gap: 0; }
   .menu { order: 4; padding-top: 6px; border-top: 1px solid var(--bord); }
   .compte { order: 5; padding: 6px 0 4px; border-top: 1px solid var(--bord); }
-  .js .entete:not(.ouvert) .menu, .js .entete:not(.ouvert) .compte { display: none; }
+  .js .entete:not(.ouvert) .menu, .js .entete:not(.ouvert) .compte, .js .entete:not(.ouvert) .lien-admin { display: none; }
   .menu a { padding: 12px 8px; border-bottom: 0; border-left: 3px solid transparent; border-radius: 0; }
   .menu a[aria-current=page] { border-left-color: var(--corail); border-radius: 0; background: var(--melon-clair); }
   .compte { flex-direction: row; align-items: center; gap: 10px; padding: 10px 8px; }

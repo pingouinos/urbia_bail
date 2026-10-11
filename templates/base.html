@@ -35,9 +35,9 @@
     <div class="compte">
       <span class="avatar" aria-hidden="true">{% if user.first_name %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}</span>
       <span class="compte-nom">{{ user.get_full_name|default:user.username }}</span>
-      {% if user.is_staff %}<a class="bouton-icone" href="{% url 'admin:index' %}" title="Administration" aria-label="Administration"><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></a>{% endif %}
       <form method="post" action="{% url 'deconnexion' %}">{% csrf_token %}<button type="submit" class="bouton-icone" title="Se déconnecter" aria-label="Se déconnecter"><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h9"/></svg></button></form>
     </div>
+    {% if user.is_staff %}<a class="lien-admin" href="{% url 'admin:index' %}"><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.2 5.2 L10.6 2.5 L13.4 2.5 L13.8 5.2 L15.5 5.9 L17.7 4.3 L19.7 6.3 L18.1 8.5 L18.8 10.2 L21.5 10.6 L21.5 13.4 L18.8 13.8 L18.1 15.5 L19.7 17.7 L17.7 19.7 L15.5 18.1 L13.8 18.8 L13.4 21.5 L10.6 21.5 L10.2 18.8 L8.5 18.1 L6.3 19.7 L4.3 17.7 L5.9 15.5 L5.2 13.8 L2.5 13.4 L2.5 10.6 L5.2 10.2 L5.9 8.5 L4.3 6.3 L6.3 4.3 L8.5 5.9Z"/><circle cx="12" cy="12" r="3"/></svg>Administration</a>{% endif %}
     <script>
       // Sur ordinateur, le menu est un panneau à gauche ; sur téléphone, il
       // se déplie sous l'en-tête.
