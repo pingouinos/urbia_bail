@@ -2,7 +2,7 @@
 {% block titre %}{% if candidature.statut == "retenue" %}Vos informations pour le bail{% else %}Votre candidature{% endif %} · URBIA Immobilier{% endblock %}
 {% block contenu %}
 <h1>{% if candidature.statut == "retenue" %}Vos informations pour le bail{% else %}Votre candidature{% endif %}</h1>
-<p>Logement : <strong>{{ candidature.bien.adresse }}{% if candidature.bien.complement %}, {{ candidature.bien.complement }}{% endif %}, {{ candidature.bien.code_postal }} {{ candidature.bien.ville }}</strong></p>
+<p>Logement : <strong>{{ candidature.propriete.adresse }}{% if candidature.propriete.complement %}, {{ candidature.propriete.complement }}{% endif %}, {{ candidature.propriete.code_postal }} {{ candidature.propriete.ville }}</strong></p>
 <p class="discret">{% if candidature.statut == "retenue" %}Votre identité figurera sur votre bail.{% else %}Si votre candidature est retenue, votre identité figurera sur votre bail.{% endif %} Vérifiez l'orthographe de vos noms, et indiquez votre lieu de naissance comme sur votre pièce d'identité.</p>
 {% if candidats.nombre > 1 %}<p>Le bail sera signé par {{ candidats.nombre }} locataires : renseignez les informations de chacun.</p>{% endif %}
 <p class="message">Avant de commencer, munissez-vous du lien de votre dossier DossierFacile : il est demandé en fin de formulaire, et rien n'est enregistré avant l'envoi. <a href="#dossierfacile">Comment l'obtenir</a></p>
@@ -17,7 +17,7 @@
     {% if sous_form.facultatif %}<p class="discret pleine-largeur">Conjoint ou colocataire qui signe le bail avec vous. Laissez vide si vous êtes seul.</p>{% endif %}
     {% for erreur in sous_form.non_field_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
     {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
-    {% for champ in sous_form.visible_fields %}{% include "biens/_champ.html" %}{% endfor %}
+    {% for champ in sous_form.visible_fields %}{% include "proprietes/_champ.html" %}{% endfor %}
     <details class="garants pleine-largeur"{% if sous_form.garants_ouverts %} open{% endif %}>
       <summary>Garants{% if forloop.first %} qui se portent caution pour vous{% else %} de ce locataire{% endif %}, le cas échéant</summary>
       <p class="discret">Deux au plus. Avec Visale, ou sans garant, laissez vide.</p>
@@ -28,7 +28,7 @@
         <p class="sous-titre">Garant {{ forloop.counter }}</p>
         <div class="sous-grille">
           {% for champ in garant.hidden_fields %}{{ champ }}{% endfor %}
-          {% for champ in garant.visible_fields %}{% if champ.name != "DELETE" or garant.instance.pk %}{% include "biens/_champ.html" %}{% endif %}{% endfor %}
+          {% for champ in garant.visible_fields %}{% if champ.name != "DELETE" or garant.instance.pk %}{% include "proprietes/_champ.html" %}{% endif %}{% endfor %}
         </div>
       </div>
       {% endfor %}
@@ -45,7 +45,7 @@
       <li><strong>Copiez le lien de partage</strong> : depuis l'accueil de votre compte, « Voir mes partages de dossier », créez un partage par lien <strong>avec les documents justificatifs</strong>, puis collez ce lien ci-dessous. Il expire au bout de 30 jours par défaut.</li>
     </ol>
     <p class="discret pleine-largeur">Une question sur les pièces ou sur le partage ? Consultez l'<a href="https://aide.dossierfacile.logement.gouv.fr/fr/" target="_blank" rel="noopener noreferrer">aide de DossierFacile</a>.</p>
-    {% include "biens/_champ.html" with champ=form.lien_dossierfacile %}
+    {% include "proprietes/_champ.html" with champ=form.lien_dossierfacile %}
   </fieldset>
   <p class="discret">Vos informations servent uniquement à {% if candidature.statut == "retenue" %}préparer votre bail{% else %}étudier votre candidature et, si elle est retenue, à préparer votre bail{% endif %} avec URBIA Immobilier. Si aucun bail n'est signé, elles sont effacées dans les trois mois.</p>
   <div class="barre-actions">

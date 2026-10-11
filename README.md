@@ -1,6 +1,6 @@
 # Urbia Gestion
 
-Application web interne de l'agence pour gérer le référentiel des biens, les candidatures (lien DossierFacile) et la génération des baux.
+Application web interne de l'agence pour gérer le référentiel des propriétés, les candidatures (lien DossierFacile) et les contrats : mandats de gestion et baux d'habitation.
 
 Le cadrage fonctionnel et les décisions sont dans le document de cadrage partagé dans le projet.
 
@@ -16,7 +16,7 @@ Le cadrage fonctionnel et les décisions sont dans le document de cadrage partag
 | Rôle | Accès |
 | --- | --- |
 | Administrateurs | Tout, y compris l'administration (comptes, modèles, paramètres) |
-| Gestionnaires | Biens, candidatures, baux |
+| Gestionnaires | Propriétés, candidatures, contrats |
 
 Les collaborateurs se connectent avec leur compte Google Workspace de l'agence. La double authentification est alors celle de Google : l'imposer dans la console d'administration Workspace (Sécurité > Validation en deux étapes). Un compte d'un autre domaine, ou dont l'adresse n'est pas vérifiée, est refusé.
 
@@ -55,6 +55,16 @@ Avant signature, la fiche du bail signale : logement classé G, fiche du bien in
 ## Modèles Word
 
 Les documents sont produits à partir des modèles Word de l'agence (`documents/modeles/`), dont les parties variables sont écrites entre doubles accolades, par exemple `{{ mandant }}`. Un administrateur peut télécharger un modèle, le retoucher dans Word et le redéposer depuis la page « Modèles Word » de l'accueil ; l'application refuse un modèle qui contient une balise inconnue.
+
+## Vocabulaire du code
+
+- **Propriété** : application `proprietes`, modèles `Propriete` et `Bailleur`.
+- **Contrat** : terme générique, avec deux sous-types. Le bail d'habitation est le modèle `Bail` de l'application `contrats` ; le mandat de gestion est le modèle `Mandat` de l'application `mandats`. Tous deux héritent de la base abstraite `contrats.base.Contrat`, qui porte la date de signature et l'interface commune (`TYPE`, `parties`, `debut`, `echeance`, `etat`). Chacun garde sa table.
+- **Situation** : la situation professionnelle d'un candidat (CDI, étudiant, retraité…), pour ne pas la confondre avec un contrat.
+
+La rubrique « Contrats » et l'onglet « Contrats » d'une propriété listent baux et mandats ensemble ; le registre des mandats (loi Hoguet) garde sa page et son export.
+
+Les applications s'appelaient auparavant `biens` et `baux`. La commande `migrate` aligne d'elle-même une base créée sous ces noms (tables, historique des migrations, types de contenu) avant d'appliquer les migrations de renommage ; les anciennes adresses `/biens/…` et `/baux/…` redirigent vers `/proprietes/…` et `/contrats/…`. Le dossier `baux/` des baux signés et les balises des modèles Word n'ont pas changé.
 
 ## Développement local
 

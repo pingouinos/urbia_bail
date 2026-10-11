@@ -61,10 +61,10 @@ INSTALLED_APPS = [
     "simple_history",
     "comptes",
     "core",
-    "biens",
+    "proprietes",
     "documents",
     "mandats",
-    "baux",
+    "contrats",
     "candidatures",
 ]
 

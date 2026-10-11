@@ -10,6 +10,9 @@ def rubrique(request):
     page = getattr(request, "resolver_match", None)
     if page is None:
         return ""
-    if page.namespace == "biens" and (page.url_name or "").startswith("bailleur"):
+    if page.namespace == "proprietes" and (page.url_name or "").startswith("bailleur"):
         return "bailleurs"
+    if page.namespace == "mandats":
+        # Les mandats sont des contrats : ils se rangent sous cette rubrique.
+        return "contrats"
     return page.namespace or ("accueil" if page.url_name == "accueil" else "")

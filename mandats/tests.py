@@ -11,7 +11,7 @@ from django.urls import reverse
 from docx import Document
 from openpyxl import load_workbook
 
-from biens.models import Bailleur, Bien
+from proprietes.models import Bailleur, Propriete
 from comptes.roles import ADMINISTRATEURS, attribuer_role
 from documents import generation
 from documents.generation import ConversionImpossible
@@ -24,7 +24,7 @@ def texte_docx(contenu):
 
 
 class Donnees:
-    def creer_bien(self, **autres):
+    def creer_propriete(self, **autres):
         bailleur = Bailleur.objects.create(
             civilite="M.", nom="Durand", prenom="Paul", conjoint_civilite="Mme",
             conjoint_nom="Martin", conjoint_prenom="Anne",
@@ -36,10 +36,10 @@ class Donnees:
             "zone_tendue": True, "dernier_loyer": Decimal("854"), "charges": Decimal("45"),
         }
         valeurs.update(autres)
-        return Bien.objects.create(**valeurs)
+        return Propriete.objects.create(**valeurs)
 
-    def creer_mandat(self, bien=None, **autres):
-        mandat = Mandat.depuis_bien(bien or self.creer_bien())
+    def creer_mandat(self, propriete=None, **autres):
+        mandat = Mandat.depuis_propriete(propriete or self.creer_propriete())
         for champ, valeur in autres.items():
             setattr(mandat, champ, valeur)
         mandat.save()
@@ -48,12 +48,12 @@ class Donnees:
 
 class MandatTests(Donnees, TestCase):
     def test_numeros_du_registre_se_suivent(self):
-        bien = self.creer_bien()
-        numeros = [self.creer_mandat(bien).numero for _ in range(3)]
+        propriete = self.creer_propriete()
+        numeros = [self.creer_mandat(propriete).numero for _ in range(3)]
         self.assertEqual(numeros, [1, 2, 3])
 
     def test_prerempli_depuis_les_fiches(self):
-        mandat = Mandat.depuis_bien(self.creer_bien())
+        mandat = Mandat.depuis_propriete(self.creer_propriete())
         self.assertEqual(mandat.mandant, "Monsieur DURAND Paul et Madame MARTIN Anne")
         self.assertEqual(mandat.mandant_code_postal_ville, "31270 Frouzins")
         self.assertEqual(mandat.designation, "Appartement T2 meublé de 39 m²")
@@ -86,13 +86,13 @@ class MandatTests(Donnees, TestCase):
         mandat = self.creer_mandat(honoraires_bail_bailleur=400, honoraires_bail_locataire=400)
         self.assertEqual(len(mandat.alertes), 1)
         self.assertIn("plafond légal de 390 € pour 39 m²", mandat.alertes[0])
-        mandat.bien.zone_tendue = False  # 8 €/m² hors zone tendue
+        mandat.propriete.zone_tendue = False  # 8 €/m² hors zone tendue
         mandat.honoraires_bail_bailleur = mandat.honoraires_bail_locataire = Decimal("312")
         self.assertEqual(mandat.alertes, [])
 
     def test_stationnement_non_soumis(self):
-        bien = self.creer_bien(usage=Bien.Usage.STATIONNEMENT, surface=None)
-        self.assertEqual(self.creer_mandat(bien, honoraires_bail_locataire=50).alertes, [])
+        propriete = self.creer_propriete(usage=Propriete.Usage.STATIONNEMENT, surface=None)
+        self.assertEqual(self.creer_mandat(propriete, honoraires_bail_locataire=50).alertes, [])
 
     def test_document_word(self):
         mandat = self.creer_mandat(
@@ -131,14 +131,14 @@ class VuesTests(Donnees, TestCase):
         self.addCleanup(reglage.disable)
         self.client.force_login(User.objects.create_user("gestion"))
 
-    def test_creation_depuis_le_bien(self):
-        bien = self.creer_bien()
+    def test_creation_depuis_le_propriete(self):
+        propriete = self.creer_propriete()
         reponse = self.client.get(reverse("mandats:creer"))
-        self.assertContains(reponse, str(bien))
-        reponse = self.client.get(reverse("mandats:creer"), {"bien": bien.pk})
+        self.assertContains(reponse, str(propriete))
+        reponse = self.client.get(reverse("mandats:creer"), {"propriete": propriete.pk})
         self.assertContains(reponse, "Monsieur DURAND Paul et Madame MARTIN Anne")
         donnees = {
-            "bien": bien.pk, "mandant": "Monsieur DURAND Paul", "mandant_adresse": "9 rue des Lilas",
+            "propriete": propriete.pk, "mandant": "Monsieur DURAND Paul", "mandant_adresse": "9 rue des Lilas",
             "mandant_code_postal_ville": "31270 Frouzins", "designation": "Appartement T2",
             "adresse_bien": "12 avenue de Muret", "loyer_cc": "899", "charges": "45",
             "duree_ans": 3, "reconductions": 0, "taux_gestion": "7", "base_gestion": "charges_comprises",
@@ -149,9 +149,9 @@ class VuesTests(Donnees, TestCase):
         mandat = Mandat.objects.get()
         self.assertRedirects(reponse, mandat.get_absolute_url())
         self.assertContains(reponse, "dépasse celle du bailleur")
-        self.assertEqual(bien.mandat_en_cours, mandat)
+        self.assertEqual(propriete.mandat_en_cours, mandat)
         # Un bien sous mandat n'est plus proposé pour un nouveau mandat.
-        self.assertNotContains(self.client.get(reverse("mandats:creer")), str(bien))
+        self.assertNotContains(self.client.get(reverse("mandats:creer")), str(propriete))
 
     def test_telechargement_word_et_pdf(self):
         mandat = self.creer_mandat()
@@ -201,7 +201,7 @@ class VuesTests(Donnees, TestCase):
         mandat = self.creer_mandat()
         for url in [
             reverse("mandats:registre"), reverse("mandats:mandat", args=[mandat.pk]),
-            reverse("mandats:modifier", args=[mandat.pk]), reverse("biens:bien", args=[mandat.bien.pk]),
+            reverse("mandats:modifier", args=[mandat.pk]), reverse("proprietes:propriete", args=[mandat.propriete.pk]),
             reverse("accueil"),
         ]:
             with self.subTest(url=url):

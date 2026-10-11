@@ -5,7 +5,7 @@
     <h1>Bonjour {{ user.first_name|default:user.username }}</h1>
     <p>Suivez chaque mise en location depuis la fiche du logement : mandat, candidatures, bail, signature.</p>
   </div>
-  <form method="get" action="{% url 'baux:creer' %}" class="recherche">
+  <form method="get" action="{% url 'contrats:creer' %}" class="recherche">
     <input type="search" name="q" placeholder="Adresse ou référence" aria-label="Logement à louer">
     <button type="submit">Nouveau contrat</button>
   </form>
@@ -14,7 +14,7 @@
 <section class="carte">
   <div class="titre-actions">
     <h2>Locations en cours</h2>
-    <a href="{% url 'biens:liste' %}?situation=a_louer">Logements à louer</a>
+    <a href="{% url 'proprietes:liste' %}?situation=a_louer">Logements à louer</a>
   </div>
   {% if locations %}
   <table>
@@ -22,7 +22,7 @@
     <tbody>
     {% for location in locations %}
       <tr>
-        <td><a href="{{ location.bien.get_absolute_url }}">{{ location.bien.adresse }}{% if location.bien.complement %}, {{ location.bien.complement }}{% endif %}</a><br><span class="discret">{{ location.bien.code_postal }} {{ location.bien.ville }}</span></td>
+        <td><a href="{{ location.propriete.get_absolute_url }}">{{ location.propriete.adresse }}{% if location.propriete.complement %}, {{ location.propriete.complement }}{% endif %}</a><br><span class="discret">{{ location.propriete.code_postal }} {{ location.propriete.ville }}</span></td>
         <td>{{ location.etape }}{% if location.detail %}<br><span class="pastille pastille-preavis">{{ location.detail }}</span>{% endif %}</td>
         <td><a class="bouton-petit" href="{{ location.lien }}">{{ location.action }}</a></td>
       </tr>
@@ -37,7 +37,7 @@
 <section class="carte">
   <div class="titre-actions">
     <h2>Derniers contrats</h2>
-    <a href="{% url 'baux:liste' %}">Tous les contrats</a>
+    <a href="{% url 'contrats:liste' %}">Tous les contrats</a>
   </div>
   {% if derniers_baux %}
   <table>
@@ -45,10 +45,10 @@
     <tbody>
     {% for bail in derniers_baux %}
       <tr>
-        <td><a href="{{ bail.get_absolute_url }}">{{ bail.bien.adresse }}</a><br><span class="discret">{{ bail.bien.code_postal }} {{ bail.bien.ville }}</span></td>
+        <td><a href="{{ bail.get_absolute_url }}">{{ bail.propriete.adresse }}</a><br><span class="discret">{{ bail.propriete.code_postal }} {{ bail.propriete.ville }}</span></td>
         <td>{% for locataire in bail.locataires.all %}{{ locataire }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
         <td class="masquer-mobile">{{ bail.date_effet|date:"d/m/Y" }}</td>
-        <td class="liens"><a href="{% url 'baux:pdf' bail.pk %}">PDF</a> <a href="{% url 'baux:word' bail.pk %}">Word</a></td>
+        <td class="liens"><a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> <a href="{% url 'contrats:word' bail.pk %}">Word</a></td>
       </tr>
     {% endfor %}
     </tbody>
@@ -60,9 +60,9 @@
 
 <div class="grille raccourcis">
   <a class="carte" href="{% url 'candidatures:liste' %}"><strong>Candidatures</strong><span class="discret">{{ nb_candidatures }} à étudier</span></a>
-  <a class="carte" href="{% url 'biens:liste' %}"><strong>Propriétés</strong><span class="discret">{{ nb_biens }} lot(s) actif(s)</span></a>
+  <a class="carte" href="{% url 'proprietes:liste' %}"><strong>Propriétés</strong><span class="discret">{{ nb_proprietes }} lot(s) actif(s)</span></a>
   <a class="carte" href="{% url 'mandats:registre' %}"><strong>Registre des mandats</strong><span class="discret">{{ nb_mandats }} en cours</span></a>
-  <a class="carte" href="{% url 'biens:importer' %}"><strong>Importer des biens</strong><span class="discret">Depuis un fichier Excel</span></a>
+  <a class="carte" href="{% url 'proprietes:importer' %}"><strong>Importer des propriétés</strong><span class="discret">Depuis un fichier Excel</span></a>
   {% if est_admin %}<a class="carte" href="{% url 'documents:modeles' %}"><strong>Modèles des documents</strong><span class="discret">Bail et mandat, depuis Google Docs</span></a>{% endif %}
 </div>
 <p class="discret">Connecté en tant que {% if est_admin %}administrateur{% else %}gestionnaire{% endif %}.</p>

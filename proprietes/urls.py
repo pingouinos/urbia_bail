@@ -1,0 +1,21 @@
+from django.urls import path
+
+from . import views
+
+app_name = "proprietes"
+
+urlpatterns = [
+    path("", views.liste, name="liste"),
+    path("nouveau/", views.propriete_editer, name="propriete_creer"),
+    path("<int:pk>/", views.propriete, name="propriete"),
+    path("<int:pk>/modifier/", views.propriete_editer, name="propriete_modifier"),
+    path("<int:pk>/mise-en-location/", views.mettre_en_location, name="mettre_en_location"),
+    path("bailleurs/", views.bailleurs, name="bailleurs"),
+    path("bailleurs/nouveau/", views.bailleur_editer, name="bailleur_creer"),
+    path("bailleurs/<int:pk>/", views.bailleur, name="bailleur"),
+    path("bailleurs/<int:pk>/modifier/", views.bailleur_editer, name="bailleur_modifier"),
+    path("import/", views.importer, name="importer"),
+    path("import/confirmer/", views.importer_confirmer, name="importer_confirmer"),
+    path("modele.xlsx", views.modele, name="modele"),
+    path("export.xlsx", views.exporter, name="exporter"),
+]

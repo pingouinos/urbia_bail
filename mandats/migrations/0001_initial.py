@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("biens", "0002_fiche_logement_et_conjoint"),
+        ("proprietes", "0002_fiche_logement_et_conjoint"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -216,7 +216,7 @@ class Migration(migrations.Migration):
                         null=True,
                         on_delete=django.db.models.deletion.DO_NOTHING,
                         related_name="+",
-                        to="biens.bien",
+                        to="proprietes.bien",
                     ),
                 ),
                 (
@@ -424,7 +424,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.PROTECT,
                         related_name="mandats",
-                        to="biens.bien",
+                        to="proprietes.bien",
                     ),
                 ),
             ],

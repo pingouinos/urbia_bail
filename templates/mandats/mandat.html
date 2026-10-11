@@ -17,7 +17,7 @@
 <div class="grille">
   <section class="carte">
     <h2>Bien</h2>
-    <p><a href="{{ mandat.bien.get_absolute_url }}">{{ mandat.adresse_bien }}</a><br><span class="discret">{{ mandat.designation }}</span></p>
+    <p><a href="{{ mandat.propriete.get_absolute_url }}">{{ mandat.adresse_bien }}</a><br><span class="discret">{{ mandat.designation }}</span></p>
     <dl>
       <dt>Loyer</dt><dd>{{ mandat.loyer_cc }} € charges comprises, dont {{ mandat.charges }} € de charges</dd>
     </dl>

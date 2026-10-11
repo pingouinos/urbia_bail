@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titre %}Mise en location · {{ propriete.adresse }} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{{ propriete.get_absolute_url }}">← {{ propriete.adresse }}</a></p>
+<h1>{% if propriete.a_louer %}Mise en location{% else %}Mettre en location{% endif %}</h1>
+<p class="discret">{{ propriete }} · <span class="pastille pastille-{{ situation.code }}">{{ situation.libelle }}</span></p>
+{% if not mandat %}<p class="message alerte-fond">Aucun mandat de gestion en cours pour ce logement : <a href="{% url 'mandats:creer' %}?propriete={{ propriete.pk }}">créez le mandat</a> avant de le proposer à la location.</p>{% endif %}
+{% if propriete.location_interdite %}<p class="message alerte-fond">Logement classé G au DPE : il ne peut plus faire l'objet d'un nouveau bail d'habitation.</p>{% endif %}
+{% with manquants=propriete.champs_manquants_pour_bail %}{% if manquants %}<p class="message">À compléter sur la fiche avant de rédiger le bail : {{ manquants|join:", " }}. <a href="{% url 'proprietes:propriete_modifier' propriete.pk %}">Compléter la fiche</a></p>{% endif %}{% endwith %}
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <fieldset>
+    <legend>Conditions proposées</legend>
+    <p class="discret pleine-largeur">Ces montants préremplissent le bail et servent au calcul du taux d'effort des candidats.</p>
+    {% for champ in form %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  <div class="actions-location">
+    <button type="submit">{% if propriete.a_louer %}Enregistrer{% else %}Mettre en location{% endif %}</button>
+    <a href="{{ propriete.get_absolute_url }}">{% if propriete.a_louer %}Annuler{% else %}Plus tard{% endif %}</a>
+  </div>
+</form>
+{% if propriete.a_louer %}
+<form method="post" class="en-ligne">
+  {% csrf_token %}
+  <button type="submit" name="action" value="retirer" class="lien">Retirer le logement de la location</button>
+</form>
+{% endif %}
+{% endblock %}

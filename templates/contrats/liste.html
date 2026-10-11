@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titre %}Contrats · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<div class="titre-actions">
+  <h1>Contrats</h1>
+  <div class="actions">
+    <a href="{% url 'mandats:registre' %}">Registre des mandats</a>
+    <a class="bouton-petit secondaire" href="{% url 'mandats:creer' %}">Nouveau mandat</a>
+    <a class="bouton-petit" href="{% url 'contrats:creer' %}">Nouveau bail</a>
+  </div>
+</div>
+<form class="filtres" method="get">
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Adresse, locataire, mandant, référence…" aria-label="Rechercher">
+  <select name="type" aria-label="Type de contrat">
+    <option value="">Baux et mandats</option>
+    {% for valeur, libelle in types %}<option value="{{ valeur }}"{% if request.GET.type == valeur %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
+  </select>
+  <select name="etat" aria-label="État">
+    <option value="">Tous les états</option>
+    <option value="en_cours"{% if request.GET.etat == "en_cours" %} selected{% endif %}>En cours</option>
+    <option value="termines"{% if request.GET.etat == "termines" %} selected{% endif %}>Terminés</option>
+  </select>
+  <button type="submit">Filtrer</button>
+</form>
+<p class="discret">{{ page.paginator.count }} contrat(s)</p>
+<table class="contrats">
+  <thead><tr><th>Type</th><th>Propriété</th><th>Locataires ou mandant</th><th class="masquer-mobile">Début</th><th>Date de fin</th><th>État</th></tr></thead>
+  <tbody>
+  {% for contrat in page %}
+    <tr{% if not contrat.en_cours %} class="inactif"{% endif %}>
+      <td><span class="pastille pastille-type-{{ contrat.code_type }}">{{ contrat.TYPE }}</span></td>
+      <td><a href="{{ contrat.get_absolute_url }}"><strong>{{ contrat.propriete.adresse }}{% if contrat.propriete.complement %}, {{ contrat.propriete.complement }}{% endif %}</strong></a><br><span class="discret">{{ contrat.propriete.code_postal }} {{ contrat.propriete.ville }}{% if contrat.code_type == "bail" %} · {{ contrat.get_type_display }}{% else %} · mandat n° {{ contrat.numero }}{% endif %}</span></td>
+      <td>{{ contrat.parties|default:"—" }}</td>
+      <td class="masquer-mobile">{{ contrat.debut|date:"d/m/Y"|default:"—" }}</td>
+      <td>{% with echeance=contrat.echeance %}{{ echeance.0|date:"d/m/Y"|default:"—" }}{% if echeance.1 %}<br><span class="discret">{{ echeance.1 }}</span>{% endif %}{% endwith %}</td>
+      <td>{% with etat=contrat.etat %}<span class="pastille pastille-{{ etat.0 }}">{{ etat.1 }}</span>{% endwith %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="discret">Aucun contrat. Le mandat et le bail se créent depuis la fiche d'une propriété, ou avec les boutons ci-dessus.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% include "proprietes/_pagination.html" %}
+{% endblock %}

@@ -3,11 +3,11 @@
 {% block contenu %}
 <div class="titre-actions">
   <h1>Candidatures</h1>
-  <div class="actions"><a class="bouton-petit" href="{% url 'candidatures:creer' %}{% if bien %}?bien={{ bien.pk }}{% endif %}">Nouvelle candidature</a></div>
+  <div class="actions"><a class="bouton-petit" href="{% url 'candidatures:creer' %}{% if propriete %}?propriete={{ propriete.pk }}{% endif %}">Nouvelle candidature</a></div>
 </div>
-{% if bien %}<p>Pour <a href="{{ bien.get_absolute_url }}">{{ bien }}</a> · <a href="{% url 'candidatures:liste' %}">tous les logements</a></p>{% endif %}
+{% if propriete %}<p>Pour <a href="{{ propriete.get_absolute_url }}">{{ propriete }}</a> · <a href="{% url 'candidatures:liste' %}">tous les logements</a></p>{% endif %}
 <form class="filtres" method="get">
-  {% if bien %}<input type="hidden" name="bien" value="{{ bien.pk }}">{% endif %}
+  {% if propriete %}<input type="hidden" name="propriete" value="{{ propriete.pk }}">{% endif %}
   <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Adresse, candidat, référence…" aria-label="Rechercher">
   <select name="statut" aria-label="Statut">
     <option value="">Tous les statuts</option>
@@ -21,7 +21,7 @@
   <tbody>
   {% for candidature in page %}
     <tr{% if candidature.statut == "non_retenue" or candidature.statut == "desistement" %} class="inactif"{% endif %}>
-      <td>{{ candidature.bien.adresse }}<br><span class="discret">{{ candidature.bien.code_postal }} {{ candidature.bien.ville }}</span></td>
+      <td>{{ candidature.propriete.adresse }}<br><span class="discret">{{ candidature.propriete.code_postal }} {{ candidature.propriete.ville }}</span></td>
       <td><a href="{{ candidature.get_absolute_url }}">{{ candidature.noms|default:"Sans nom" }}</a></td>
       <td>{% if candidature.revenus %}{{ candidature.revenus|floatformat:0 }} €{% else %}—{% endif %}</td>
       <td>{% with taux=candidature.taux_effort %}{% if taux is not None %}{{ taux }} %{% else %}—{% endif %}{% endwith %}</td>
@@ -33,5 +33,5 @@
   {% endfor %}
   </tbody>
 </table>
-{% include "biens/_pagination.html" %}
+{% include "proprietes/_pagination.html" %}
 {% endblock %}

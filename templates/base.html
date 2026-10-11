@@ -16,9 +16,10 @@
     <details class="ajouter">
       <summary class="bouton-entete">Ajouter</summary>
       <div class="ajouter-liste">
-        <a href="{% url 'baux:creer' %}">Contrat<span class="discret">Bail d'habitation ; la propriété peut être créée en chemin</span></a>
+        <a href="{% url 'contrats:creer' %}">Bail d'habitation<span class="discret">Contrat de location ; la propriété peut être créée en chemin</span></a>
+        <a href="{% url 'mandats:creer' %}">Mandat de gestion<span class="discret">Contrat avec le bailleur, inscrit au registre</span></a>
         <a href="{% url 'candidatures:creer' %}">Candidature<span class="discret">Pour une propriété à louer</span></a>
-        <a href="{% url 'biens:bien_creer' %}">Propriété<span class="discret">Nouveau logement ou lot</span></a>
+        <a href="{% url 'proprietes:propriete_creer' %}">Propriété<span class="discret">Nouveau logement ou lot</span></a>
       </div>
     </details>
     <button type="button" class="bouton-menu" aria-expanded="false" aria-controls="menu-principal">
@@ -27,10 +28,10 @@
     </button>
     <nav class="menu" id="menu-principal" aria-label="Menu principal">
       <a href="{% url 'accueil' %}"{% if rubrique == "accueil" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="12" width="8" height="9" rx="1.5"/><rect x="3" y="15" width="8" height="6" rx="1.5"/></svg>Tableau de bord</a>
-      <a href="{% url 'biens:liste' %}"{% if rubrique == "biens" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></svg>Propriétés</a>
+      <a href="{% url 'proprietes:liste' %}"{% if rubrique == "proprietes" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></svg>Propriétés</a>
       <a href="{% url 'candidatures:liste' %}"{% if rubrique == "candidatures" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18.5 14.8c1.7.8 2.7 2.5 3 5.200"/></svg>Candidatures</a>
-      <a href="{% url 'baux:liste' %}"{% if rubrique == "baux" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>Contrats</a>
-      <a href="{% url 'biens:bailleurs' %}"{% if rubrique == "bailleurs" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.8 3.4-6 7-6s6.300 2.200 7 6"/></svg>Bailleurs</a>
+      <a href="{% url 'contrats:liste' %}"{% if rubrique == "contrats" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>Contrats</a>
+      <a href="{% url 'proprietes:bailleurs' %}"{% if rubrique == "bailleurs" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.8 3.4-6 7-6s6.300 2.200 7 6"/></svg>Bailleurs</a>
     </nav>
     <div class="compte">
       <span class="avatar" aria-hidden="true">{% if user.first_name %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}</span>

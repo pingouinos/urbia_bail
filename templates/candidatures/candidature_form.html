@@ -9,7 +9,7 @@
   {{ form.non_field_errors }}
   <fieldset>
     <legend>Logement et dossier</legend>
-    {% for champ in form %}{% include "biens/_champ.html" %}{% endfor %}
+    {% for champ in form %}{% include "proprietes/_champ.html" %}{% endfor %}
   </fieldset>
   <fieldset>
     <legend>Candidats</legend>
@@ -22,14 +22,14 @@
       {% for erreur in sous_form.non_field_errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}
       {% for champ in sous_form.hidden_fields %}{{ champ }}{% endfor %}
       <div class="sous-grille">
-        {% for champ in sous_form.champs_essentiels %}{% include "biens/_champ.html" %}{% endfor %}
-        {% if sous_form.instance.pk %}{% include "biens/_champ.html" with champ=sous_form.DELETE %}{% endif %}
+        {% for champ in sous_form.champs_essentiels %}{% include "proprietes/_champ.html" %}{% endfor %}
+        {% if sous_form.instance.pk %}{% include "proprietes/_champ.html" with champ=sous_form.DELETE %}{% endif %}
       </div>
       <details class="garants"{% if sous_form.detail_ouvert %} open{% endif %}>
         <summary>État civil, activité et revenus</summary>
         <p class="discret">À saisir ici seulement si le candidat ne passe pas par le lien (dossier papier, par exemple).</p>
         <div class="sous-grille">
-          {% for champ in sous_form.champs_detail %}{% include "biens/_champ.html" %}{% endfor %}
+          {% for champ in sous_form.champs_detail %}{% include "proprietes/_champ.html" %}{% endfor %}
         </div>
       </details>
     </div>

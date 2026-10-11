@@ -10,8 +10,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from baux.models import Bail
-from baux.tests import Donnees as DonneesBaux
+from contrats.models import Bail
+from contrats.tests import Donnees as DonneesBaux
 from mandats.models import Mandat
 
 from .models import Candidat, Candidature, Garant, valider_lien_dossierfacile
@@ -20,16 +20,16 @@ LIEN = "https://locataire.dossierfacile.logement.gouv.fr/file/3f2a"
 
 
 class Donnees(DonneesBaux):
-    def creer_candidature(self, bien=None, candidats=(("Martin", 1500), ("Petit", 1000)), **autres):
+    def creer_candidature(self, propriete=None, candidats=(("Martin", 1500), ("Petit", 1000)), **autres):
         candidature = Candidature.objects.create(
-            bien=bien or self.creer_bien(), lien_dossierfacile=LIEN, date_entree_souhaitee=dt.date(2026, 11, 1),
+            propriete=propriete or self.creer_propriete(), lien_dossierfacile=LIEN, date_entree_souhaitee=dt.date(2026, 11, 1),
             **autres,
         )
         for nom, revenus in candidats:
             Candidat.objects.create(
                 candidature=candidature, civilite="Mme", nom=nom, prenom="Julie",
                 date_naissance=dt.date(1996, 3, 8), lieu_naissance="Albi", email=f"{nom.lower()}@exemple.fr",
-                contrat=Candidat.Contrat.CDI, revenus_mensuels=Decimal(revenus),
+                situation=Candidat.Situation.CDI, revenus_mensuels=Decimal(revenus),
             )
         return candidature
 
@@ -41,7 +41,7 @@ class CandidatureTests(Donnees, TestCase):
     def test_alerte_logement_deja_loue(self):
         candidature = self.creer_candidature()
         self.assertEqual(candidature.alertes, [])
-        self.creer_bail(bien=candidature.bien, date_effet=dt.date(2024, 9, 1))
+        self.creer_bail(propriete=candidature.propriete, date_effet=dt.date(2024, 9, 1))
         self.assertIn("Ce logement est déjà loué", candidature.alertes[0])
 
     def test_lien_dossierfacile(self):
@@ -58,12 +58,12 @@ class CandidatureTests(Donnees, TestCase):
         self.assertIsNone(self.creer_candidature(candidats=()).taux_effort)
 
     def test_caution_et_assurance_loyers_impayes(self):
-        bien = self.creer_bien()
-        Mandat.depuis_bien(bien).save()
+        propriete = self.creer_propriete()
+        Mandat.depuis_propriete(propriete).save()
         Mandat.objects.update(assurance_loyers_impayes=True)
-        candidature = self.creer_candidature(bien, garantie=Candidature.Garantie.PERSONNE)
+        candidature = self.creer_candidature(propriete, garantie=Candidature.Garantie.PERSONNE)
         self.assertTrue(any("art. 22-1" in alerte for alerte in candidature.alertes))
-        candidature.candidats.update(contrat=Candidat.Contrat.ETUDIANT)
+        candidature.candidats.update(situation=Candidat.Situation.ETUDIANT)
         self.assertEqual(candidature.alertes, [])
 
     def test_decision(self):
@@ -109,9 +109,9 @@ class VuesTests(Donnees, TestCase):
         self.utilisateur = User.objects.create_user("gestion", first_name="Elodie", last_name="Durand")
         self.client.force_login(self.utilisateur)
 
-    def donnees_formulaire(self, bien, candidats):
+    def donnees_formulaire(self, propriete, candidats):
         donnees = {
-            "bien": bien.pk, "nombre_locataires": "1", "lien_dossierfacile": LIEN, "garantie": "visale",
+            "propriete": propriete.pk, "nombre_locataires": "1", "lien_dossierfacile": LIEN, "garantie": "visale",
             "date_entree_souhaitee": "2026-11-01",
             "candidats-TOTAL_FORMS": str(len(candidats)), "candidats-INITIAL_FORMS": "0",
             "candidats-MIN_NUM_FORMS": "1", "candidats-MAX_NUM_FORMS": "4",
@@ -122,10 +122,10 @@ class VuesTests(Donnees, TestCase):
         return donnees
 
     def test_creation(self):
-        bien = self.creer_bien()
-        self.assertContains(self.client.get(reverse("candidatures:creer"), {"bien": bien.pk}),
-                            f'<option value="{bien.pk}" selected>')
-        reponse = self.client.post(reverse("candidatures:creer"), self.donnees_formulaire(bien, ["Martin", ""]))
+        propriete = self.creer_propriete()
+        self.assertContains(self.client.get(reverse("candidatures:creer"), {"propriete": propriete.pk}),
+                            f'<option value="{propriete.pk}" selected>')
+        reponse = self.client.post(reverse("candidatures:creer"), self.donnees_formulaire(propriete, ["Martin", ""]))
         candidature = Candidature.objects.get()
         self.assertRedirects(reponse, candidature.get_absolute_url())
         self.assertEqual(candidature.noms, "Julie MARTIN")
@@ -133,15 +133,15 @@ class VuesTests(Donnees, TestCase):
     def test_creation_avec_le_nom_seul(self):
         """Le candidat complète le reste par son lien : l'état civil,
         l'activité et les revenus sont repliés, et facultatifs."""
-        bien = self.creer_bien()
-        page = self.client.get(reverse("candidatures:creer"), {"bien": bien.pk})
+        propriete = self.creer_propriete()
+        page = self.client.get(reverse("candidatures:creer"), {"propriete": propriete.pk})
         self.assertContains(page, "<summary>État civil, activité et revenus</summary>")
         self.assertNotContains(page, "<details class=\"garants\" open>")
         # Une seule ligne à la création : le candidat qui recevra le lien.
         self.assertEqual(len(page.context["candidats"].forms), 1)
         self.assertNotContains(page, "Autre candidat, le cas échéant")
         donnees = {
-            "bien": bien.pk, "nombre_locataires": "1", "garantie": "aucune",
+            "propriete": propriete.pk, "nombre_locataires": "1", "garantie": "aucune",
             "candidats-TOTAL_FORMS": "1", "candidats-INITIAL_FORMS": "0",
             "candidats-MIN_NUM_FORMS": "1", "candidats-MAX_NUM_FORMS": "4",
             "candidats-0-nom": "Martin", "candidats-0-prenom": "Julie", "candidats-0-email": "julie@exemple.fr",
@@ -158,10 +158,10 @@ class VuesTests(Donnees, TestCase):
         self.assertContains(page, "Autre candidat, le cas échéant")
 
     def test_refus_sans_candidat_ou_lien_etranger(self):
-        bien = self.creer_bien()
+        propriete = self.creer_propriete()
         self.assertEqual(self.client.post(reverse("candidatures:creer"),
-                                          self.donnees_formulaire(bien, [""])).status_code, 200)
-        donnees = self.donnees_formulaire(bien, ["Martin"])
+                                          self.donnees_formulaire(propriete, [""])).status_code, 200)
+        donnees = self.donnees_formulaire(propriete, ["Martin"])
         donnees["lien_dossierfacile"] = "https://exemple.fr/dossier"
         self.assertEqual(self.client.post(reverse("candidatures:creer"), donnees).status_code, 200)
         self.assertFalse(Candidature.objects.exists())
@@ -198,15 +198,15 @@ class VuesTests(Donnees, TestCase):
 
     def test_bail_depuis_la_candidature_retenue(self):
         candidature = self.creer_candidature()
-        url = reverse("baux:creer")
+        url = reverse("contrats:creer")
         self.assertEqual(self.client.get(url, {"candidature": candidature.pk}).status_code, 404)
         self.client.post(reverse("candidatures:decider", args=[candidature.pk]), {"statut": "retenue"})
         page = self.client.get(url, {"candidature": candidature.pk})
         self.assertContains(page, 'value="Petit"')
         self.assertContains(page, 'value="2026-11-01"')
-        bien = candidature.bien
+        propriete = candidature.propriete
         donnees = {
-            "candidature": candidature.pk, "bien": bien.pk, "type": "nu", "date_effet": "2026-11-01",
+            "candidature": candidature.pk, "propriete": propriete.pk, "type": "nu", "date_effet": "2026-11-01",
             "lieu_signature": "Toulouse", "loyer": "700", "mode_charges": "provision", "charges": "50",
             "jour_paiement": "1", "depot_garantie": "700", "irl_trimestre": "2e trimestre 2026",
             "irl_valeur": "146.68", "honoraires_bail_bailleur": "0", "honoraires_bail_locataire": "0",
@@ -216,8 +216,8 @@ class VuesTests(Donnees, TestCase):
             "locataires-0-civilite": "Mme", "locataires-0-nom": "Martin", "locataires-0-prenom": "Julie",
             "locataires-1-civilite": "Mme", "locataires-1-nom": "Petit", "locataires-1-prenom": "Julie",
         }
-        autre_bien = self.creer_bien(adresse="3 rue Pargaminières")
-        self.assertEqual(self.client.post(url, {**donnees, "bien": autre_bien.pk}).status_code, 200)
+        autre_propriete = self.creer_propriete(adresse="3 rue Pargaminières")
+        self.assertEqual(self.client.post(url, {**donnees, "propriete": autre_propriete.pk}).status_code, 200)
         reponse = self.client.post(url, donnees)
         bail = Bail.objects.get()
         self.assertRedirects(reponse, bail.get_absolute_url())
@@ -239,11 +239,11 @@ class VuesTests(Donnees, TestCase):
         candidature = self.creer_candidature()
         ancienne = self.creer_candidature(statut=Candidature.Statut.NON_RETENUE)
         self.vieillir(ancienne, 120)
-        for url in [reverse("candidatures:liste"), reverse("candidatures:liste") + f"?bien={candidature.bien.pk}",
+        for url in [reverse("candidatures:liste"), reverse("candidatures:liste") + f"?propriete={candidature.propriete.pk}",
                     reverse("candidatures:liste") + "?statut=a_etudier&q=martin",
                     reverse("candidatures:candidature", args=[candidature.pk]),
                     reverse("candidatures:modifier", args=[candidature.pk]),
-                    reverse("biens:bien", args=[candidature.bien.pk]), reverse("accueil")]:
+                    reverse("proprietes:propriete", args=[candidature.propriete.pk]), reverse("accueil")]:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
         # La liste a purgé la candidature refusée il y a quatre mois.
@@ -277,7 +277,7 @@ class LienLocataireTests(Donnees, TestCase):
             "candidats-0-prenom": "Julie", "candidats-0-date_naissance": "1996-03-08",
             "candidats-0-lieu_naissance": "Albi (Tarn)", "candidats-0-email": "julie@exemple.fr",
             "candidats-0-telephone": "06 12 34 56 78", "candidats-0-profession": "Infirmière",
-            "candidats-0-employeur": "CHU de Toulouse", "candidats-0-contrat": "cdi",
+            "candidats-0-employeur": "CHU de Toulouse", "candidats-0-situation": "cdi",
             "candidats-0-date_embauche": "2022-09-01", "candidats-0-revenus_mensuels": "2150",
             "candidats-1-nom": "", "candidats-1-prenom": "",
         }
@@ -348,7 +348,7 @@ class LienLocataireTests(Donnees, TestCase):
             donnees.update({f"candidats-{i}-civilite": "M.", f"candidats-{i}-nom": "Roux", f"candidats-{i}-prenom": prenom,
                             f"candidats-{i}-date_naissance": "1995-01-20", f"candidats-{i}-lieu_naissance": "Toulouse",
                             f"candidats-{i}-email": f"{prenom.lower()}@exemple.fr",
-                            f"candidats-{i}-telephone": "07 00 00 00 00", f"candidats-{i}-contrat": "etudiant",
+                            f"candidats-{i}-telephone": "07 00 00 00 00", f"candidats-{i}-situation": "etudiant",
                             f"candidats-{i}-revenus_mensuels": "600"})
         donnees.update({"garants-2-TOTAL_FORMS": "2", "garants-2-INITIAL_FORMS": "0",
                         "garants-2-MIN_NUM_FORMS": "0", "garants-2-MAX_NUM_FORMS": "2"})
@@ -399,7 +399,7 @@ class LienLocataireTests(Donnees, TestCase):
         donnees = self.donnees(**{"candidats-1-civilite": "M.", "candidats-1-nom": "Roux",
                                   "candidats-1-prenom": "Hugo", "candidats-1-date_naissance": "1995-01-20",
                                   "candidats-1-lieu_naissance": "Toulouse", "candidats-1-email": "hugo@exemple.fr",
-                                  "candidats-1-telephone": "07 00 00 00 00", "candidats-1-contrat": "etudiant",
+                                  "candidats-1-telephone": "07 00 00 00 00", "candidats-1-situation": "etudiant",
                                   "candidats-1-revenus_mensuels": "0"})
         self.assertRedirects(self.client.post(formulaire, donnees), reverse("formulaire_locataire_merci"))
         self.candidature.refresh_from_db()
@@ -409,7 +409,7 @@ class LienLocataireTests(Donnees, TestCase):
         self.assertEqual(self.candidature.lien_dossierfacile, "https://locataire.dossierfacile.logement.gouv.fr/file/9b7c")
         julie, hugo = self.candidature.candidats.all()
         self.assertEqual((julie.nom, julie.lieu_naissance, julie.telephone), ("Martin-Roux", "Albi (Tarn)", "06 12 34 56 78"))
-        self.assertEqual((julie.profession, julie.contrat, julie.revenus_mensuels),
+        self.assertEqual((julie.profession, julie.situation, julie.revenus_mensuels),
                          ("Infirmière", "cdi", Decimal("2150")))
         self.assertEqual((hugo.prenom, hugo.email, hugo.revenus_mensuels), ("Hugo", "hugo@exemple.fr", Decimal("0")))
         self.assertEqual(self.candidature.revenus, Decimal("2150"))
@@ -417,7 +417,7 @@ class LienLocataireTests(Donnees, TestCase):
         self.assertContains(self.client.get(formulaire), "plus valable", status_code=404)
         # Le bail reprend les informations complétées.
         self.client.force_login(User.objects.get(username="gestion"))
-        page = self.client.get(reverse("baux:creer"), {"candidature": self.candidature.pk})
+        page = self.client.get(reverse("contrats:creer"), {"candidature": self.candidature.pk})
         self.assertContains(page, 'value="Martin-Roux"')
         self.assertContains(page, 'value="Albi (Tarn)"')
 
@@ -449,7 +449,7 @@ class LienLocataireTests(Donnees, TestCase):
         self.assertEqual(self.client.get(formulaire).status_code, 404)
         self.assertEqual(self.client.get(nouveau).status_code, 200)
         # Plus de lien une fois le bail rédigé.
-        self.candidature.bail = self.creer_bail(bien=self.candidature.bien)
+        self.candidature.bail = self.creer_bail(propriete=self.candidature.propriete)
         self.candidature.save()
         self.assertEqual(self.client.get(nouveau).status_code, 404)
 
@@ -492,5 +492,5 @@ class LienLocataireTests(Donnees, TestCase):
         # La candidature les montre, le bail les reprend.
         self.client.force_login(User.objects.get(username="gestion"))
         self.assertContains(self.client.get(self.candidature.get_absolute_url()), "sophie@exemple.fr")
-        page = self.client.get(reverse("baux:creer"), {"candidature": self.candidature.pk})
+        page = self.client.get(reverse("contrats:creer"), {"candidature": self.candidature.pk})
         self.assertContains(page, "Madame MARTIN Sophie, 8 rue des Arts, 81000 Albi\nMonsieur MARTIN Alain")
