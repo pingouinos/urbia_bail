@@ -134,6 +134,10 @@ class ProprieteForm(AdresseDejaConnueMixin, RefIcsVideEnNullMixin, forms.ModelFo
             self.fields["bailleur"].required = False
             self.fields["bailleur"].empty_label = "Nouveau bailleur (ci-dessous)"
         self.ajouter_confirmation()
+        # Un immeuble par ligne, désigné par son nom et son adresse.
+        self.fields["immeuble"].queryset = Immeuble.objects.order_by("nom", "ville", "adresse")
+        self.fields["immeuble"].label_from_instance = lambda immeuble: immeuble.designation
+        self.fields["immeuble"].empty_label = "Aucun (logement isolé)"
 
     def sections(self):
         return [(titre, [self[nom] for nom in noms]) for titre, noms in self.SECTIONS]
@@ -173,6 +177,7 @@ class ImmeubleForm(AdresseDejaConnueMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.ajouter_confirmation()
         self.fields["confirmer_adresse"].label = "Créer quand même cet immeuble et ses lots"
+        self.doublon = None
 
     def champs(self):
         return [self[nom] for nom in self.Meta.fields]
@@ -180,7 +185,15 @@ class ImmeubleForm(AdresseDejaConnueMixin, forms.ModelForm):
     def clean(self):
         donnees = super().clean()
         adresse, code_postal = donnees.get("adresse"), donnees.get("code_postal")
-        if adresse and code_postal and not self.instance.pk:
+        if not (adresse and code_postal and donnees.get("ville")):
+            return donnees
+        # Le même immeuble ne s'enregistre pas deux fois, quelle que soit l'écriture de son adresse.
+        cle = Immeuble.identite(donnees.get("nom"), adresse, code_postal, donnees["ville"])
+        self.doublon = Immeuble.objects.filter(cle=cle).exclude(pk=self.instance.pk).first()
+        if self.doublon:
+            self.add_error("nom" if donnees.get("nom") else "adresse", "Cet immeuble est déjà enregistré.")
+        elif not self.instance.pk:
+            # Autre nom à la même adresse (bâtiment A, bâtiment B) : possible, après confirmation.
             self.immeubles_la = Immeuble.a_l_adresse(adresse, code_postal)
             self.deja_la = Propriete.a_l_adresse(adresse, code_postal)
             self.confirmer(donnees)
