@@ -75,7 +75,17 @@ def contact_editer(request, pk=None):
                 for bailleur in objet.bailleurs.all():
                     for champ in ("civilite", "nom", "prenom", "email", "telephone", "adresse", "code_postal", "ville"):
                         setattr(bailleur, champ, getattr(objet, champ))
+                    # La nature choisie ici vaut aussi pour la fiche du bailleur ; sans cela, son
+                    # type (société ou personne) reprendrait le dessus à l'enregistrement.
+                    if objet.entreprise and not bailleur.societe:
+                        bailleur.type = Bailleur.Type.PERSONNE_MORALE
+                    elif not objet.entreprise and bailleur.societe:
+                        bailleur.type = Bailleur.Type.PERSONNE_PHYSIQUE
+                        bailleur.representant_civilite = bailleur.representant_nom = ""
+                        bailleur.representant_prenom = bailleur.representant_qualite = bailleur.siren = ""
+                        bailleur.associes.all().delete()
                     bailleur.save()
+                Contact.effacer_orphelins()
         messages.success(request, "Contact enregistré.")
         return redirect(objet)
     return render(request, "contacts/contact_form.html", {

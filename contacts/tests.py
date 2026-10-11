@@ -136,6 +136,31 @@ class ContactsTests(Donnees, TestCase):
         self.bailleur.refresh_from_db()
         self.assertEqual((self.bailleur.email, self.bailleur.contact, Contact.objects.count()), ("nouveau@exemple.fr", contact, 1))
 
+    def test_changer_la_nature_depuis_le_contact(self):
+        """Passer un contact d'« Entreprise » à « Personne » (ou l'inverse)
+        vaut aussi pour sa fiche de bailleur : la modification n'est pas annulée."""
+        from proprietes.models import Associe
+
+        societe = Bailleur.objects.create(
+            type="sci_familiale", nom="Couet", representant_nom="Couet", representant_prenom="Elodie", siren="732 829 320",
+        )
+        Associe.objects.create(bailleur=societe, nom="Couet", prenom="Tom")
+        contact = societe.contact
+        self.assertEqual(contact.nature, "entreprise")
+        self.client.post(reverse("contacts:modifier", args=[contact.pk]), {
+            "nature": "personne", "civilite": "Mme", "nom": "Couet", "prenom": "Sarah", "email": "sarah@exemple.fr"})
+        contact.refresh_from_db()
+        societe.refresh_from_db()
+        self.assertEqual((contact.nature, contact.prenom, contact.civilite), ("personne", "Sarah", "Mme"))
+        self.assertEqual((societe.type, societe.prenom, societe.representant, societe.siren), ("physique", "Sarah", None, ""))
+        self.assertFalse(societe.associes.exists())
+        self.assertEqual(societe.designation, "Madame COUET Sarah")
+        # Et dans l'autre sens : la personne redevient une société.
+        self.client.post(reverse("contacts:modifier", args=[contact.pk]), {"nature": "entreprise", "nom": "SCI Couet"})
+        contact.refresh_from_db()
+        societe.refresh_from_db()
+        self.assertEqual((contact.nature, contact.prenom, societe.type, societe.nom), ("entreprise", "", "morale", "SCI Couet"))
+
     def test_menu_et_anciennes_pages(self):
         page = self.client.get(reverse("contacts:liste"))
         self.assertContains(page, ">Contacts</a>")
