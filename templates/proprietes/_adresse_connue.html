@@ -1,0 +1,12 @@
+{% if form.deja_la or form.immeubles_la %}
+<div class="message alerte-fond adresse-connue">
+  {% if form.doublons %}<p><strong>Cette propriété semble déjà enregistrée.</strong> Même adresse et même lot :</p>
+  {% else %}<p><strong>Cette adresse est déjà enregistrée.</strong> Vérifiez qu'il ne s'agit pas de la même propriété :</p>{% endif %}
+  <ul>
+    {% for immeuble in form.immeubles_la %}<li><a href="{{ immeuble.get_absolute_url }}" target="_blank" rel="noopener">Immeuble {{ immeuble }}</a> · {{ immeuble.lots.count }} lot(s) : ajoutez plutôt vos lots depuis sa fiche.</li>{% endfor %}
+    {% for propriete in form.deja_la %}<li><a href="{{ propriete.get_absolute_url }}" target="_blank" rel="noopener">{{ propriete }}</a> · {{ propriete.bailleur }}{% if propriete.immeuble %} · immeuble {{ propriete.immeuble }}{% endif %}{% if not propriete.actif %} · plus géré{% endif %}</li>{% endfor %}
+  </ul>
+  {% if not form.doublons and not form.immeubles_la %}<p class="discret">S'il s'agit d'un autre lot du même bâtiment, précisez son complément ou son n° d'appartement pour le distinguer{% if propriete_form %} ; vous pourrez réunir ces lots dans un immeuble{% endif %}.</p>{% endif %}
+  <label class="case">{{ form.confirmer_adresse }} {{ form.confirmer_adresse.label }}</label>
+</div>
+{% endif %}

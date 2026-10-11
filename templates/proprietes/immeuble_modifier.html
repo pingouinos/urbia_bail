@@ -9,7 +9,7 @@
   {{ form.non_field_errors }}
   <fieldset>
     <legend>Immeuble</legend>
-    {% for champ in form %}{% include "proprietes/_champ.html" %}{% endfor %}
+    {% for champ in form.champs %}{% include "proprietes/_champ.html" %}{% endfor %}
   </fieldset>
   <div class="actions-formulaire"><button type="submit" class="bouton-corail">Enregistrer</button></div>
 </form>

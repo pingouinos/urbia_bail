@@ -243,6 +243,37 @@ def propriete_editer(request, pk=None):
     })
 
 
+@require_POST
+def propriete_supprimer(request, pk):
+    """Supprime une fiche créée par erreur. Une propriété qui a un mandat, un
+    bail ou une candidature ne se supprime pas : elle se marque « plus gérée »."""
+    objet = get_object_or_404(Propriete, pk=pk)
+    liens = [
+        (objet.mandats.count(), "mandat", "mandats"), (objet.baux.count(), "bail", "baux"),
+        (objet.candidatures.count(), "candidature", "candidatures"),
+    ]
+    attaches = [f"{nombre} {singulier if nombre == 1 else pluriel}" for nombre, singulier, pluriel in liens if nombre]
+    if attaches:
+        en_cours = []
+        if objet.mandat_en_cours:
+            en_cours.append(f"le mandat n° {objet.mandat_en_cours.numero} est en cours")
+        situation = objet.situation
+        if situation.bail or situation.a_venir:
+            en_cours.append("un bail est en cours")
+        precision = f" ({' et '.join(en_cours)})" if en_cours else ""
+        messages.error(request, f"Suppression refusée : cette propriété a {', '.join(attaches)}{precision}. "
+                                "Ces contrats doivent rester consultables. Si l'agence ne la gère plus, "
+                                "ouvrez « Modifier » et décochez « Actif ».")
+        return redirect(objet)
+    libelle = str(objet)
+    with transaction.atomic():
+        for piece in objet.pieces.all():
+            piece.fichier.delete(save=False)
+        objet.delete()
+    messages.success(request, f"Propriété supprimée : {libelle}.")
+    return redirect("proprietes:liste")
+
+
 def immeuble_creer(request):
     """Un immeuble et ses lots en une fois : l'adresse et les caractéristiques
     communes se saisissent une seule fois, puis une ligne par lot."""
