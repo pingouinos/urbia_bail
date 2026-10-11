@@ -71,6 +71,8 @@
         var lien = ligne.querySelector("td:first-child a[href], a[href]");
         if (!lien || lien.target === "_blank") return;
         ligne.classList.add("ligne-lien");
+        // Le lien qui porte la ligne garde la couleur du texte : c'est la ligne qui réagit.
+        lien.classList.add("lien-ligne");
         ligne.addEventListener("click", function (evenement) {
           if (evenement.target.closest("a, button, form, label")) return;
           if (String(window.getSelection())) return;

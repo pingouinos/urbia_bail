@@ -6,6 +6,8 @@
   --melon: #ffbca3;
   --melon-clair: #fff1eb;
   --corail: #f8756e;
+  --lien: #c9463c;
+  --lien-survol: #8f2b24;
   --vert: #c6e8ad;
   --vert-clair: #eef8e6;
   --fond: #fbf8f6;
@@ -23,8 +25,9 @@ body { margin: 0; font: 15px/1.5 system-ui, "Segoe UI", Roboto, sans-serif; back
 h1, h2 { line-height: 1.25; }
 h1 { font-size: 1.6rem; margin: 0 0 12px; }
 h2 { font-size: 1.15rem; margin: 0 0 12px; }
-a, .lien { color: var(--acier); text-decoration-color: var(--corail); text-underline-offset: 3px; }
-a:hover { text-decoration-thickness: 2px; }
+/* Liens : pas de soulignement. Ils se distinguent par leur couleur, qui fonce au survol. */
+a, .lien { color: var(--lien); text-decoration: none; }
+a:hover, .lien:hover { color: var(--lien-survol); }
 h1 a, h2 a { color: inherit; }
 .discret { color: var(--discret); }
 .erreur { color: var(--erreur); }
@@ -86,7 +89,7 @@ button.danger[type=submit] { background: var(--erreur); border-color: var(--erre
 /* Action de création mise en avant, dans le corail du logo. */
 .bouton.bouton-corail, .bouton-petit.bouton-corail { background: #e4574e; border-color: #e4574e; color: #fff; }
 .bouton.bouton-corail:hover, .bouton-petit.bouton-corail:hover { background: #cf463d; border-color: #cf463d; }
-.lien { background: none; border: 0; padding: 0; text-decoration: underline; }
+.lien { background: none; border: 0; padding: 0; }
 
 /* Blocs */
 .carte { display: block; background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 20px 24px; }
@@ -255,8 +258,9 @@ th { background: #f6f2f0; font-weight: 600; font-size: 0.9rem; }
 tbody tr:hover { background: #fdfaf9; }
 tr.inactif td { color: var(--discret); }
 /* Dans les listes, un lien ne se souligne qu'au survol : le tableau reste sobre. */
-td a, .contacts a, .liens-contact a { text-decoration: none; }
-td a:hover, .contacts a:hover, .liens-contact a:hover { text-decoration: underline; text-decoration-color: var(--corail); }
+/* Dans une liste, le nom garde la couleur du texte : c'est la ligne entière qui réagit au survol. */
+a.lien-ligne, .contacts a, .liens-contact a { color: var(--texte); }
+a.lien-ligne:hover, .contacts a:hover, .liens-contact a:hover { color: var(--lien); }
 .carte table { border: 0; }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
 dt { color: var(--discret); }
@@ -376,7 +380,7 @@ button.lien.lien-danger { color: var(--erreur); }
 .fil { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 14px; font-size: 0.92rem; color: var(--discret); }
 .barre-fiche .fil { margin: 0; }
 .fil a { color: var(--discret); text-decoration: none; }
-.fil a:hover { color: var(--acier); text-decoration: underline; text-decoration-color: var(--corail); }
+.fil a:hover { color: var(--lien); }
 .fil-ici { color: var(--texte); font-weight: 600; }
 .actions-fiche { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .actions-fiche form { margin: 0; display: flex; }
@@ -389,3 +393,13 @@ button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erre
 .loyers input[type=date] { width: auto; padding: 4px 8px; }
 .loyers td { white-space: nowrap; }
 .loyers form.en-ligne { flex-wrap: nowrap; }
+
+/* Éléments de navigation : ils gardent leur couleur, le survol colore leur fond. */
+.menu a, .onglets a, .raccourcis .carte, .segments a, .choix a, .ajouter-liste a, .marque,
+.menu a:hover, .onglets a:hover, .raccourcis .carte:hover, .segments a:hover, .choix a:hover, .ajouter-liste a:hover { color: var(--acier); }
+.raccourcis .carte:hover, .choix a:hover { border-color: var(--corail); background: var(--melon-clair); }
+.bouton:hover, .bouton-petit:hover, .bouton-entete:hover { color: #fff; }
+.bouton.secondaire:hover, .bouton-petit.secondaire:hover { color: var(--acier); background: var(--melon-clair); }
+.bouton-entete:hover { color: var(--acier); background: var(--corail); }
+.lien-admin:hover { color: var(--acier); }
+.pastille a, a.pastille { color: inherit; }
