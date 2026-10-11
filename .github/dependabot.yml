@@ -1,0 +1,16 @@
+# Propose chaque semaine les mises à jour des dépendances, des images Docker
+# et des actions GitHub, pour qu'une correction de sécurité ne reste pas en attente.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

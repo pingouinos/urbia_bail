@@ -12,6 +12,7 @@ from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from core.champs import TelephoneField
+from core.fichiers import nom_aleatoire
 
 from proprietes.models import Propriete
 from .base import Contrat
@@ -23,6 +24,10 @@ def ajouter_mois(date, mois):
     annee += date.year
     jour = min(date.day, calendar.monthrange(annee, mois_ + 1)[1])
     return dt.date(annee, mois_ + 1, jour)
+
+
+def ranger_bail_signe(bail, nom):
+    return f"baux/{nom_aleatoire(nom)}"
 
 
 def _montant(**options):
@@ -126,7 +131,7 @@ class Bail(Contrat):
     date_fin_effective = models.DateField(
         "fin effective", null=True, blank=True, help_text="Date de départ du locataire."
     )
-    fichier_signe = models.FileField("bail signé (scan)", upload_to="baux/", blank=True)
+    fichier_signe = models.FileField("bail signé (scan)", upload_to=ranger_bail_signe, blank=True)
     # Suivi des loyers : l'échéancier court à partir de ce mois. Sans date, le
     # bail n'est pas suivi (bail ancien dont les loyers sont tenus ailleurs).
     suivi_loyers_depuis = models.DateField("suivi des loyers depuis", null=True, blank=True, editable=False)

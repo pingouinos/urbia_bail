@@ -6,6 +6,7 @@ from django.db import transaction
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
+from core.journal import noter
 from proprietes.models import Bailleur, Propriete
 
 from .forms import ContactForm
@@ -93,5 +94,6 @@ def supprimer(request, pk):
         return redirect(objet)
     nom = objet.designation
     objet.delete()
+    noter(request, "suppression", f"Contact · {nom}")
     messages.success(request, f"Contact supprimé : {nom}.")
     return redirect("contacts:liste")

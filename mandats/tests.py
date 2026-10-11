@@ -242,7 +242,16 @@ class VuesTests(Donnees, TestCase):
         reponse = self.client.post(
             deposer, {"date_signature": "2026-09-15", "fichier_signe": SimpleUploadedFile("virus.exe", b"MZ")}, follow=True,
         )
-        self.assertContains(reponse, "Fournir un PDF ou une image")
+        self.assertContains(reponse, "ni un PDF ni une image")
+        # L'extension ne suffit pas : un exécutable renommé en .pdf est refusé, sur le mandat comme sur le bail.
+        faux = SimpleUploadedFile("evil.pdf", b"MZ\x90\x00", content_type="application/pdf")
+        reponse = self.client.post(deposer, {"date_signature": "2026-09-15", "fichier_signe": faux}, follow=True)
+        self.assertContains(reponse, "ni un PDF ni une image")
+        mandat.refresh_from_db()
+        # Le fichier est rangé sous un nom tiré au hasard et servi sans laisser le navigateur deviner son type.
+        self.assertRegex(mandat.fichier_signe.name, r"^mandats/[0-9a-f]{32}\.pdf$")
+        reponse = self.client.get(reverse("mandats:fichier_signe", args=[mandat.pk]))
+        self.assertEqual((reponse["Content-Type"], reponse["X-Content-Type-Options"]), ("application/pdf", "nosniff"))
 
     def test_honoraires_proposes_au_metre_carre(self):
         """Visite, dossier et bail : plafond par m² selon la zone, reporté sur

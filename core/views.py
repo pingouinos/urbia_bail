@@ -2,11 +2,13 @@ from axes.utils import reset
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models import Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
@@ -16,8 +18,10 @@ from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from mandats.models import Mandat
 
-from .forms import OrganisationForm, UtilisateurForm, type_image
-from .models import Organisation
+from .fichiers import servir
+from .forms import OrganisationForm, UtilisateurForm
+from .journal import noter
+from .models import Evenement, Organisation
 from .taches import par_rubrique, taches
 
 
@@ -120,7 +124,11 @@ def utilisateur_editer(request, pk=None):
     compte = get_object_or_404(get_user_model(), pk=pk) if pk else None
     form = UtilisateurForm(request.POST or None, instance=compte, acteur=request.user)
     if form.is_valid():
+        creation = compte is None
         compte = form.save()
+        noter(request, "compte créé" if creation else "compte modifié", compte.username,
+              f"{form.cleaned_data['role']}, {'actif' if compte.is_active else 'désactivé'}"
+              + (", mot de passe changé" if form.cleaned_data.get("mot_de_passe") else ""))
         messages.success(request, f"Compte de {compte.get_full_name() or compte.username} enregistré.")
         return redirect("utilisateurs")
     return render(request, "core/utilisateur_form.html", {
@@ -138,12 +146,34 @@ def utilisateur_action(request, pk, action):
     nom = compte.get_full_name() or compte.username
     if action == "mfa":
         TOTPDevice.objects.filter(user=compte).delete()
+        noter(request, "double authentification réinitialisée", compte.username)
         messages.success(request, f"Double authentification de {nom} réinitialisée : "
                                   "un nouveau code QR lui sera proposé à sa prochaine connexion.")
     else:
         reset(username=compte.username)
+        noter(request, "compte débloqué", compte.username)
         messages.success(request, f"Compte de {nom} débloqué.")
     return redirect("utilisateur_modifier", pk=compte.pk)
+
+
+def journal(request):
+    """Journal de sécurité : connexions, documents ouverts, exports,
+    suppressions, changements de droits. Gardé un an."""
+    _administrateur(request)
+    Evenement.objects.filter(date__lt=timezone.now() - timezone.timedelta(days=Evenement.CONSERVATION_JOURS)).delete()
+    evenements = Evenement.objects.select_related("utilisateur")
+    action, q = request.GET.get("action", ""), request.GET.get("q", "").strip()
+    if action:
+        evenements = evenements.filter(action=action)
+    if q:
+        evenements = evenements.filter(Q(identifiant__icontains=q) | Q(objet__icontains=q) | Q(ip__icontains=q))
+    page = Paginator(evenements, 100).get_page(request.GET.get("page"))
+    parametres = request.GET.copy()
+    parametres.pop("page", None)
+    return render(request, "core/journal.html", {
+        "page": page, "parametres": parametres.urlencode(),
+        "actions": Evenement.objects.order_by("action").values_list("action", flat=True).distinct(),
+    })
 
 
 def agence(request):
@@ -154,6 +184,7 @@ def agence(request):
     form = OrganisationForm(request.POST or None, request.FILES or None, instance=organisation)
     if form.is_valid():
         form.save()
+        noter(request, "agence modifiée", organisation.designation, ", ".join(form.changed_data)[:300])
         messages.success(request, "Fiche de l'agence enregistrée.")
         return redirect("agence")
     return render(request, "core/agence.html", {
@@ -164,17 +195,7 @@ def agence(request):
 
 def logo_agence(request):
     """Logo déposé par l'agence. Public : il figure sur le formulaire du candidat."""
-    logo = Organisation.courante().logo
-    if not logo:
-        raise Http404
-    try:
-        fichier = logo.open("rb")
-    except FileNotFoundError:
-        raise Http404
-    type_ = type_image(fichier.read(12)) or "application/octet-stream"
-    fichier.seek(0)
-    reponse = FileResponse(fichier, content_type=type_)
-    reponse["X-Content-Type-Options"] = "nosniff"
+    reponse = servir(Organisation.courante().logo)
     # Affiché sur chaque page : le navigateur le garde une heure.
     reponse["Cache-Control"] = "private, max-age=3600"
     return reponse

@@ -20,6 +20,8 @@ from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
+from core.fichiers import controler_archive
+
 from .models import Bailleur, Propriete
 
 
@@ -158,12 +160,34 @@ class PointVirgule(csv.excel):
     delimiter = ";"
 
 
+# Bornes d'un import, pour qu'un fichier démesuré n'épuise pas le serveur.
+LIGNES_MAX = 5000
+COLONNES_MAX = 80
+
+
+def sans_formule(valeur):
+    """Un texte qui commence comme une formule est précédé d'une apostrophe :
+    ouvert dans Excel, il s'affiche au lieu de s'exécuter."""
+    if isinstance(valeur, str) and valeur[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + valeur
+    return valeur
+
+
 def lire_lignes(nom_fichier, contenu):
     """Renvoie les lignes du fichier sous forme de listes de cellules."""
     if nom_fichier.lower().endswith((".xlsx", ".xlsm")):
+        try:
+            controler_archive(contenu)
+        except ValidationError as erreur:
+            raise ValueError(erreur.messages[0])
         classeur = load_workbook(io.BytesIO(contenu), read_only=True, data_only=True)
         feuille = classeur.worksheets[0]
-        return [list(ligne) for ligne in feuille.iter_rows(values_only=True)]
+        lignes = []
+        for ligne in feuille.iter_rows(values_only=True, max_col=COLONNES_MAX):
+            lignes.append(list(ligne))
+            if len(lignes) > LIGNES_MAX:
+                raise ValueError(f"Fichier trop long : {LIGNES_MAX} lignes au maximum par import.")
+        return lignes
     if nom_fichier.lower().endswith(".csv"):
         for encodage in ("utf-8-sig", "cp1252"):
             try:
@@ -175,7 +199,10 @@ def lire_lignes(nom_fichier, contenu):
             dialecte = csv.Sniffer().sniff(texte[:4096], delimiters=";,\t")
         except csv.Error:
             dialecte = PointVirgule
-        return [ligne for ligne in csv.reader(io.StringIO(texte), dialecte)]
+        lignes = [ligne[:COLONNES_MAX] for ligne in csv.reader(io.StringIO(texte), dialecte)]
+        if len(lignes) > LIGNES_MAX:
+            raise ValueError(f"Fichier trop long : {LIGNES_MAX} lignes au maximum par import.")
+        return lignes
     raise ValueError("Format non pris en charge : fournir un fichier .xlsx ou .csv.")
 
 
@@ -339,7 +366,7 @@ def classeur(proprietes=()):
     for propriete in proprietes:
         feuille.append(
             [
-                _valeur_export(c, propriete.bailleur if c.modele is Bailleur else propriete)
+                sans_formule(_valeur_export(c, propriete.bailleur if c.modele is Bailleur else propriete))
                 for c in COLONNES
             ]
         )

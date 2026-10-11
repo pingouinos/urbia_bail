@@ -511,6 +511,34 @@ class VuesTests(TestCase):
         self.assertFalse(Contact.objects.filter(pk=contact.pk).exists())
         self.assertEqual(self.client.get(reverse("contacts:supprimer", args=[contact.pk])).status_code, 405)
 
+    def test_import_hors_session_et_export_sans_formule(self):
+        """Le fichier vérifié attend sa confirmation sur le disque, pas dans la
+        session ; un texte qui ressemble à une formule est neutralisé à l'export."""
+        with tempfile.TemporaryDirectory() as dossier, self.settings(MEDIA_ROOT=dossier):
+            fichier = SimpleUploadedFile("proprietes.xlsx", xlsx(ligne("L001", **{"Complément": "@SUM(1+1)"})))
+            self.client.post(reverse("proprietes:importer"), {"fichier": fichier})
+            depot = self.client.session["import_proprietes"]
+            self.assertNotIn("contenu", depot)
+            self.assertRegex(depot["depot"], r"^[0-9a-f]{32}$")
+            self.client.post(reverse("proprietes:importer_confirmer"))
+            self.assertEqual(Propriete.objects.count(), 1)
+            # Le fichier temporaire est effacé, et un nom de dépôt forgé est ignoré.
+            import pathlib
+            self.assertEqual(list((pathlib.Path(dossier) / "imports").iterdir()), [])
+            session = self.client.session
+            session["import_proprietes"] = {"nom": "x.xlsx", "depot": "../../etc/passwd"}
+            session.save()
+            reponse = self.client.post(reverse("proprietes:importer_confirmer"), follow=True)
+            self.assertContains(reponse, "Aucun fichier en attente")
+        classeur = load_workbook(io.BytesIO(self.client.get(reverse("proprietes:exporter")).content))
+        valeurs = [cellule.value for cellule in classeur.active[2]]
+        self.assertIn("'@SUM(1+1)", valeurs)
+        self.assertEqual(tableur.sans_formule("+33 6 12 34 56 78"), "'+33 6 12 34 56 78")
+        self.assertEqual(tableur.sans_formule("12 rue des Lois"), "12 rue des Lois")
+        # Un fichier démesuré est refusé avant d'être traité.
+        with self.assertRaisesMessage(ValueError, "Fichier trop long"):
+            tableur.lire_lignes("gros.csv", ("a;b\n" * (tableur.LIGNES_MAX + 2)).encode())
+
     def test_depenses_energie_incoherentes(self):
         bailleur = Bailleur.objects.create(nom="Durand")
         reponse = self.client.post(reverse("proprietes:propriete_creer"), {

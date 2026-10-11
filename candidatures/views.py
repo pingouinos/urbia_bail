@@ -1,5 +1,6 @@
 from urllib.parse import quote, urlencode
 
+from core.journal import noter
 from django.conf import settings
 from django.contrib import messages
 from django.core.mail import EmailMessage
@@ -132,6 +133,7 @@ def effacer(request, pk):
     propriete = objet.propriete
     objet.delete()
     Contact.effacer_orphelins()
+    noter(request, "suppression", f"Candidature · {propriete}")
     messages.success(request, "Candidature et données du candidat effacées.")
     return redirect(f"{reverse('candidatures:liste')}?propriete={propriete.pk}")
 

@@ -25,6 +25,12 @@ PLAFOND_ETAT_DES_LIEUX = Decimal("3")
 NOMBRES = {1: "un", 2: "deux", 3: "trois", 4: "quatre", 5: "cinq", 6: "six"}
 
 
+def ranger_mandat_signe(mandat, nom):
+    from core.fichiers import nom_aleatoire
+
+    return f"mandats/{nom_aleatoire(nom)}"
+
+
 def plafonds_locataire(propriete):
     """Plafonds (bail, état des lieux) de la part locataire, ou None si le
     bien n'y est pas soumis ou si sa surface est inconnue."""
@@ -127,9 +133,7 @@ class Mandat(Contrat):
     honoraires_edl_bailleur = _montant(verbose_name="état des lieux : part bailleur (€ TTC)", default=0)
     honoraires_edl_locataire = _montant(verbose_name="état des lieux : part locataire (€ TTC)", default=0)
 
-    fichier_signe = models.FileField(
-        "mandat signé (scan)", upload_to="mandats/", blank=True,
-    )
+    fichier_signe = models.FileField("mandat signé (scan)", upload_to=ranger_mandat_signe, blank=True)
     observations = models.TextField(blank=True)
 
     history = HistoricalRecords()

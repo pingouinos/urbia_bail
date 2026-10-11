@@ -2,6 +2,7 @@ from django import forms
 from django.utils import timezone
 
 from proprietes.models import Propriete
+from core.fichiers import controler_fichier
 from documents.forms import FichierSigneMixin
 
 from .models import (
@@ -104,8 +105,5 @@ class SignatureForm(forms.ModelForm):
     def clean_fichier_signe(self):
         fichier = self.cleaned_data.get("fichier_signe")
         if fichier and hasattr(fichier, "content_type"):
-            if not fichier.name.lower().endswith((".pdf", ".jpg", ".jpeg", ".png")):
-                raise forms.ValidationError("Fournir un PDF ou une image.")
-            if fichier.size > FichierSigneMixin.TAILLE_MAX:
-                raise forms.ValidationError("Fichier trop volumineux (20 Mo au maximum).")
+            controler_fichier(fichier, FichierSigneMixin.TAILLE_MAX)
         return fichier

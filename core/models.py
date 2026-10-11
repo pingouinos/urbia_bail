@@ -14,8 +14,13 @@ from django.db import models
 from simple_history.models import HistoricalRecords
 
 from core.champs import TelephoneField, code_postal_francais, siren_valide
+from core.fichiers import nom_aleatoire
 
 from proprietes.models import Horodatage
+
+
+def ranger_logo(organisation, nom):
+    return f"organisation/{nom_aleatoire(nom)}"
 
 
 class Organisation(Horodatage):
@@ -32,7 +37,7 @@ class Organisation(Horodatage):
     siren = models.CharField("SIREN", max_length=20, blank=True, validators=[siren_valide])
     rcs_ville = models.CharField("ville du RCS", max_length=80, blank=True)
     logo = models.FileField(
-        upload_to="organisation/", blank=True,
+        upload_to=ranger_logo, blank=True,
         help_text="Image de 1 Mo au maximum. Elle remplace le logo de l'application à l'écran et, si elle est "
                   "en PNG ou en JPEG, celui de l'en-tête des mandats et des baux.",
     )
@@ -104,3 +109,27 @@ class Organisation(Horodatage):
             "garant_adresse": self.garant_adresse,
             "garantie_montant": montant(self.garantie_montant),
         }
+
+
+class Evenement(models.Model):
+    """Ligne du journal de sécurité (voir core/journal.py)."""
+
+    CONSERVATION_JOURS = 365
+
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    # Gardé en clair : il reste lisible si le compte est supprimé, et sert aux connexions refusées.
+    identifiant = models.CharField(max_length=150, blank=True)
+    ip = models.CharField("adresse IP", max_length=45, blank=True)
+    action = models.CharField(max_length=40, db_index=True)
+    objet = models.CharField(max_length=200, blank=True)
+    detail = models.CharField("détail", max_length=300, blank=True)
+
+    class Meta:
+        ordering = ["-date", "-pk"]
+        verbose_name = "événement"
+
+    def __str__(self):
+        return f"{self.date:%d/%m/%Y %H:%M} · {self.action} · {self.identifiant}"

@@ -10,7 +10,7 @@ from pathlib import Path
 from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -19,6 +19,8 @@ from docxtpl import DocxTemplate
 from jinja2 import TemplateSyntaxError
 
 from comptes.roles import est_administrateur
+from core.fichiers import controler_archive, servir
+from core.journal import noter
 
 from . import google
 from .generation import DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, convertir_pdf, generer_docx
@@ -53,11 +55,9 @@ def document(request, objet, modele, format_):
     return reponse
 
 
-def fichier_signe(objet):
-    if not objet.fichier_signe:
-        raise Http404
-    type_, _ = mimetypes.guess_type(objet.fichier_signe.name)
-    return FileResponse(objet.fichier_signe.open("rb"), content_type=type_ or "application/octet-stream")
+def fichier_signe(request, objet):
+    noter(request, "document ouvert", f"Exemplaire signé · {objet}")
+    return servir(objet.fichier_signe)
 
 
 def _verifier(request, nom):
@@ -85,6 +85,10 @@ def _objet_essai(nom):
 
 def verifier_modele(nom, contenu):
     """Raison pour laquelle le modèle ne peut pas servir, ou None."""
+    try:
+        controler_archive(contenu)
+    except ValidationError as erreur:
+        return erreur.messages[0]
     try:
         variables = _variables(io.BytesIO(contenu))
     except TemplateSyntaxError as erreur:
@@ -170,6 +174,7 @@ def reprendre(request, nom):
         messages.error(request, f"« {libelle} » n'a pas été mis en service. {raison}")
         return redirect("documents:modeles")
     mettre_en_service(nom, contenu, Modele.Origine.GOOGLE, request.user)
+    noter(request, "modèle remplacé", nom, "repris de Google Docs")
     messages.success(request, f"« {libelle} » repris de Google Docs et mis en service. "
                               "Ouvrez le document d'essai pour vérifier la mise en page.")
     return redirect("documents:modeles")
@@ -188,6 +193,7 @@ def deposer(request, nom):
         messages.error(request, raison)
         return redirect("documents:modeles")
     mettre_en_service(nom, contenu, Modele.Origine.DEPOT, request.user)
+    noter(request, "modèle remplacé", nom, "fichier déposé")
     messages.success(request, f"Nouveau modèle « {MODELES[nom][0]} » en service.")
     return redirect("documents:modeles")
 
@@ -198,6 +204,7 @@ def precedent(request, nom):
     if not _precedent(nom).exists():
         raise Http404
     mettre_en_service(nom, _precedent(nom).read_bytes(), Modele.Origine.PRECEDENT, request.user)
+    noter(request, "modèle remplacé", nom, "version précédente")
     messages.success(request, f"Version précédente de « {MODELES[nom][0]} » remise en service.")
     return redirect("documents:modeles")
 
@@ -206,5 +213,6 @@ def precedent(request, nom):
 def retablir(request, nom):
     _verifier(request, nom)
     mettre_en_service(nom, None, Modele.Origine.ORIGINE, request.user)
+    noter(request, "modèle remplacé", nom, "modèle d'origine")
     messages.success(request, f"Modèle d'origine « {MODELES[nom][0]} » rétabli.")
     return redirect("documents:modeles")

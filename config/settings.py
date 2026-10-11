@@ -71,6 +71,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "core.middleware.SecuriteMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -157,6 +158,18 @@ CSRF_COOKIE_SECURE = HTTPS
 if HTTPS:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
+    # Caddy redirige déjà vers HTTPS ; l'application le fait aussi, sauf pour
+    # la sonde de santé que Docker interroge en HTTP de l'intérieur.
+    SECURE_SSL_REDIRECT = True
+    SECURE_REDIRECT_EXEMPT = [r"^sante/$"]
+    # À n'activer que si tous les sous-domaines du site sont en HTTPS.
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("HSTS_SOUS_DOMAINES", default=False)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+# Formulaire public du candidat : demandes admises en dix minutes par adresse
+# (0 : pas de limite). Sans objet pendant les tests, qui partagent une adresse.
+LIMITE_FORMULAIRE_PUBLIC = 0 if "test" in sys.argv else env.int("LIMITE_FORMULAIRE_PUBLIC", default=40)
 SESSION_COOKIE_AGE = 60 * 60 * 10  # une journée de travail
 
 # Service de conversion Word vers PDF (utilisé à l'étape « Baux »).
@@ -224,5 +237,6 @@ LOGGING = {
     "loggers": {
         "comptes": {"handlers": ["console"], "level": "INFO"},
         "documents": {"handlers": ["console"], "level": "INFO"},
+        "securite": {"handlers": ["console"], "level": "INFO"},
     },
 }
