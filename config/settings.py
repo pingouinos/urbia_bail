@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "mandats",
     "contrats",
     "candidatures",
+    "contacts",
 ]
 
 MIDDLEWARE = [

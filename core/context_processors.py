@@ -11,7 +11,10 @@ def rubrique(request):
     if page is None:
         return ""
     if page.namespace == "proprietes" and (page.url_name or "").startswith("bailleur"):
-        return "bailleurs"
+        return "contacts"
+    if page.namespace == "candidatures":
+        # Une candidature est une étape de la mise en location d'une propriété.
+        return "proprietes"
     if page.namespace == "mandats":
         # Les mandats sont des contrats : ils se rangent sous cette rubrique.
         return "contrats"

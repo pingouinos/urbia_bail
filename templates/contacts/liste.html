@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block titre %}Contacts · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<div class="titre-actions">
+  <h1>Contacts</h1>
+  <div class="actions"><a class="bouton-petit" href="{% url 'proprietes:bailleur_creer' %}">Nouveau bailleur</a></div>
+</div>
+{% if propriete %}<p>Personnes liées à <a href="{{ propriete.get_absolute_url }}">{{ propriete }}</a> · <a href="{% url 'contacts:liste' %}">tous les contacts</a></p>{% endif %}
+<form class="filtres" method="get">
+  {% if propriete %}<input type="hidden" name="propriete" value="{{ propriete.pk }}">{% endif %}
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Nom, e-mail, téléphone, adresse d'une propriété…" aria-label="Rechercher">
+  <select name="categorie" aria-label="Catégorie">
+    <option value="">Toutes les catégories</option>
+    {% for valeur, libelle in categories %}<option value="{{ valeur }}"{% if request.GET.categorie == valeur %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
+  </select>
+  <select name="tri" aria-label="Tri">
+    <option value="">Par nom</option>
+    <option value="proprietes"{% if request.GET.tri == "proprietes" %} selected{% endif %}>Par nombre de propriétés</option>
+  </select>
+  <button type="submit">Filtrer</button>
+</form>
+<p class="discret">{{ page.paginator.count }} contact(s). Une personne n'apparaît qu'une fois, avec toutes ses catégories et tous ses liens.</p>
+<table>
+  <thead><tr><th>Nom</th><th>Catégorie</th><th>Coordonnées</th><th>Lié à</th></tr></thead>
+  <tbody>
+  {% for contact in page %}
+    <tr>
+      <td><a href="{{ contact.url }}"><strong>{{ contact.designation }}</strong></a></td>
+      <td>{% for code, libelle in contact.etiquettes %}<span class="pastille pastille-contact-{{ code }}">{{ libelle }}</span> {% endfor %}</td>
+      <td>{{ contact.email|default:"—" }}{% if contact.telephone %}<br><span class="discret">{{ contact.telephone }}</span>{% endif %}</td>
+      <td>
+        {% if contact.liens|length > 3 %}
+        <details class="liens-contact">
+          <summary>{% with nb=contact.proprietes|length %}{% if nb == contact.liens|length %}{{ nb }} propriétés{% else %}{{ contact.liens|length }} liens{% endif %}{% endwith %}</summary>
+          <ul>{% for lien in contact.liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} <span class="discret">· {{ lien.precision }}</span>{% endif %}</li>{% endfor %}</ul>
+        </details>
+        {% elif contact.liens %}
+        <ul class="liens-contact">{% for lien in contact.liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} <span class="discret">· {{ lien.precision }}</span>{% endif %}</li>{% endfor %}</ul>
+        {% else %}<span class="discret">Aucune propriété</span>{% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4" class="discret">Aucun contact. Un bailleur se crée ici ou avec sa propriété ; les candidats et locataires arrivent avec les candidatures et les baux.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% include "proprietes/_pagination.html" %}
+{% endblock %}

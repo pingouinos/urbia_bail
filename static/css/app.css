@@ -107,6 +107,13 @@ button.danger[type=submit] { background: var(--erreur); border-color: var(--erre
 .pastille-type-mandat { background: var(--carte); border-color: var(--acier); }
 .bouton-petit.secondaire { background: var(--carte); color: var(--acier); }
 .bouton-petit.secondaire:hover { background: var(--melon-clair); }
+ul.liens-contact, .liens-contact ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.liens-contact summary { font-weight: 600; }
+.liens-contact[open] summary { margin-bottom: 4px; }
+.pastille-contact-bailleur { background: var(--carte); border-color: var(--acier); }
+.pastille-contact-candidat { background: var(--melon-clair); border-color: var(--melon); }
+.pastille-contact-locataire { background: var(--vert-clair); border-color: var(--vert); }
+.pastille-contact-ancien { background: var(--fond); color: var(--discret); }
 .pastille-a_louer { background: var(--acier); border-color: var(--acier); color: #fff; }
 .pastilles { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 

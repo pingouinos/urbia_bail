@@ -241,7 +241,7 @@ class VuesTests(TestCase):
         for url in [
             reverse("proprietes:liste"), reverse("proprietes:propriete", args=[propriete.pk]),
             reverse("proprietes:propriete_creer"), reverse("proprietes:propriete_modifier", args=[propriete.pk]),
-            reverse("proprietes:bailleurs"), reverse("proprietes:bailleur", args=[bailleur.pk]),
+            reverse("contacts:liste"), reverse("proprietes:bailleur", args=[bailleur.pk]),
             reverse("proprietes:bailleur_creer"), reverse("proprietes:bailleur_modifier", args=[bailleur.pk]),
             reverse("proprietes:importer"), reverse("proprietes:modele"), reverse("accueil"),
         ]:

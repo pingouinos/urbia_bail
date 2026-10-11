@@ -60,6 +60,7 @@ Les documents sont produits à partir des modèles Word de l'agence (`documents/
 
 - **Propriété** : application `proprietes`, modèles `Propriete` et `Bailleur`.
 - **Contrat** : terme générique, avec deux sous-types. Le bail d'habitation est le modèle `Bail` de l'application `contrats` ; le mandat de gestion est le modèle `Mandat` de l'application `mandats`. Tous deux héritent de la base abstraite `contrats.base.Contrat`, qui porte la date de signature et l'interface commune (`TYPE`, `parties`, `debut`, `echeance`, `etat`). Chacun garde sa table.
+- **Contact** : terme générique pour les personnes. La rubrique « Contacts » (application `contacts`, sans table) réunit les bailleurs, les locataires, les candidats et les anciens locataires, chacun restant dans sa table. Une personne n'y figure qu'une fois : deux enregistrements de même nom et prénom (sans tenir compte des majuscules ni des accents) sont regroupés, sauf s'ils portent deux dates de naissance différentes. Ses catégories se cumulent et ses liens (propriétés, baux, candidatures) se listent sous son nom ; on filtre par catégorie ou par propriété et on trie par nombre de propriétés. Les candidatures se suivent depuis la fiche de la propriété à louer.
 - **Situation** : la situation professionnelle d'un candidat (CDI, étudiant, retraité…), pour ne pas la confondre avec un contrat.
 
 La rubrique « Contrats » et l'onglet « Contrats » d'une propriété listent baux et mandats ensemble ; le registre des mandats (loi Hoguet) garde sa page et son export.
