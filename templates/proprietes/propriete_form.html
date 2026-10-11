@@ -16,7 +16,7 @@
   {% if forloop.first and nouveau_bailleur %}
   <fieldset id="nouveau-bailleur">
     <legend>Nouveau bailleur</legend>
-    <p class="discret pleine-largeur">À remplir si le bailleur n'est pas dans la liste ci-dessus. Sa fiche (conjoint, SIREN, référence ICS) se complète ensuite depuis « Bailleurs ».</p>
+    <p class="discret pleine-largeur">À remplir si le bailleur n'est pas dans la liste ci-dessus. Pour une société, indiquez sa raison sociale et la personne qui la représente. Le reste (conjoint, SIREN, référence ICS) se complète ensuite sur sa fiche.</p>
     {% for champ in nouveau_bailleur %}{% include "proprietes/_champ.html" %}{% endfor %}
   </fieldset>
   {% endif %}

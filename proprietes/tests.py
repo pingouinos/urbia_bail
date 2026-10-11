@@ -339,6 +339,58 @@ class VuesTests(TestCase):
         self.assertIsNone(Piece(type="reglement", date_document=dt.date(2000, 1, 1)).expire_le)
         self.assertIsNone(Piece(type="dpe").expire_le)
 
+    def test_societe_et_son_representant(self):
+        """Pour une SCI, la raison sociale et la personne qui la représente
+        sont deux contacts distincts ; la désignation des actes les réunit."""
+        from contacts.models import Contact
+
+        donnees = {
+            "type": "sci_familiale", "nom": "SCI ESGT", "civilite": "Mme", "prenom": "Ignoré",
+            "representant_civilite": "Mme", "representant_nom": "Garcia", "representant_prenom": "Elodie",
+            "representant_qualite": "gérante", "siren": "732 829 320", "telephone": "0612345678",
+        }
+        self.assertContains(self.client.get(reverse("proprietes:bailleur_creer")), "js/bailleur.js")
+        self.client.post(reverse("proprietes:bailleur_creer"), donnees)
+        bailleur = Bailleur.objects.get()
+        self.assertEqual((bailleur.prenom, bailleur.civilite, bailleur.telephone), ("", "", "06 12 34 56 78"))
+        self.assertEqual(bailleur.designation, "SCI ESGT, représentée par Madame GARCIA Elodie, gérante")
+        self.assertEqual(str(bailleur), "SCI ESGT")
+        societe, personne = bailleur.contact, bailleur.representant
+        self.assertEqual((societe.nature, societe.nom, societe.prenom), ("entreprise", "SCI ESGT", ""))
+        self.assertEqual((personne.nature, personne.nom, personne.prenom, personne.civilite), ("personne", "Garcia", "Elodie", "Mme"))
+        self.assertEqual(Contact.objects.count(), 2)
+        self.assertEqual(dict(personne.etiquettes), {"representant": "Représentant"})
+        self.assertContains(self.client.get(personne.get_absolute_url()), "SCI ESGT")
+        self.assertContains(self.client.get(societe.get_absolute_url()), "GARCIA Elodie")
+        self.assertContains(self.client.get(reverse("contacts:liste"), {"categorie": "representant"}), "GARCIA Elodie")
+        # Changer de représentant relie la société à une autre personne.
+        self.client.post(reverse("proprietes:bailleur_modifier", args=[bailleur.pk]), {**donnees, "representant_nom": "Faure", "representant_prenom": "Paul"})
+        bailleur.refresh_from_db()
+        self.assertEqual(bailleur.representant.nom, "Faure")
+        # Une personne physique n'a pas de représentant.
+        self.client.post(reverse("proprietes:bailleur_modifier", args=[bailleur.pk]), {**donnees, "type": "physique", "nom": "Garcia", "prenom": "Elodie"})
+        bailleur.refresh_from_db()
+        self.assertEqual((bailleur.representant, bailleur.representant_nom, bailleur.siren, bailleur.prenom), (None, "", "", "Elodie"))
+
+    def test_controles_de_saisie(self):
+        """Téléphone, e-mail, code postal et SIREN sont contrôlés à la saisie."""
+        from core.champs import normaliser_telephone
+
+        for saisi, attendu in [("0612345678", "06 12 34 56 78"), ("06.12.34.56.78", "06 12 34 56 78"),
+                               ("+33 6 12 34 56 78", "06 12 34 56 78"), ("0032 470 12 34 56", "+32470123456"), ("", "")]:
+            self.assertEqual(normaliser_telephone(saisi), attendu)
+        reponse = self.client.post(reverse("proprietes:bailleur_creer"), {
+            "type": "morale", "nom": "Bernard SA", "siren": "123 456 789", "telephone": "06 12 34", "email": "contact@",
+        })
+        erreurs = reponse.context["form"].errors
+        self.assertEqual(set(erreurs), {"siren", "telephone", "email"})
+        self.assertFalse(Bailleur.objects.exists())
+        bailleur = Bailleur.objects.create(nom="Durand")
+        reponse = self.client.post(reverse("proprietes:propriete_creer"), {
+            "bailleur": bailleur.pk, "usage": "habitation", "adresse": "1 rue", "code_postal": "3100", "ville": "Toulouse",
+        })
+        self.assertContains(reponse, "Le code postal compte cinq chiffres.")
+
     def test_depenses_energie_incoherentes(self):
         bailleur = Bailleur.objects.create(nom="Durand")
         reponse = self.client.post(reverse("proprietes:propriete_creer"), {

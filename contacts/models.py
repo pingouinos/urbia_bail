@@ -19,6 +19,8 @@ from django.db import models
 from django.urls import reverse
 from simple_history.models import HistoricalRecords
 
+from core.champs import TelephoneField
+
 from proprietes.models import Horodatage
 
 EN_COURS = ("a_etudier", "retenue")  # statuts d'une candidature qui n'est ni refusée ni abandonnée
@@ -61,7 +63,7 @@ class Contact(Horodatage):
     # Étiquettes affichées, dans cet ordre.
     ETIQUETTES = {
         "bailleur": "Bailleur", "locataire": "Locataire", "candidat": "Candidat",
-        "ancien": "Ancien locataire", "garant": "Garant",
+        "ancien": "Ancien locataire", "garant": "Garant", "representant": "Représentant",
     }
 
     nature = models.CharField(max_length=10, choices=Nature.choices, default=Nature.PERSONNE)
@@ -71,7 +73,7 @@ class Contact(Horodatage):
     date_naissance = models.DateField("date de naissance", null=True, blank=True)
     lieu_naissance = models.CharField("lieu de naissance", max_length=100, blank=True)
     email = models.EmailField("e-mail", blank=True)
-    telephone = models.CharField("téléphone", max_length=30, blank=True)
+    telephone = TelephoneField("téléphone", blank=True)
     adresse = models.CharField(max_length=255, blank=True)
     code_postal = models.CharField("code postal", max_length=10, blank=True)
     ville = models.CharField(max_length=100, blank=True)
@@ -157,7 +159,7 @@ class Contact(Horodatage):
         """Efface les contacts automatiques auxquels plus rien ne se rattache."""
         return cls.objects.filter(
             automatique=True, bailleurs__isnull=True, locataires__isnull=True, candidats__isnull=True,
-            garants__isnull=True,
+            garants__isnull=True, societes__isnull=True,
         ).delete()
 
     # --- Catégories et liens ----------------------------------------------------
@@ -169,6 +171,8 @@ class Contact(Horodatage):
         codes = set()
         if self.bailleurs.all():
             codes.add("bailleur")
+        if self.societes.all():
+            codes.add("representant")
         baux = [locataire.bail for locataire in self.locataires.all()]
         if any(bail.en_cours for bail in baux):
             codes.add("locataire")
@@ -190,7 +194,9 @@ class Contact(Horodatage):
 
     @property
     def proprietes(self):
-        return [propriete for bailleur in self.bailleurs.all() for propriete in bailleur.proprietes.all()]
+        """Propriétés de la personne, et celles des sociétés qu'elle représente."""
+        bailleurs = {b.pk: b for b in [*self.bailleurs.all(), *self.societes.all()]}
+        return [propriete for bailleur in bailleurs.values() for propriete in bailleur.proprietes.all()]
 
     @property
     def baux(self):
@@ -207,7 +213,11 @@ class Contact(Horodatage):
 
     @property
     def liens(self):
-        liens = [Lien("propriete", str(p), p.get_absolute_url(), p.pk) for p in self.proprietes]
+        liens = [
+            Lien("societe", f"Représente {societe.nom}", societe.get_absolute_url(), None, societe.representant_qualite)
+            for societe in self.societes.all()
+        ]
+        liens += [Lien("propriete", str(p), p.get_absolute_url(), p.pk) for p in self.proprietes]
         liens += [
             Lien("bail", f"Bail · {bail.propriete}", bail.get_absolute_url(), bail.propriete_id,
                  "" if bail.en_cours else "terminé")
@@ -237,6 +247,6 @@ class Contact(Horodatage):
     def avec_liens(cls):
         """Contacts avec tout ce qu'il faut pour afficher catégories et liens."""
         return cls.objects.prefetch_related(
-            "bailleurs__proprietes", "locataires__bail__propriete", "candidats__candidature__propriete",
+            "bailleurs__proprietes", "bailleurs__representant", "societes__proprietes", "locataires__bail__propriete", "candidats__candidature__propriete",
             "garants__candidat__candidature__bail",
         )

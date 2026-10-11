@@ -5,6 +5,7 @@
 <h1>{% if bailleur %}Modifier {{ bailleur }}{% else %}Nouveau bailleur{% endif %}</h1>
 <form method="post" class="formulaire">
   {% csrf_token %}
+  {{ form.non_field_errors }}
   <fieldset>
     {% for champ in form %}{% include "proprietes/_champ.html" %}{% endfor %}
   </fieldset>

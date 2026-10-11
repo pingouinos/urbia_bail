@@ -12,6 +12,7 @@
 <section class="carte">
   <dl>
     <dt>Désignation</dt><dd>{{ bailleur.designation }}</dd>
+    {% if bailleur.societe %}<dt>Représentant</dt><dd>{% if bailleur.representant %}<a href="{{ bailleur.representant.get_absolute_url }}">{{ bailleur.representant }}</a>{% if bailleur.representant_qualite %}, {{ bailleur.representant_qualite }}{% endif %}{% else %}<span class="alerte">à renseigner</span> : il signe le mandat et le bail au nom de la société.{% endif %}</dd>{% endif %}
     <dt>Type</dt><dd>{{ bailleur.get_type_display }} (bail nu de {{ bailleur.duree_bail_nu_ans }} ans)</dd>
     <dt>Réf. ICS</dt><dd>{{ bailleur.ref_ics|default:"—" }}</dd>
     <dt>Adresse</dt><dd>{% if bailleur.adresse %}{{ bailleur.adresse }}, {{ bailleur.code_postal }} {{ bailleur.ville }}{% else %}—{% endif %}</dd>
