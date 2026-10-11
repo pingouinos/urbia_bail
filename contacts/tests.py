@@ -9,13 +9,13 @@ from contrats.models import Locataire
 from contrats.tests import Donnees
 from proprietes.models import Bailleur, Propriete
 
-from .views import contacts
+from .models import Contact
 
 
 @override_settings(MFA_OBLIGATOIRE=False)
 class ContactsTests(Donnees, TestCase):
-    """Bailleurs, candidats et locataires dans une même liste, sans doublon,
-    avec leurs catégories et leurs liens."""
+    """Une fiche par personne : bailleurs, locataires, candidats et garants
+    s'y rattachent, et ses catégories se déduisent de ces liens."""
 
     def setUp(self):
         self.client.force_login(User.objects.create_user("gestion"))
@@ -35,7 +35,7 @@ class ContactsTests(Donnees, TestCase):
         Candidat.objects.create(candidature=candidature, nom=nom, prenom="Lina", email=f"{nom.lower()}@exemple.fr")
         return candidature
 
-    def test_une_personne_une_ligne(self):
+    def test_une_personne_une_fiche(self):
         lois, muret, taur = self.propriete("3 rue des Lois"), self.propriete("12 avenue de Muret"), self.propriete("5 rue du Taur")
         # Paul Martin : un bail terminé, un bail en cours, écrit différemment.
         self.creer_bail(propriete=lois, locataires=("Martin",), date_effet=dt.date(2020, 1, 1),
@@ -47,42 +47,94 @@ class ContactsTests(Donnees, TestCase):
         Garant.objects.create(candidat=candidature.candidats.get(), nom="Garant", prenom="Paul", adresse="1 rue A")
         self.candidature(lois, "Refuse", statut=Candidature.Statut.NON_RETENUE)
         self.assertEqual(self.noms(), [
-            ("DURAND Anne", ["bailleur", "candidat"]), ("MARTIN Paul", ["locataire"]), ("ROUX Lina", ["candidat"]),
+            ("DURAND Anne", ["bailleur", "candidat"]), ("GARANT Paul", ["garant"]), ("MARTIN Paul", ["locataire"]),
+            ("ROUX Lina", ["candidat"]),
         ])
-        martin = next(c for c in contacts() if c.nom.lower() == "martin")
+        # Le candidat non retenu garde sa fiche jusqu'à la purge, hors du carnet.
+        self.assertTrue(Contact.objects.filter(nom="Refuse").exists())
+        martin = Contact.avec_liens().get(nom__iexact="martin")
         self.assertEqual([(lien.type, lien.propriete_id, lien.precision) for lien in martin.liens],
                          [("bail", muret.pk, ""), ("bail", lois.pk, "terminé")])
-        self.assertEqual(martin.url, en_cours.get_absolute_url())
-        durand = contacts()[0]
-        self.assertEqual((durand.url, durand.email, len(durand.proprietes)), (self.bailleur.get_absolute_url(), "anne@exemple.fr", 3))
-        # Recherche et filtres portent sur les liens.
+        self.assertTrue(martin.automatique)
+        durand = Contact.avec_liens().get(nom__iexact="durand")
+        self.assertEqual((durand.email, len(durand.proprietes), durand.automatique), ("anne@exemple.fr", 3, False))
+        # Filtres, recherche et tri portent sur les liens.
         self.assertEqual(self.noms(categorie="candidat"), [("DURAND Anne", ["bailleur", "candidat"]), ("ROUX Lina", ["candidat"])])
         self.assertEqual(self.noms(categorie="ancien"), [])
         self.assertEqual(self.noms(q="muret"), [("DURAND Anne", ["bailleur", "candidat"]), ("MARTIN Paul", ["locataire"])])
         self.assertEqual(self.noms(propriete=taur.pk), [("DURAND Anne", ["bailleur", "candidat"])])
-        self.assertEqual([nom for nom, _ in self.noms(propriete=lois.pk)], ["DURAND Anne", "MARTIN Paul", "ROUX Lina"])
-        page = self.client.get(reverse("contacts:liste"))
-        self.assertContains(page, "3 rue des Lois")
-        self.assertNotContains(page, "GARANT")
-        self.assertNotContains(page, "REFUSE")
+        self.assertEqual(self.noms(tri="proprietes")[0][0], "DURAND Anne")
+        # La fiche réunit tout ce qui concerne la personne.
+        page = self.client.get(martin.get_absolute_url())
+        self.assertContains(page, "<h2>Baux (2)</h2>")
+        self.assertContains(page, en_cours.get_absolute_url())
+        page = self.client.get(durand.get_absolute_url())
+        self.assertContains(page, "<h2>Propriétés (3)</h2>")
+        self.assertContains(page, "<h2>Candidatures (1)</h2>")
+        self.assertContains(page, self.bailleur.get_absolute_url())
 
     def test_homonymes_nes_a_des_dates_differentes(self):
-        bail = self.creer_bail(propriete=self.propriete("3 rue des Lois"), locataires=("Martin",))
-        Locataire.objects.filter(bail=bail).update(date_naissance=dt.date(1990, 1, 1))
-        autre = self.creer_bail(propriete=self.propriete("5 rue du Taur"), locataires=("Martin",))
-        Locataire.objects.filter(bail=autre).update(date_naissance=dt.date(1975, 6, 30))
-        self.assertEqual([nom for nom, _ in self.noms(categorie="locataire")], ["MARTIN Paul", "MARTIN Paul"])
+        bail = self.creer_bail(propriete=self.propriete("3 rue des Lois"), locataires=())
+        Locataire.objects.create(bail=bail, nom="Martin", prenom="Paul", date_naissance=dt.date(1990, 1, 1))
+        Locataire.objects.create(bail=bail, nom="Martin", prenom="Paul", date_naissance=dt.date(1975, 6, 30))
+        Locataire.objects.create(bail=bail, nom="MARTIN", prenom="paul", date_naissance=dt.date(1990, 1, 1))
+        self.assertEqual(Contact.objects.filter(nom__iexact="martin").count(), 2)
 
-    def test_bailleur_et_ses_proprietes(self):
-        """Un propriétaire de plusieurs biens : une ligne, toutes ses propriétés."""
-        for numero in range(1, 6):
-            self.propriete(f"{numero} rue des Lois")
-        Bailleur.objects.create(nom="Zola", prenom="Emile")
-        page = self.client.get(reverse("contacts:liste"), {"categorie": "bailleur", "tri": "proprietes"})
-        self.assertEqual([(c.designation, len(c.proprietes)) for c in page.context["page"]], [("DURAND Anne", 5), ("ZOLA Emile", 0)])
-        self.assertContains(page, "<summary>5 propriétés</summary>")
-        self.assertContains(page, "4 rue des Lois")
-        self.assertContains(page, "Aucune propriété")
+    def test_purge_des_candidats_non_retenus(self):
+        """Le contact d'un candidat s'efface avec sa candidature, sauf s'il
+        est aussi bailleur ou locataire."""
+        lois = self.propriete("3 rue des Lois")
+        refusee = self.candidature(lois, "Roux", statut=Candidature.Statut.NON_RETENUE)
+        Candidat.objects.create(candidature=refusee, nom="Durand", prenom="Anne")
+        Garant.objects.create(candidat=refusee.candidats.first(), nom="Garant", prenom="Paul", adresse="1 rue A")
+        self.assertEqual(Contact.objects.count(), 3)
+        self.client.post(reverse("candidatures:effacer", args=[refusee.pk]))
+        self.assertEqual([c.designation for c in Contact.objects.all()], ["DURAND Anne"])
+
+    def test_creation_par_type(self):
+        self.assertContains(self.client.get(reverse("contacts:liste")),
+                            f'<a class="bouton-petit bouton-corail" href="{reverse("contacts:nouveau")}">+ Nouveau contact</a>')
+        page = self.client.get(reverse("contacts:nouveau"))
+        for libelle in ("Propriétaire (bailleur)", "Locataire", "Garant", "Personne", "Entreprise"):
+            self.assertContains(page, libelle)
+        # Propriétaire : la fiche de bailleur est créée avec le contact.
+        reponse = self.client.post(reverse("contacts:nouveau"), {
+            "categorie": "bailleur", "nature": "entreprise", "nom": "Bernard SA", "email": "contact@bernard.fr"})
+        societe = Contact.objects.get(nom="Bernard SA")
+        self.assertRedirects(reponse, societe.get_absolute_url())
+        bailleur = societe.bailleurs.get()
+        self.assertEqual((bailleur.type, bailleur.email, societe.designation), ("morale", "contact@bernard.fr", "Bernard SA"))
+        self.assertEqual([code for code, _ in societe.etiquettes], ["bailleur"])
+        # Locataire ou garant : une fiche seule, reliée ensuite par le nom.
+        self.client.post(reverse("contacts:nouveau"), {
+            "categorie": "locataire", "nature": "personne", "nom": "Petit", "prenom": "Hugo", "telephone": "06 00 00 00 00"})
+        hugo = Contact.objects.get(nom="Petit")
+        self.assertEqual(([code for code, _ in hugo.etiquettes], hugo.automatique, hugo.liens), (["locataire"], False, []))
+        bail = self.creer_bail(propriete=self.propriete("3 rue des Lois"), locataires=())
+        locataire = Locataire.objects.create(bail=bail, nom="PETIT", prenom="hugo", email="hugo@exemple.fr")
+        hugo = Contact.avec_liens().get(pk=hugo.pk)
+        self.assertEqual((locataire.contact, hugo.email, len(hugo.liens)), (hugo, "hugo@exemple.fr", 1))
+        # Pas de doublon, pas de personne sans prénom.
+        reponse = self.client.post(reverse("contacts:nouveau"), {
+            "categorie": "garant", "nature": "personne", "nom": "petit", "prenom": "Hugo"})
+        self.assertContains(reponse, "Ce contact existe déjà")
+        reponse = self.client.post(reverse("contacts:nouveau"), {"categorie": "garant", "nature": "personne", "nom": "Seul"})
+        self.assertIn("prenom", reponse.context["form"].errors)
+        self.assertEqual(Contact.objects.count(), 3)
+
+    def test_bailleur_et_contact_restent_alignes(self):
+        contact = self.bailleur.contact
+        self.assertEqual((contact.designation, contact.email), ("DURAND Anne", "anne@exemple.fr"))
+        # La fiche du bailleur fait foi…
+        self.bailleur.nom, self.bailleur.telephone = "Durand-Roux", "05 61 00 00 00"
+        self.bailleur.save()
+        contact.refresh_from_db()
+        self.assertEqual((contact.nom, contact.telephone, Contact.objects.count()), ("Durand-Roux", "05 61 00 00 00", 1))
+        # … et une modification du contact revient sur le bailleur.
+        self.client.post(reverse("contacts:modifier", args=[contact.pk]), {
+            "nature": "personne", "civilite": "Mme", "nom": "Durand-Roux", "prenom": "Anne", "email": "nouveau@exemple.fr"})
+        self.bailleur.refresh_from_db()
+        self.assertEqual((self.bailleur.email, self.bailleur.contact, Contact.objects.count()), ("nouveau@exemple.fr", contact, 1))
 
     def test_menu_et_anciennes_pages(self):
         page = self.client.get(reverse("contacts:liste"))

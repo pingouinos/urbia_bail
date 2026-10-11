@@ -235,7 +235,11 @@ class Candidature(Horodatage):
 
     @classmethod
     def purger(cls, maintenant=None):
+        from contacts.models import Contact
+
         _, detail = cls.a_effacer(maintenant).delete()
+        # Les personnes qui n'apparaissaient que par ces candidatures s'effacent avec elles.
+        Contact.effacer_orphelins()
         return detail.get(cls._meta.label, 0)
 
     def texte_refus(self, signataire=""):
@@ -282,9 +286,21 @@ class Candidat(models.Model):
         "revenus mensuels nets (€)", max_digits=9, decimal_places=2, null=True, blank=True
     )
 
+    # La personne, quelle que soit la ligne par laquelle elle apparaît.
+    contact = models.ForeignKey(
+        "contacts.Contact", on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+        related_name="candidats",
+    )
+
     class Meta:
         ordering = ["pk"]
         verbose_name = "candidat"
+
+    def save(self, *args, **kwargs):
+        from contacts.models import Contact
+
+        self.contact = Contact.rattacher(self)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.prenom} {self.nom.upper()}"
@@ -302,9 +318,21 @@ class Garant(models.Model):
     email = models.EmailField("e-mail", blank=True)
     telephone = models.CharField("téléphone", max_length=30, blank=True)
 
+    # La personne, quelle que soit la ligne par laquelle elle apparaît.
+    contact = models.ForeignKey(
+        "contacts.Contact", on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+        related_name="garants",
+    )
+
     class Meta:
         ordering = ["pk"]
         verbose_name = "garant"
+
+    def save(self, *args, **kwargs):
+        from contacts.models import Contact
+
+        self.contact = Contact.rattacher(self)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.prenom} {self.nom.upper()}"

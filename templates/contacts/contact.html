@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block titre %}{{ contact.designation }} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'contacts:liste' %}">← Contacts</a></p>
+
+<section class="carte fiche-entete fiche-contact">
+  <div class="titre-actions">
+    <h1>{{ contact.designation }}</h1>
+    <div class="actions"><a class="bouton-petit" href="{% url 'contacts:modifier' contact.pk %}">Modifier</a></div>
+  </div>
+  <p class="pastilles">
+    {% for code, libelle in contact.etiquettes %}<span class="pastille pastille-contact-{{ code }}">{{ libelle }}</span>{% endfor %}
+    <span class="pastille">{{ contact.get_nature_display }}</span>
+  </p>
+  <dl class="resume">
+    <div><dt>E-mail</dt><dd>{{ contact.email|default:"—" }}</dd></div>
+    <div><dt>Téléphone</dt><dd>{{ contact.telephone|default:"—" }}</dd></div>
+    <div><dt>Adresse</dt><dd>{% if contact.adresse or contact.ville %}{{ contact.adresse }}{% if contact.adresse and contact.ville %}, {% endif %}{{ contact.code_postal }} {{ contact.ville }}{% else %}—{% endif %}</dd></div>
+    {% if not contact.entreprise %}<div><dt>Naissance</dt><dd>{% if contact.date_naissance %}{{ contact.date_naissance|date:"d/m/Y" }}{% if contact.lieu_naissance %} à {{ contact.lieu_naissance }}{% endif %}{% else %}—{% endif %}</dd></div>{% endif %}
+  </dl>
+  {% if contact.notes %}<p class="discret">{{ contact.notes|linebreaksbr }}</p>{% endif %}
+</section>
+
+{% if contact.bailleurs.all %}
+<section class="carte">
+  <div class="titre-actions">
+    <h2>Propriétés ({{ contact.proprietes|length }})</h2>
+    <div class="actions">{% for bailleur in contact.bailleurs.all %}<a href="{{ bailleur.get_absolute_url }}">Fiche bailleur{% if contact.bailleurs.all|length > 1 %} {{ forloop.counter }}{% endif %}</a>{% endfor %}</div>
+  </div>
+  {% if contact.proprietes %}
+  <table>
+    <thead><tr><th>Adresse</th><th>Location</th><th>Usage</th></tr></thead>
+    <tbody>
+    {% for propriete in contact.proprietes %}
+      <tr>
+        <td><a href="{{ propriete.get_absolute_url }}">{{ propriete }}</a></td>
+        <td>{% with situation=propriete.situation %}<span class="pastille pastille-{{ situation.code }}">{{ situation.libelle }}</span>{% endwith %}</td>
+        <td>{{ propriete.get_usage_display }}{% if propriete.meuble %} meublé{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="discret">Aucune propriété pour l'instant. <a href="{% url 'proprietes:propriete_creer' %}?bailleur={{ contact.bailleurs.all.0.pk }}">Ajouter une propriété</a></p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if contact.baux %}
+<section class="carte">
+  <h2>Baux ({{ contact.baux|length }})</h2>
+  <table>
+    <thead><tr><th>Propriété</th><th>Début</th><th>Date de fin</th><th>État</th></tr></thead>
+    <tbody>
+    {% for bail in contact.baux %}
+      <tr{% if not bail.en_cours %} class="inactif"{% endif %}>
+        <td><a href="{{ bail.get_absolute_url }}">{{ bail.propriete }}</a></td>
+        <td>{{ bail.debut|date:"d/m/Y" }}</td>
+        <td>{% with echeance=bail.echeance %}{{ echeance.0|date:"d/m/Y"|default:"—" }}{% if echeance.1 %}<br><span class="discret">{{ echeance.1 }}</span>{% endif %}{% endwith %}</td>
+        <td>{% with etat=bail.etat %}<span class="pastille pastille-{{ etat.0 }}">{{ etat.1 }}</span>{% endwith %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if contact.candidatures %}
+<section class="carte">
+  <h2>Candidatures ({{ contact.candidatures|length }})</h2>
+  <table>
+    <thead><tr><th>Propriété</th><th>Reçue le</th><th>Statut</th></tr></thead>
+    <tbody>
+    {% for candidature in contact.candidatures %}
+      <tr>
+        <td><a href="{{ candidature.get_absolute_url }}">{{ candidature.propriete }}</a></td>
+        <td>{{ candidature.cree_le|date:"d/m/Y" }}</td>
+        <td>{% if candidature.bail_id %}bail rédigé{% else %}{{ candidature.get_statut_display }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if contact.garanties %}
+<section class="carte">
+  <h2>Garanties ({{ contact.garanties|length }})</h2>
+  <ul>{% for garant in contact.garanties %}<li>Garant de <a href="{{ garant.candidat.candidature.get_absolute_url }}">{{ garant.candidat }}</a> · {{ garant.candidat.candidature.propriete }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if not contact.liens and not contact.bailleurs.all %}
+<section class="carte">
+  <p class="discret">Ce contact n'est encore relié à aucune propriété, aucun bail ni aucune candidature. Il le sera de lui-même dès qu'une candidature ou un bail portera le même nom.</p>
+  <div class="actions-location"><a class="bouton secondaire" href="{% url 'candidatures:creer' %}">Enregistrer une candidature</a></div>
+</section>
+{% endif %}
+
+<section class="carte">
+  <h2>Historique</h2>
+  <ul class="historique">
+  {% for version in historique %}
+    <li>{{ version.history_date|date:"d/m/Y H:i" }} · {{ version.get_history_type_display }} par {{ version.history_user|default:"import ou système" }}</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endblock %}

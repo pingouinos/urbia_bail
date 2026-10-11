@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}{{ bailleur }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'contacts:liste' %}?categorie=bailleur">← Contacts</a></p>
+<p><a href="{% if bailleur.contact %}{{ bailleur.contact.get_absolute_url }}{% else %}{% url 'contacts:liste' %}?categorie=bailleur{% endif %}">← {% if bailleur.contact %}Fiche du contact{% else %}Contacts{% endif %}</a></p>
 <div class="titre-actions">
   <h1>{{ bailleur }}</h1>
   <div class="actions">

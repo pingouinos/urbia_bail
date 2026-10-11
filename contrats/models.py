@@ -479,11 +479,23 @@ class Locataire(models.Model):
         blank=True, help_text="Nom et adresse de chaque caution de ce locataire, une par ligne."
     )
 
+    # La personne, quelle que soit la ligne par laquelle elle apparaît.
+    contact = models.ForeignKey(
+        "contacts.Contact", on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+        related_name="locataires",
+    )
+
     history = HistoricalRecords()
 
     class Meta:
         ordering = ["pk"]
         verbose_name = "locataire"
+
+    def save(self, *args, **kwargs):
+        from contacts.models import Contact
+
+        self.contact = Contact.rattacher(self)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.prenom} {self.nom.upper()}"

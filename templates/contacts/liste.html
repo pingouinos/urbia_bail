@@ -3,7 +3,7 @@
 {% block contenu %}
 <div class="titre-actions">
   <h1>Contacts</h1>
-  <div class="actions"><a class="bouton-petit" href="{% url 'proprietes:bailleur_creer' %}">Nouveau bailleur</a></div>
+  <div class="actions"><a class="bouton-petit bouton-corail" href="{% url 'contacts:nouveau' %}">+ Nouveau contact</a></div>
 </div>
 {% if propriete %}<p>Personnes liées à <a href="{{ propriete.get_absolute_url }}">{{ propriete }}</a> · <a href="{% url 'contacts:liste' %}">tous les contacts</a></p>{% endif %}
 <form class="filtres" method="get">
@@ -20,29 +20,29 @@
   <button type="submit">Filtrer</button>
 </form>
 <p class="discret">{{ page.paginator.count }} contact(s). Une personne n'apparaît qu'une fois, avec toutes ses catégories et tous ses liens.</p>
-<table>
-  <thead><tr><th>Nom</th><th>Catégorie</th><th>Coordonnées</th><th>Lié à</th></tr></thead>
-  <tbody>
+{% if page %}
+<ul class="contacts">
   {% for contact in page %}
-    <tr>
-      <td><a href="{{ contact.url }}"><strong>{{ contact.designation }}</strong></a></td>
-      <td>{% for code, libelle in contact.etiquettes %}<span class="pastille pastille-contact-{{ code }}">{{ libelle }}</span> {% endfor %}</td>
-      <td>{{ contact.email|default:"—" }}{% if contact.telephone %}<br><span class="discret">{{ contact.telephone }}</span>{% endif %}</td>
-      <td>
-        {% if contact.liens|length > 3 %}
-        <details class="liens-contact">
-          <summary>{% with nb=contact.proprietes|length %}{% if nb == contact.liens|length %}{{ nb }} propriétés{% else %}{{ contact.liens|length }} liens{% endif %}{% endwith %}</summary>
-          <ul>{% for lien in contact.liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} <span class="discret">· {{ lien.precision }}</span>{% endif %}</li>{% endfor %}</ul>
-        </details>
-        {% elif contact.liens %}
-        <ul class="liens-contact">{% for lien in contact.liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} <span class="discret">· {{ lien.precision }}</span>{% endif %}</li>{% endfor %}</ul>
-        {% else %}<span class="discret">Aucune propriété</span>{% endif %}
-      </td>
-    </tr>
-  {% empty %}
-    <tr><td colspan="4" class="discret">Aucun contact. Un bailleur se crée ici ou avec sa propriété ; les candidats et locataires arrivent avec les candidatures et les baux.</td></tr>
+  <li>
+    <a class="nom" href="{{ contact.get_absolute_url }}">{{ contact.designation }}</a>
+    <div class="etiquettes">
+      {% for code, libelle in contact.etiquettes %}<span class="pastille pastille-contact-{{ code }}">{{ libelle }}</span>{% endfor %}
+      <span class="pastille">{{ contact.get_nature_display }}</span>
+    </div>
+    <div class="coordonnees">{% if contact.email %}<span>{{ contact.email }}</span>{% endif %}{% if contact.telephone %}<span>{{ contact.telephone }}</span>{% endif %}{% if not contact.email and not contact.telephone %}<span class="discret">Coordonnées non renseignées</span>{% endif %}</div>
+    {% if contact.liens|length > 3 %}
+    <details class="liens-contact">
+      <summary>{% with nb=contact.proprietes|length %}{% if nb and nb == contact.liens|length %}{{ nb }} propriétés{% else %}{{ contact.liens|length }} liens{% endif %}{% endwith %}</summary>
+      <ul>{% for lien in contact.liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} · {{ lien.precision }}{% endif %}</li>{% endfor %}</ul>
+    </details>
+    {% elif contact.liens %}
+    <ul class="liens-contact">{% for lien in contact.liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} · {{ lien.precision }}{% endif %}</li>{% endfor %}</ul>
+    {% else %}<div class="liens-contact">Aucun lien pour l'instant</div>{% endif %}
+  </li>
   {% endfor %}
-  </tbody>
-</table>
+</ul>
+{% else %}
+<p class="carte discret">Aucun contact. Créez-en un avec « Nouveau contact » ; ceux des candidatures et des baux s'ajoutent d'eux-mêmes.</p>
+{% endif %}
 {% include "proprietes/_pagination.html" %}
 {% endblock %}
