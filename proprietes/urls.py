@@ -9,6 +9,7 @@ urlpatterns = [
     path("nouveau/", views.propriete_editer, name="propriete_creer"),
     path("<int:pk>/", views.propriete, name="propriete"),
     path("<int:pk>/modifier/", views.propriete_editer, name="propriete_modifier"),
+    path("<int:pk>/supprimer/", views.propriete_supprimer, name="propriete_supprimer"),
     path("<int:pk>/mise-en-location/", views.mettre_en_location, name="mettre_en_location"),
     path("<int:pk>/documents/", views.piece_deposer, name="piece_deposer"),
     path("<int:pk>/documents/<int:piece_pk>/", views.piece, name="piece"),

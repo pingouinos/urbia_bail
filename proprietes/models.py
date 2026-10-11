@@ -6,6 +6,8 @@ pour la future migration du logiciel de gestion.
 """
 
 import datetime as dt
+import re
+import unicodedata
 from dataclasses import dataclass
 from types import SimpleNamespace
 from decimal import Decimal
@@ -27,6 +29,23 @@ class Situation:
     libelle: str
     bail: object = None  # bail du locataire en place
     a_venir: object = None  # bail rédigé dont la prise d'effet est à venir
+
+
+# Abréviations courantes des voies, pour reconnaître une même adresse.
+VOIES = {
+    "av": "avenue", "ave": "avenue", "bd": "boulevard", "bld": "boulevard", "boul": "boulevard", "pl": "place",
+    "all": "allee", "ch": "chemin", "che": "chemin", "rte": "route", "imp": "impasse", "sq": "square",
+    "fg": "faubourg", "st": "saint", "ste": "sainte",
+}
+
+
+def cle_adresse(texte):
+    """Adresse ramenée à l'essentiel pour la comparer : sans accents,
+    majuscules ni ponctuation, abréviations de voies développées.
+    « 302, Av. de Muret » et « 302 avenue de muret » donnent la même clé."""
+    sans_accents = unicodedata.normalize("NFKD", texte or "").encode("ascii", "ignore").decode().lower()
+    mots = re.sub(r"[^a-z0-9]+", " ", sans_accents).split()
+    return " ".join(VOIES.get(mot, mot) for mot in mots)
 
 
 class Horodatage(models.Model):
@@ -175,6 +194,12 @@ class Immeuble(Horodatage):
 
     def get_absolute_url(self):
         return reverse("proprietes:immeuble", args=[self.pk])
+
+    @classmethod
+    def a_l_adresse(cls, adresse, code_postal):
+        """Immeubles déjà enregistrés à cette adresse."""
+        cle = cle_adresse(adresse)
+        return [i for i in cls.objects.filter(code_postal=(code_postal or "").strip()) if cle_adresse(i.adresse) == cle]
 
     def aligner_les_lots(self):
         """Reporte l'adresse de l'immeuble sur ses lots, après une correction."""
@@ -338,6 +363,18 @@ class Propriete(Horodatage):
 
     def get_absolute_url(self):
         return reverse("proprietes:propriete", args=[self.pk])
+
+    @classmethod
+    def a_l_adresse(cls, adresse, code_postal, sauf=None):
+        """Propriétés déjà enregistrées à cette adresse, quel que soit le lot."""
+        cle = cle_adresse(adresse)
+        memes = cls.objects.filter(code_postal=(code_postal or "").strip()).select_related("bailleur", "immeuble")
+        return [p for p in memes.exclude(pk=sauf) if cle_adresse(p.adresse) == cle]
+
+    @property
+    def cle_lot(self):
+        """Ce qui distingue un lot d'un autre à la même adresse."""
+        return cle_adresse(self.complement), cle_adresse(self.numero_appartement)
 
     @property
     def mandat_en_cours(self):

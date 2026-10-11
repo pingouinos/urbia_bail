@@ -391,6 +391,67 @@ class VuesTests(TestCase):
         })
         self.assertContains(reponse, "Le code postal compte cinq chiffres.")
 
+    def test_adresse_deja_enregistree(self):
+        """Saisir une adresse déjà présente montre ce qui s'y trouve et
+        demande confirmation ; un autre lot du même immeuble passe sans question."""
+        bailleur = Bailleur.objects.create(nom="Durand")
+        existante = Propriete.objects.create(bailleur=bailleur, adresse="302 avenue de Muret", code_postal="31300", ville="Toulouse")
+        donnees = {"bailleur": bailleur.pk, "usage": "habitation", "actif": "on", "adresse": "302, Av. de MURET",
+                   "code_postal": "31300", "ville": "Toulouse"}
+        reponse = self.client.post(reverse("proprietes:propriete_creer"), donnees)
+        self.assertContains(reponse, "Cette propriété semble déjà enregistrée.")
+        self.assertContains(reponse, existante.get_absolute_url())
+        self.assertEqual(Propriete.objects.count(), 1)
+        # Un autre lot à la même adresse : signalé, puis accepté une fois confirmé.
+        reponse = self.client.post(reverse("proprietes:propriete_creer"), {**donnees, "complement": "Apt 2"})
+        self.assertContains(reponse, "Cette adresse est déjà enregistrée.")
+        self.client.post(reverse("proprietes:propriete_creer"), {**donnees, "complement": "Apt 2", "confirmer_adresse": "on"})
+        self.assertEqual(Propriete.objects.count(), 2)
+        # La même rue dans une autre commune n'est pas un doublon.
+        self.client.post(reverse("proprietes:propriete_creer"), {**donnees, "code_postal": "31600", "ville": "Muret"})
+        self.assertEqual(Propriete.objects.count(), 3)
+        # Modifier une fiche sans toucher à son adresse ne pose pas la question.
+        reponse = self.client.post(reverse("proprietes:propriete_modifier", args=[existante.pk]), {**donnees, "adresse": "302 avenue de Muret", "surface": "40"})
+        self.assertRedirects(reponse, existante.get_absolute_url())
+        # Un immeuble à une adresse déjà connue demande aussi confirmation ; ses lots ne se répètent pas.
+        immeuble = self.immeuble(**{"immeuble-adresse": "302 avenue de Muret", "immeuble-code_postal": "31300"})
+        reponse = self.client.post(reverse("proprietes:immeuble_creer"), immeuble)
+        self.assertContains(reponse, "Créer quand même cet immeuble et ses lots")
+        self.assertFalse(Immeuble.objects.exists())
+        reponse = self.client.post(reverse("proprietes:immeuble_creer"), {
+            **self.immeuble(), "lots-1-numero_appartement": "", "lots-1-complement": "APT 1",
+        })
+        self.assertContains(reponse, "Ce lot figure déjà dans une autre ligne.")
+        self.client.post(reverse("proprietes:immeuble_creer"), self.immeuble())
+        lot = Immeuble.objects.get().lots.first()
+        # Ajouter un lot distinct à cet immeuble passe sans confirmation.
+        self.client.post(reverse("proprietes:propriete_creer") + f"?immeuble={lot.immeuble_id}", {
+            "bailleur": lot.bailleur_id, "immeuble": lot.immeuble_id, "usage": "habitation", "actif": "on",
+            "adresse": lot.adresse, "code_postal": lot.code_postal, "ville": lot.ville, "complement": "Apt 9",
+        })
+        self.assertEqual(Immeuble.objects.get().lots.count(), 3)
+
+    def test_modifier_et_supprimer_depuis_la_liste(self):
+        from mandats.models import Mandat
+
+        bailleur = Bailleur.objects.create(nom="Durand")
+        erreur = Propriete.objects.create(bailleur=bailleur, adresse="1 rue Erreur", code_postal="31000", ville="Toulouse")
+        geree = Propriete.objects.create(
+            bailleur=bailleur, adresse="2 rue Gérée", code_postal="31000", ville="Toulouse", dernier_loyer=600,
+        )
+        Mandat.depuis_propriete(geree).save()
+        page = self.client.get(reverse("proprietes:liste"))
+        self.assertContains(page, reverse("proprietes:propriete_modifier", args=[erreur.pk]))
+        self.assertContains(page, reverse("proprietes:propriete_supprimer", args=[erreur.pk]))
+        # Une propriété sous mandat ne se supprime pas.
+        reponse = self.client.post(reverse("proprietes:propriete_supprimer", args=[geree.pk]), follow=True)
+        self.assertContains(reponse, "Suppression refusée : cette propriété a 1 mandat (le mandat n° 1 est en cours)")
+        self.assertTrue(Propriete.objects.filter(pk=geree.pk).exists())
+        reponse = self.client.post(reverse("proprietes:propriete_supprimer", args=[erreur.pk]), follow=True)
+        self.assertContains(reponse, "Propriété supprimée : 1 rue Erreur")
+        self.assertEqual(list(Propriete.objects.all()), [geree])
+        self.assertEqual(self.client.get(reverse("proprietes:propriete_supprimer", args=[geree.pk])).status_code, 405)
+
     def test_depenses_energie_incoherentes(self):
         bailleur = Bailleur.objects.create(nom="Durand")
         reponse = self.client.post(reverse("proprietes:propriete_creer"), {

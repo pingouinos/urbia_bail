@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Bailleur, Immeuble, Piece, Propriete
+from .models import Bailleur, Immeuble, Piece, Propriete, cle_adresse
 
 
 class RefIcsVideEnNullMixin:
@@ -27,6 +27,23 @@ class SocieteOuPersonneMixin:
                 if champ in self.fields and champ not in self.errors:
                     donnees[champ] = ""
         return donnees
+
+
+class AdresseDejaConnueMixin:
+    """Avant d'enregistrer une adresse déjà présente, on montre ce qui s'y
+    trouve et on demande confirmation : plusieurs lots peuvent légitimement
+    partager une adresse, mais c'est aussi la façon dont naît un doublon."""
+
+    def ajouter_confirmation(self):
+        self.fields["confirmer_adresse"] = forms.BooleanField(
+            required=False, label="Enregistrer quand même : c'est bien une autre propriété",
+        )
+        # Ce qui existe déjà à l'adresse saisie, pour l'afficher avec la question.
+        self.deja_la, self.doublons, self.immeubles_la = [], [], []
+
+    def confirmer(self, donnees):
+        if (self.deja_la or self.immeubles_la) and not donnees.get("confirmer_adresse"):
+            self.add_error("adresse", "Cette adresse est déjà enregistrée : voir en haut de la page.")
 
 
 class BailleurForm(SocieteOuPersonneMixin, RefIcsVideEnNullMixin, forms.ModelForm):
@@ -67,7 +84,7 @@ class MiseEnLocationForm(forms.ModelForm):
         self.fields["dernier_loyer"].required = True
 
 
-class ProprieteForm(RefIcsVideEnNullMixin, forms.ModelForm):
+class ProprieteForm(AdresseDejaConnueMixin, RefIcsVideEnNullMixin, forms.ModelForm):
     class Meta:
         model = Propriete
         exclude = ["cree_le", "modifie_le", "disponible_le"]
@@ -100,6 +117,7 @@ class ProprieteForm(RefIcsVideEnNullMixin, forms.ModelForm):
             # À la création, le bailleur peut être saisi dans la foulée.
             self.fields["bailleur"].required = False
             self.fields["bailleur"].empty_label = "Nouveau bailleur (ci-dessous)"
+        self.ajouter_confirmation()
 
     def sections(self):
         return [(titre, [self[nom] for nom in noms]) for titre, noms in self.SECTIONS]
@@ -109,13 +127,48 @@ class ProprieteForm(RefIcsVideEnNullMixin, forms.ModelForm):
         mini, maxi = donnees.get("depenses_energie_min"), donnees.get("depenses_energie_max")
         if mini is not None and maxi is not None and mini > maxi:
             self.add_error("depenses_energie_max", "Le maximum doit être supérieur au minimum.")
+        self.controler_adresse(donnees)
         return donnees
 
+    def controler_adresse(self, donnees):
+        adresse, code_postal = donnees.get("adresse"), donnees.get("code_postal")
+        if not adresse or not code_postal:
+            return
+        instance = self.instance
+        if instance.pk and (cle_adresse(instance.adresse), instance.code_postal) == (cle_adresse(adresse), code_postal):
+            # Fiche existante dont l'adresse ne change pas : rien à signaler.
+            return
+        memes = Propriete.a_l_adresse(adresse, code_postal, sauf=instance.pk)
+        lot = cle_adresse(donnees.get("complement")), cle_adresse(donnees.get("numero_appartement"))
+        self.doublons = [p for p in memes if p.cle_lot == lot]
+        if donnees.get("immeuble") and not self.doublons:
+            # Nouveau lot d'un immeuble, distinct des autres : c'est attendu.
+            return
+        self.deja_la = memes
+        self.confirmer(donnees)
 
-class ImmeubleForm(forms.ModelForm):
+
+class ImmeubleForm(AdresseDejaConnueMixin, forms.ModelForm):
     class Meta:
         model = Immeuble
         fields = ["nom", "adresse", "code_postal", "ville"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ajouter_confirmation()
+        self.fields["confirmer_adresse"].label = "Créer quand même cet immeuble et ses lots"
+
+    def champs(self):
+        return [self[nom] for nom in self.Meta.fields]
+
+    def clean(self):
+        donnees = super().clean()
+        adresse, code_postal = donnees.get("adresse"), donnees.get("code_postal")
+        if adresse and code_postal and not self.instance.pk:
+            self.immeubles_la = Immeuble.a_l_adresse(adresse, code_postal)
+            self.deja_la = Propriete.a_l_adresse(adresse, code_postal)
+            self.confirmer(donnees)
+        return donnees
 
 
 class LotsCommunsForm(forms.ModelForm):
@@ -159,7 +212,22 @@ class LotForm(forms.ModelForm):
         return donnees
 
 
-LotFormSet = forms.formset_factory(LotForm, extra=3, min_num=1, validate_min=True, max_num=60)
+class LotsFormSet(forms.BaseFormSet):
+    def clean(self):
+        """Deux lignes ne peuvent pas désigner le même lot."""
+        vus = set()
+        for ligne in self.forms:
+            if not ligne.has_changed() or ligne.errors:
+                continue
+            lot = cle_adresse(ligne.cleaned_data.get("complement")), cle_adresse(ligne.cleaned_data.get("numero_appartement"))
+            if lot in vus:
+                ligne.add_error("complement", "Ce lot figure déjà dans une autre ligne.")
+            vus.add(lot)
+
+
+LotFormSet = forms.formset_factory(
+    LotForm, formset=LotsFormSet, extra=3, min_num=1, validate_min=True, max_num=60,
+)
 
 
 class PieceForm(forms.ModelForm):
