@@ -116,3 +116,10 @@ class OrganisationTests(TestCase):
         bailleur = Bailleur.objects.create(nom="DURAND", prenom="Paul")
         propriete = Propriete.objects.create(bailleur=bailleur, adresse="3 rue des Lois", code_postal="31000", ville="Toulouse")
         self.assertEqual(str(Mandat.depuis_propriete(propriete).taux_gestion), "6.50")
+
+    def test_aide_a_la_saisie_des_adresses(self):
+        """Le script qui interroge les services d'adresses n'est servi qu'aux
+        collaborateurs connectés, jamais sur les pages ouvertes au public."""
+        self.assertNotContains(self.client.get(reverse("connexion")), "js/adresse.js")
+        self.connecter(ADMINISTRATEURS)
+        self.assertContains(self.client.get(reverse("agence")), "js/adresse.js")

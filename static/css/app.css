@@ -325,3 +325,9 @@ dd { margin: 0; }
 .ligne-lien:hover { background: var(--melon-clair); }
 .accroche-action { text-align: right; }
 .segments a > span:first-child:has(.pastille) { margin-bottom: 4px; }
+
+/* Propositions d'adresses sous le champ. */
+.avec-suggestions { position: relative; }
+.suggestions { position: absolute; z-index: 20; left: 0; right: 0; margin: 2px 0 0; padding: 4px; list-style: none; background: var(--carte); border: 1px solid var(--bord); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+.suggestions li { padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.suggestions li:hover, .suggestions li.actif { background: var(--melon-clair); }

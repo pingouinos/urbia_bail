@@ -80,5 +80,6 @@
       });
     })();
   </script>
+  {% if user.is_authenticated %}<script src="{% static 'js/adresse.js' %}" defer></script>{% endif %}
 </body>
 </html>
