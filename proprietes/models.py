@@ -61,12 +61,24 @@ class Bailleur(Horodatage):
     email = models.EmailField("e-mail", blank=True)
     telephone = models.CharField("téléphone", max_length=30, blank=True)
     siren = models.CharField("SIREN", max_length=14, blank=True)
+    # La personne, quelle que soit la ligne par laquelle elle apparaît.
+    contact = models.ForeignKey(
+        "contacts.Contact", on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+        related_name="bailleurs",
+    )
 
     history = HistoricalRecords()
 
     class Meta:
         ordering = ["nom", "prenom"]
         verbose_name = "bailleur"
+
+    def save(self, *args, **kwargs):
+        from contacts.models import Contact
+
+        # La fiche du bailleur fait foi pour l'identité et les coordonnées de son contact.
+        self.contact = Contact.rattacher(self, automatique=False, synchroniser=True)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.nom} {self.prenom}".strip()

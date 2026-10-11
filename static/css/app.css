@@ -83,6 +83,9 @@ button.secondaire[type=submit], .bouton.secondaire { background: var(--carte); c
 button.secondaire[type=submit]:hover, .bouton.secondaire:hover { background: var(--melon-clair); }
 button.danger[type=submit] { background: var(--erreur); border-color: var(--erreur); }
 .bouton-principal { padding: 14px 24px; font-size: 1.05rem; }
+/* Action de création mise en avant, dans le corail du logo. */
+.bouton.bouton-corail, .bouton-petit.bouton-corail { background: #e4574e; border-color: #e4574e; color: #fff; }
+.bouton.bouton-corail:hover, .bouton-petit.bouton-corail:hover { background: #cf463d; border-color: #cf463d; }
 .lien { background: none; border: 0; padding: 0; text-decoration: underline; }
 
 /* Blocs */
@@ -107,12 +110,27 @@ button.danger[type=submit] { background: var(--erreur); border-color: var(--erre
 .pastille-type-mandat { background: var(--carte); border-color: var(--acier); }
 .bouton-petit.secondaire { background: var(--carte); color: var(--acier); }
 .bouton-petit.secondaire:hover { background: var(--melon-clair); }
+/* Liste des contacts : une personne par ligne, étiquettes à droite. */
+.contacts { list-style: none; margin: 0; padding: 4px 24px; background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); }
+.contacts > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 16px 0; }
+.contacts > li + li { border-top: 1px solid var(--bord); }
+.contacts .nom { font-weight: 700; color: var(--texte); }
+.contacts .etiquettes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-content: start; grid-row: span 2; }
+.contacts .coordonnees { color: var(--texte); font-size: 0.95rem; }
+.contacts .coordonnees span + span::before { content: "•"; margin: 0 8px; color: var(--bord); }
+.contacts .liens-contact { grid-column: 1 / -1; color: var(--discret); font-size: 0.9rem; }
+.contacts .liens-contact a { color: var(--discret); }
+.contacts .liens-contact summary { font-weight: 500; }
 ul.liens-contact, .liens-contact ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .liens-contact summary { font-weight: 600; }
 .liens-contact[open] summary { margin-bottom: 4px; }
 .pastille-contact-bailleur { background: var(--carte); border-color: var(--acier); }
 .pastille-contact-candidat { background: var(--melon-clair); border-color: var(--melon); }
 .pastille-contact-locataire { background: var(--vert-clair); border-color: var(--vert); }
+.pastille-contact-garant { background: var(--carte); }
+.fiche-entete.fiche-contact { padding-bottom: 20px; }
+button.bouton-corail[type=submit] { background: #e4574e; border-color: #e4574e; }
+button.bouton-corail[type=submit]:hover { background: #cf463d; border-color: #cf463d; }
 .pastille-contact-ancien { background: var(--fond); color: var(--discret); }
 .pastille-a_louer { background: var(--acier); border-color: var(--acier); color: #fff; }
 .pastilles { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
@@ -202,6 +220,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--acier); }
 .etapes-dossier { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
 label.case { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
 .libelle { font-weight: 500; }
+.champ.obligatoire > .libelle { font-weight: 700; }
+.champ.obligatoire > .libelle::after { content: " *"; color: var(--erreur); }
 .choix-radio { display: flex; flex-wrap: wrap; gap: 4px 24px; }
 .en-erreur input, .en-erreur select, .en-erreur textarea { border-color: var(--erreur); }
 .sous-formulaire { border-bottom: 1px solid var(--bord); padding-bottom: 12px; margin-bottom: 12px; }
@@ -234,6 +254,9 @@ th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--bo
 th { background: #f6f2f0; font-weight: 600; font-size: 0.9rem; }
 tbody tr:hover { background: #fdfaf9; }
 tr.inactif td { color: var(--discret); }
+/* Dans les listes, un lien ne se souligne qu'au survol : le tableau reste sobre. */
+td a, .contacts a, .liens-contact a { text-decoration: none; }
+td a:hover, .contacts a:hover, .liens-contact a:hover { text-decoration: underline; text-decoration-color: var(--corail); }
 .carte table { border: 0; }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
 dt { color: var(--discret); }

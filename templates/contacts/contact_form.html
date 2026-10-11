@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titre %}{% if contact %}Modifier le contact{% else %}Nouveau contact{% endif %} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{% if contact %}{{ contact.get_absolute_url }}{% else %}{% url 'contacts:liste' %}{% endif %}">← Retour</a></p>
+<h1>{% if contact %}Modifier {{ contact.designation }}{% else %}Nouveau contact{% endif %}</h1>
+{% if doublon %}<p class="message alerte-fond">Ce contact existe déjà : <a href="{{ doublon.get_absolute_url }}">{{ doublon.designation }}</a>. Deux homonymes se distinguent par leur date de naissance.</p>{% endif %}
+<p class="discret">Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <fieldset>
+    <legend>Type de contact</legend>
+    <div class="champ pleine-largeur{% if not contact %} obligatoire{% endif %}{% if form.categorie.errors %} en-erreur{% endif %}">
+      <span class="libelle">{{ form.categorie.label }} :</span>
+      <div class="choix-radio">{% for radio in form.categorie %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
+      {% for erreur in form.categorie.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
+    </div>
+    <div class="champ pleine-largeur obligatoire{% if form.nature.errors %} en-erreur{% endif %}">
+      <span class="libelle">{{ form.nature.label }} :</span>
+      <div class="choix-radio">{% for radio in form.nature %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
+      {% for erreur in form.nature.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
+    </div>
+    {% if not contact %}<p class="discret pleine-largeur">Un propriétaire reçoit aussi sa fiche de bailleur, à laquelle se rattachent ses propriétés. Un locataire ou un garant saisi ici pourra être relié plus tard à une candidature ou à un bail qui porte le même nom.</p>{% endif %}
+  </fieldset>
+  {% for titre, champs in form.sections %}
+  <fieldset>
+    <legend>{{ titre }}</legend>
+    {% for champ in champs %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  {% endfor %}
+  <button type="submit" class="bouton-corail">Enregistrer</button>
+</form>
+{% endblock %}

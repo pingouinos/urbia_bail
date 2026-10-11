@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from contacts.models import Contact
 from proprietes.models import Propriete
 
 from .forms import (
@@ -130,6 +131,7 @@ def effacer(request, pk):
         return redirect(objet)
     propriete = objet.propriete
     objet.delete()
+    Contact.effacer_orphelins()
     messages.success(request, "Candidature et données du candidat effacées.")
     return redirect(f"{reverse('candidatures:liste')}?propriete={propriete.pk}")
 
