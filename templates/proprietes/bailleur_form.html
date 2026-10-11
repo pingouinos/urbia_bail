@@ -7,7 +7,27 @@
   {% csrf_token %}
   {{ form.non_field_errors }}
   <fieldset>
+    <legend>Bailleur</legend>
     {% for champ in form %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  <fieldset data-societe>
+    <legend>Associés</legend>
+    <p class="discret pleine-largeur">Les associés de la société, avec leurs parts si elles sont connues. Chacun a sa fiche dans les contacts. Le représentant se saisit ci-dessus ; s'il est aussi associé, indiquez-le ici également.</p>
+    {{ associes.management_form }}
+    {% for erreur in associes.non_form_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
+    <div class="pleine-largeur tableau-lots">
+      <table>
+        <thead><tr><th>Civilité</th><th>Nom</th><th>Prénom</th><th>Parts (%)</th><th>Retirer</th></tr></thead>
+        <tbody>
+        {% for ligne in associes %}
+          <tr>{{ ligne.id }}
+            {% for champ in ligne.visible_fields %}<td{% if champ.errors %} class="en-erreur"{% endif %}>{% if champ.name == "DELETE" %}{% if ligne.instance.pk %}{{ champ }}{% endif %}{% else %}{{ champ }}{% endif %}{% for erreur in champ.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}</td>{% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="discret pleine-largeur">Les lignes laissées vides sont ignorées. Pour ajouter plus de deux associés, enregistrez puis revenez sur cette page.</p>
   </fieldset>
   <button type="submit">Enregistrer</button>
 </form>

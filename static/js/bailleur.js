@@ -16,6 +16,8 @@
       PERSONNE.forEach(function (nom) { if (champ(nom)) champ(nom).closest(".champ").hidden = societe; });
       SOCIETE.forEach(function (nom) { if (champ(nom)) champ(nom).closest(".champ").hidden = !societe; });
       if (libelle) libelle.textContent = (societe ? "Raison sociale" : "Nom") + "\u00a0:";
+      // Blocs réservés aux sociétés (associés).
+      type.form.querySelectorAll("[data-societe]").forEach(function (bloc) { bloc.hidden = !societe; });
     }
     type.addEventListener("change", majAffichage);
     majAffichage();

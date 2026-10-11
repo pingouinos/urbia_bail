@@ -63,7 +63,7 @@ class Contact(Horodatage):
     # Étiquettes affichées, dans cet ordre.
     ETIQUETTES = {
         "bailleur": "Bailleur", "locataire": "Locataire", "candidat": "Candidat",
-        "ancien": "Ancien locataire", "garant": "Garant", "representant": "Représentant",
+        "ancien": "Ancien locataire", "garant": "Garant", "representant": "Représentant", "associe": "Associé",
     }
 
     nature = models.CharField(max_length=10, choices=Nature.choices, default=Nature.PERSONNE)
@@ -148,6 +148,12 @@ class Contact(Horodatage):
             if valeur and (synchroniser or not getattr(contact, champ)) and getattr(contact, champ) != valeur:
                 setattr(contact, champ, valeur)
                 modifie = True
+        if synchroniser and entreprise:
+            # Une société n'a ni civilité ni naissance : ce qui en restait d'une saisie ancienne s'efface.
+            for champ, vide in (("civilite", ""), ("date_naissance", None), ("lieu_naissance", "")):
+                if getattr(contact, champ):
+                    setattr(contact, champ, vide)
+                    modifie = True
         if contact.automatique and not automatique:
             contact.automatique, modifie = False, True
         if modifie:
@@ -159,7 +165,7 @@ class Contact(Horodatage):
         """Efface les contacts automatiques auxquels plus rien ne se rattache."""
         return cls.objects.filter(
             automatique=True, bailleurs__isnull=True, locataires__isnull=True, candidats__isnull=True,
-            garants__isnull=True, societes__isnull=True,
+            garants__isnull=True, societes__isnull=True, associes__isnull=True,
         ).delete()
 
     # --- Catégories et liens ----------------------------------------------------
@@ -173,6 +179,8 @@ class Contact(Horodatage):
             codes.add("bailleur")
         if self.societes.all():
             codes.add("representant")
+        if self.associes.all():
+            codes.add("associe")
         baux = [locataire.bail for locataire in self.locataires.all()]
         if any(bail.en_cours for bail in baux):
             codes.add("locataire")
@@ -194,8 +202,9 @@ class Contact(Horodatage):
 
     @property
     def proprietes(self):
-        """Propriétés de la personne, et celles des sociétés qu'elle représente."""
-        bailleurs = {b.pk: b for b in [*self.bailleurs.all(), *self.societes.all()]}
+        """Propriétés de la personne, et celles des sociétés qu'elle représente ou dont elle est associée."""
+        societes = [associe.bailleur for associe in self.associes.all()]
+        bailleurs = {b.pk: b for b in [*self.bailleurs.all(), *self.societes.all(), *societes]}
         return [propriete for bailleur in bailleurs.values() for propriete in bailleur.proprietes.all()]
 
     @property
@@ -216,6 +225,11 @@ class Contact(Horodatage):
         liens = [
             Lien("societe", f"Représente {societe.nom}", societe.get_absolute_url(), None, societe.representant_qualite)
             for societe in self.societes.all()
+        ]
+        liens += [
+            Lien("societe", f"Associé de {associe.bailleur.nom}", associe.bailleur.get_absolute_url(), None,
+                 f"{associe.parts.normalize():f} % des parts".replace(".", ",") if associe.parts is not None else "")
+            for associe in self.associes.all()
         ]
         liens += [Lien("propriete", str(p), p.get_absolute_url(), p.pk) for p in self.proprietes]
         liens += [
@@ -247,6 +261,7 @@ class Contact(Horodatage):
     def avec_liens(cls):
         """Contacts avec tout ce qu'il faut pour afficher catégories et liens."""
         return cls.objects.prefetch_related(
-            "bailleurs__proprietes", "bailleurs__representant", "societes__proprietes", "locataires__bail__propriete", "candidats__candidature__propriete",
+            "bailleurs__proprietes", "bailleurs__representant", "bailleurs__associes__contact", "societes__proprietes",
+            "associes__bailleur__proprietes", "locataires__bail__propriete", "candidats__candidature__propriete",
             "garants__candidat__candidature__bail",
         )

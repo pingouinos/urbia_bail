@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -169,6 +170,39 @@ class Bailleur(Horodatage):
     def duree_bail_nu_ans(self):
         """3 ans pour une personne physique ou une SCI familiale, 6 ans sinon."""
         return 6 if self.type == self.Type.PERSONNE_MORALE else 3
+
+
+class Associe(models.Model):
+    """Associé d'une société bailleresse (SCI, personne morale)."""
+
+    bailleur = models.ForeignKey(Bailleur, on_delete=models.CASCADE, related_name="associes")
+    civilite = models.CharField("civilité", max_length=5, choices=Bailleur.Civilite.choices, blank=True)
+    nom = models.CharField(max_length=200)
+    prenom = models.CharField("prénom", max_length=100, blank=True)
+    parts = models.DecimalField(
+        "parts (%)", max_digits=5, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
+    contact = models.ForeignKey(
+        "contacts.Contact", on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+        related_name="associes",
+    )
+
+    class Meta:
+        ordering = ["-parts", "nom", "prenom"]
+        verbose_name = "associé"
+
+    def __str__(self):
+        return f"{self.nom.upper()} {self.prenom}".strip()
+
+    def save(self, *args, **kwargs):
+        from contacts.models import Contact, cle_identite
+
+        # L'associé garde son contact tant que son nom ne change pas.
+        if self.contact_id and self.contact.cle != cle_identite(self.nom, self.prenom):
+            self.contact = None
+        self.contact = Contact.rattacher(self, automatique=False)
+        super().save(*args, **kwargs)
 
 
 class Immeuble(Horodatage):

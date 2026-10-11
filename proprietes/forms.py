@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Bailleur, Immeuble, Piece, Propriete, cle_adresse
+from .models import Associe, Bailleur, Immeuble, Piece, Propriete, cle_adresse
 
 
 class RefIcsVideEnNullMixin:
@@ -54,6 +54,20 @@ class BailleurForm(SocieteOuPersonneMixin, RefIcsVideEnNullMixin, forms.ModelFor
             "representant_civilite", "representant_nom", "representant_prenom", "representant_qualite", "siren",
             "ref_ics", "adresse", "code_postal", "ville", "email", "telephone",
         ]
+
+
+class AssociesFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        lignes = [f.cleaned_data for f in self.forms if f.cleaned_data and not f.cleaned_data.get("DELETE")]
+        total = sum(ligne["parts"] for ligne in lignes if ligne.get("parts") is not None)
+        if total > 100:
+            raise forms.ValidationError(f"Les parts des associés font {total:f} % : elles ne peuvent dépasser 100 %.")
+
+
+AssociesForms = forms.inlineformset_factory(
+    Bailleur, Associe, formset=AssociesFormSet, fields=["civilite", "nom", "prenom", "parts"], extra=2, can_delete=True,
+)
 
 
 class NouveauBailleurForm(SocieteOuPersonneMixin, forms.ModelForm):

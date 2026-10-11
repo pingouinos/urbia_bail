@@ -14,12 +14,13 @@ from django.views.decorators.http import require_POST
 
 from contrats.models import Bail
 from candidatures.models import Candidature
+from contacts.models import Contact
 from mandats.models import Mandat
 
 from . import tableur
 from .forms import (
-    BailleurForm, ImmeubleForm, ImportForm, LotFormSet, LotsCommunsForm, MiseEnLocationForm, NouveauBailleurForm,
-    PieceForm, ProprieteForm,
+    AssociesForms, BailleurForm, ImmeubleForm, ImportForm, LotFormSet, LotsCommunsForm, MiseEnLocationForm,
+    NouveauBailleurForm, PieceForm, ProprieteForm,
 )
 from .models import Bailleur, Immeuble, Piece, Propriete
 
@@ -383,11 +384,22 @@ def bailleur(request, pk):
 def bailleur_editer(request, pk=None):
     objet = get_object_or_404(Bailleur, pk=pk) if pk else None
     form = BailleurForm(request.POST or None, instance=objet)
-    if form.is_valid():
-        objet = form.save()
-        messages.success(request, "Bailleur enregistré.")
-        return redirect(objet)
-    return render(request, "proprietes/bailleur_form.html", {"form": form, "bailleur": objet})
+    associes = AssociesForms(request.POST or None, instance=objet or Bailleur(), prefix="associes")
+    if request.method == "POST" and form.is_valid():
+        societe = form.cleaned_data["type"] != Bailleur.Type.PERSONNE_PHYSIQUE
+        if not societe or associes.is_valid():
+            with transaction.atomic():
+                objet = form.save()
+                if societe:
+                    associes.instance = objet
+                    associes.save()
+                else:
+                    # Une personne physique n'a pas d'associés.
+                    objet.associes.all().delete()
+                Contact.effacer_orphelins()
+            messages.success(request, "Bailleur enregistré.")
+            return redirect(objet)
+    return render(request, "proprietes/bailleur_form.html", {"form": form, "bailleur": objet, "associes": associes})
 
 
 def modele(request):
