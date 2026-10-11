@@ -3,7 +3,7 @@
 {% block contenu %}
 <p><a href="{% if mandat %}{{ mandat.get_absolute_url }}{% else %}{% url 'mandats:registre' %}{% endif %}">← Retour</a></p>
 <h1>{% if mandat %}Modifier le mandat n° {{ mandat.numero }}{% else %}Nouveau mandat{% endif %}</h1>
-{% if not mandat %}<p class="discret">Le numéro au registre est attribué à l'enregistrement et ne pourra plus être supprimé.</p>{% endif %}
+<p class="discret">{% if mandat %}Corriger le numéro n'est utile que s'il a été mal recopié du registre papier ; la modification est gardée dans l'historique.{% else %}Inscrivez d'abord le mandat au registre papier, puis reportez ici le numéro qu'il y porte.{% endif %} Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
 <form method="post" class="formulaire">
   {% csrf_token %}
   {{ form.non_field_errors }}

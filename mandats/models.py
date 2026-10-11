@@ -79,7 +79,10 @@ class Mandat(Contrat):
         HORS_CHARGES = "hors_charges", "Encaissements hors charges"
         CHARGES_COMPRISES = "charges_comprises", "Encaissements charges comprises"
 
-    numero = models.PositiveIntegerField("numéro au registre", unique=True, editable=False)
+    numero = models.PositiveIntegerField(
+        "numéro au registre", unique=True,
+        error_messages={"unique": "Ce numéro est déjà porté par un autre mandat."},
+    )
     propriete = models.ForeignKey(
         Propriete, on_delete=models.PROTECT, related_name="mandats", verbose_name="propriété",
     )
@@ -145,8 +148,9 @@ class Mandat(Contrat):
     def save(self, *args, **kwargs):
         if self.numero:
             return super().save(*args, **kwargs)
-        # Numéro suivant du registre ; on réessaie si un autre mandat a été
-        # créé au même instant.
+        # Le numéro se saisit d'après le registre papier. Sans numéro (reprise
+        # de données, traitement automatique), on prend le suivant ; on
+        # réessaie si un autre mandat a été créé au même instant.
         for _ in range(5):
             self.numero = (Mandat.objects.aggregate(m=Max("numero"))["m"] or 0) + 1
             try:

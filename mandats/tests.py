@@ -138,7 +138,7 @@ class VuesTests(Donnees, TestCase):
         reponse = self.client.get(reverse("mandats:creer"), {"propriete": propriete.pk})
         self.assertContains(reponse, "Monsieur DURAND Paul et Madame MARTIN Anne")
         donnees = {
-            "propriete": propriete.pk, "mandant": "Monsieur DURAND Paul", "mandant_adresse": "9 rue des Lilas",
+            "numero": "412", "propriete": propriete.pk, "mandant": "Monsieur DURAND Paul", "mandant_adresse": "9 rue des Lilas",
             "mandant_code_postal_ville": "31270 Frouzins", "designation": "Appartement T2",
             "adresse_bien": "12 avenue de Muret", "loyer_cc": "899", "charges": "45",
             "duree_ans": 3, "reconductions": 0, "taux_gestion": "7", "base_gestion": "charges_comprises",
@@ -150,6 +150,20 @@ class VuesTests(Donnees, TestCase):
         self.assertRedirects(reponse, mandat.get_absolute_url())
         self.assertContains(reponse, "dépasse celle du bailleur")
         self.assertEqual(propriete.mandat_en_cours, mandat)
+        # Le numéro est celui du registre papier, reporté à la main.
+        self.assertEqual(mandat.numero, 412)
+        autre = self.creer_propriete(adresse="5 rue du Taur")
+        page = self.client.get(reverse("mandats:creer"), {"propriete": autre.pk})
+        self.assertContains(page, "Le plus grand numéro déjà saisi ici est le 412.")
+        reponse = self.client.post(reverse("mandats:creer"), {**donnees, "propriete": autre.pk})
+        self.assertContains(reponse, "Ce numéro est déjà porté par un autre mandat.")
+        reponse = self.client.post(reverse("mandats:creer"), {**donnees, "propriete": autre.pk, "numero": ""})
+        self.assertIn("numero", reponse.context["form"].errors)
+        self.assertEqual(Mandat.objects.count(), 1)
+        # Une erreur de recopie se corrige, et la correction reste dans l'historique.
+        self.client.post(reverse("mandats:modifier", args=[mandat.pk]), {**donnees, "numero": "413"})
+        mandat.refresh_from_db()
+        self.assertEqual((mandat.numero, mandat.history.count()), (413, 2))
         # Un bien sous mandat n'est plus proposé pour un nouveau mandat.
         self.assertNotContains(self.client.get(reverse("mandats:creer")), str(propriete))
 
