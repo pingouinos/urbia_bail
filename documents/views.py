@@ -41,8 +41,8 @@ def document(request, objet, modele, format_):
     if format_ == "pdf":
         try:
             contenu = convertir_pdf(contenu, modele)
-        except ConversionImpossible:
-            messages.error(request, "La conversion en PDF est indisponible pour le moment ; "
+        except ConversionImpossible as erreur:
+            messages.error(request, f"La conversion en PDF est indisponible ({erreur}) ; "
                                     "téléchargez la version Word.")
             return redirect(objet)
         type_, extension = "application/pdf", "pdf"
