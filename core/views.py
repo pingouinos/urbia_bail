@@ -18,6 +18,7 @@ from mandats.models import Mandat
 
 from .forms import OrganisationForm, UtilisateurForm, type_image
 from .models import Organisation
+from .taches import par_rubrique, taches
 
 
 def locations_en_cours():
@@ -71,14 +72,16 @@ def locations_en_cours():
 
 
 def accueil(request):
-    """Page d'accueil centrée sur les mises en location en cours, puis les
-    derniers baux."""
+    """Page d'accueil : les actions en attente, puis les derniers baux."""
     est_admin = est_administrateur(request.user)
+    locations = locations_en_cours()
+    a_faire = taches(locations)
     return render(request, "core/accueil.html", {
         "est_admin": est_admin,
         "agence_manquants": Organisation.courante().manquants if est_admin else [],
         "derniers_baux": Bail.objects.select_related("propriete").prefetch_related("locataires").order_by("-modifie_le")[:8],
-        "locations": locations_en_cours(),
+        "locations": locations, "taches": par_rubrique(a_faire), "nb_taches": len(a_faire),
+        "nb_urgentes": sum(tache.urgent for tache in a_faire),
         "nb_proprietes": Propriete.objects.filter(actif=True).count(),
         "nb_baux": Bail.objects.filter(date_fin_effective__isnull=True).count(),
         "nb_candidatures": Candidature.objects.filter(statut=Candidature.Statut.A_ETUDIER).count(),

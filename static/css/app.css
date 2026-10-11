@@ -364,3 +364,9 @@ dd { margin: 0; }
 /* Action irréversible présentée comme un lien. */
 button.lien.lien-danger { color: var(--erreur); }
 .telechargements form { margin: 0; }
+
+/* Liste des actions en attente, sur le tableau de bord. */
+.compteur { display: inline-block; min-width: 1.6em; padding: 1px 8px; border-radius: 999px; background: var(--acier); color: #fff; font-size: 0.8rem; text-align: center; vertical-align: middle; }
+.rubrique-taches { margin: 18px 0 6px; font-size: 0.95rem; }
+.taches td:first-child { width: 46%; }
+.taches td { padding-top: 8px; padding-bottom: 8px; }

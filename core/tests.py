@@ -179,3 +179,51 @@ class OrganisationTests(TestCase):
         self.assertFalse(TOTPDevice.objects.filter(user=gestionnaire).exists())
         self.assertEqual(self.client.post(reverse("utilisateur_debloquer", args=[gestionnaire.pk])).status_code, 302)
         self.assertEqual(self.client.get(reverse("utilisateur_mfa", args=[gestionnaire.pk])).status_code, 405)
+
+    def test_taches_du_tableau_de_bord(self):
+        """Le tableau de bord liste les actions en attente, déduites des
+        fiches ; une action faite fait disparaître sa ligne."""
+        import datetime as dt
+
+        from candidatures.models import Candidat, Candidature
+        from contrats.models import Bail
+        from proprietes.models import Piece
+
+        from .taches import taches
+
+        self.connecter(GESTIONNAIRES)
+        self.assertContains(self.client.get(reverse("accueil")), "Rien en attente.")
+        sci = Bailleur.objects.create(type="sci_familiale", nom="SCI ESGT")
+        propriete = Propriete.objects.create(
+            bailleur=sci, adresse="3 rue des Lois", code_postal="31000", ville="Toulouse", dernier_loyer=600,
+        )
+        mandat = Mandat.depuis_propriete(propriete)
+        mandat.save()
+        refusee = Candidature.objects.create(propriete=propriete, statut="non_retenue")
+        Candidat.objects.create(candidature=refusee, nom="Roux", prenom="Lina")
+        Piece.objects.create(propriete=propriete, type="dpe", fichier="proprietes/dpe.pdf", date_document=dt.date(2019, 1, 1))
+        bail = Bail.depuis_propriete(propriete)
+        bail.date_effet, bail.date_signature = dt.date(2024, 1, 1), dt.date(2023, 12, 20)
+        bail.conge_recu_le, bail.date_depart_prevue = dt.date(2026, 1, 1), dt.date(2026, 4, 1)
+        bail.irl_trimestre, bail.irl_valeur = "2e trimestre 2023", "140.59"
+        bail.save()
+        titres = {tache.titre: tache for tache in taches([])}
+        for attendu in ("Réponse à envoyer à Lina ROUX", "Représentant de la société à renseigner",
+                        "Diagnostic de performance énergétique (DPE) périmé", "Départ à confirmer : locataire"):
+            self.assertIn(attendu, titres)
+        # Une seule ligne par mandat : la signature et les pièces qui lui manquent.
+        du_mandat = [titre for titre in titres if "Mandat" in titre or "dossier" in titre]
+        self.assertEqual(len(du_mandat), 1)
+        self.assertRegex(du_mandat[0], r"^Mandat à faire signer, \d+ pièces du dossier à fournir$")
+        self.assertTrue(titres["Départ à confirmer : locataire"].urgent)
+        page = self.client.get(reverse("accueil"))
+        self.assertContains(page, "Mandat à faire signer")
+        self.assertContains(page, "en retard")
+        # Le mandat signé, sa ligne disparaît.
+        mandat.date_signature = dt.date(2026, 9, 1)
+        mandat.save()
+        du_mandat = [tache.titre for tache in taches([]) if "dossier" in tache.titre]
+        self.assertRegex(du_mandat[0], r"^\d+ pièces du dossier à fournir$")
+        # Une propriété hors mandat est comptée en une seule ligne.
+        Propriete.objects.create(bailleur=sci, adresse="5 rue du Taur", code_postal="31000", ville="Toulouse")
+        self.assertIn("1 propriété sans mandat en cours", {tache.titre for tache in taches([])})
