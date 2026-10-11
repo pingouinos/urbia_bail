@@ -11,23 +11,44 @@ class RefIcsVideEnNullMixin:
         return self.cleaned_data.get("ref_ics") or None
 
 
-class BailleurForm(RefIcsVideEnNullMixin, forms.ModelForm):
+class SocieteOuPersonneMixin:
+    """Une société porte un nom et un représentant ; une personne, une
+    civilité, un prénom et éventuellement un conjoint. Les champs qui ne
+    concernent pas le type choisi sont vidés."""
+
+    PERSONNE = ("civilite", "prenom", "conjoint_civilite", "conjoint_nom", "conjoint_prenom")
+    SOCIETE = ("representant_civilite", "representant_nom", "representant_prenom", "representant_qualite", "siren")
+
+    def clean(self):
+        donnees = super().clean()
+        if donnees.get("type"):
+            societe = donnees["type"] != Bailleur.Type.PERSONNE_PHYSIQUE
+            for champ in self.PERSONNE if societe else self.SOCIETE:
+                if champ in self.fields and champ not in self.errors:
+                    donnees[champ] = ""
+        return donnees
+
+
+class BailleurForm(SocieteOuPersonneMixin, RefIcsVideEnNullMixin, forms.ModelForm):
     class Meta:
         model = Bailleur
         fields = [
-            "type", "civilite", "nom", "prenom", "conjoint_civilite", "conjoint_nom",
-            "conjoint_prenom", "ref_ics", "adresse", "code_postal", "ville",
-            "email", "telephone", "siren",
+            "type", "nom", "civilite", "prenom", "conjoint_civilite", "conjoint_nom", "conjoint_prenom",
+            "representant_civilite", "representant_nom", "representant_prenom", "representant_qualite", "siren",
+            "ref_ics", "adresse", "code_postal", "ville", "email", "telephone",
         ]
 
 
-class NouveauBailleurForm(forms.ModelForm):
+class NouveauBailleurForm(SocieteOuPersonneMixin, forms.ModelForm):
     """Création rapide d'un bailleur pendant celle d'une propriété ou d'un
     bail : l'essentiel, le reste se complète sur sa fiche."""
 
     class Meta:
         model = Bailleur
-        fields = ["type", "civilite", "nom", "prenom", "adresse", "code_postal", "ville", "email", "telephone"]
+        fields = [
+            "type", "nom", "civilite", "prenom", "representant_civilite", "representant_nom", "representant_prenom",
+            "representant_qualite", "adresse", "code_postal", "ville", "email", "telephone",
+        ]
 
 
 class MiseEnLocationForm(forms.ModelForm):

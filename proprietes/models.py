@@ -7,6 +7,7 @@ pour la future migration du logiciel de gestion.
 
 import datetime as dt
 from dataclasses import dataclass
+from types import SimpleNamespace
 from decimal import Decimal
 
 from django.conf import settings
@@ -14,6 +15,8 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
+
+from core.champs import TelephoneField, code_postal_francais, siren_valide
 
 
 @dataclass(frozen=True)
@@ -61,12 +64,25 @@ class Bailleur(Horodatage):
     code_postal = models.CharField("code postal", max_length=10, blank=True)
     ville = models.CharField(max_length=100, blank=True)
     email = models.EmailField("e-mail", blank=True)
-    telephone = models.CharField("téléphone", max_length=30, blank=True)
-    siren = models.CharField("SIREN", max_length=14, blank=True)
+    telephone = TelephoneField("téléphone", blank=True)
+    siren = models.CharField("SIREN", max_length=20, blank=True, validators=[siren_valide])
+    # Personne qui signe pour une société (SCI, personne morale).
+    representant_civilite = models.CharField(
+        "civilité du représentant", max_length=5, choices=Civilite.choices, blank=True
+    )
+    representant_nom = models.CharField("nom du représentant", max_length=200, blank=True)
+    representant_prenom = models.CharField("prénom du représentant", max_length=100, blank=True)
+    representant_qualite = models.CharField(
+        "qualité du représentant", max_length=60, blank=True, help_text="Gérant, gérante, président…",
+    )
     # La personne, quelle que soit la ligne par laquelle elle apparaît.
     contact = models.ForeignKey(
         "contacts.Contact", on_delete=models.SET_NULL, null=True, blank=True, editable=False,
         related_name="bailleurs",
+    )
+    representant = models.ForeignKey(
+        "contacts.Contact", on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+        related_name="societes",
     )
 
     history = HistoricalRecords()
@@ -75,15 +91,34 @@ class Bailleur(Horodatage):
         ordering = ["nom", "prenom"]
         verbose_name = "bailleur"
 
-    def save(self, *args, **kwargs):
-        from contacts.models import Contact
+    @property
+    def societe(self):
+        return self.type != self.Type.PERSONNE_PHYSIQUE
 
+    def save(self, *args, **kwargs):
+        from contacts.models import Contact, cle_identite
+
+        if self.societe:
+            # Le nom est celui de la société ; la personne saisie avec elle est son représentant.
+            if self.prenom and not self.representant_prenom:
+                self.representant_civilite = self.representant_civilite or self.civilite
+                self.representant_prenom = self.prenom
+            self.civilite = self.prenom = ""
         # La fiche du bailleur fait foi pour l'identité et les coordonnées de son contact.
         self.contact = Contact.rattacher(self, automatique=False, synchroniser=True)
+        if self.societe and self.representant_nom:
+            cle = cle_identite(self.representant_nom, self.representant_prenom)
+            deja = self.representant if self.representant_id and self.representant.cle == cle else None
+            self.representant = Contact.rattacher(SimpleNamespace(
+                nom=self.representant_nom, prenom=self.representant_prenom, civilite=self.representant_civilite,
+                contact=deja, contact_id=deja and deja.pk,
+            ), automatique=False)
+        else:
+            self.representant = None
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.nom} {self.prenom}".strip()
+        return self.nom if self.societe else f"{self.nom} {self.prenom}".strip()
 
     def get_absolute_url(self):
         return reverse("proprietes:bailleur", args=[self.pk])
@@ -91,13 +126,20 @@ class Bailleur(Horodatage):
     @property
     def designation(self):
         """Désignation complète, telle qu'elle figure en tête d'un mandat ou
-        d'un bail : « Monsieur DURAND Paul et Madame MARTIN Anne »."""
-        if self.type != self.Type.PERSONNE_PHYSIQUE:
-            return self.nom
+        d'un bail : « Monsieur DURAND Paul et Madame MARTIN Anne », ou « SCI
+        DU CANAL, représentée par Madame DURAND Anne, gérante »."""
 
         def personne(civilite, nom, prenom):
             libelle = self.Civilite(civilite).label if civilite else ""
             return " ".join(m for m in (libelle, nom.upper(), prenom) if m)
+
+        if self.societe:
+            if not self.representant_nom:
+                return self.nom
+            representant = personne(self.representant_civilite, self.representant_nom, self.representant_prenom)
+            accord = "représentée" if self.type == self.Type.SCI_FAMILIALE else "représenté(e)"
+            qualite = f", {self.representant_qualite}" if self.representant_qualite else ""
+            return f"{self.nom}, {accord} par {representant}{qualite}"
 
         titulaire = personne(self.civilite, self.nom, self.prenom)
         if not self.conjoint_nom:
@@ -119,7 +161,7 @@ class Immeuble(Horodatage):
         "nom de l'immeuble", max_length=120, blank=True, help_text="Résidence, bâtiment… Facultatif.",
     )
     adresse = models.CharField(max_length=255)
-    code_postal = models.CharField("code postal", max_length=10)
+    code_postal = models.CharField("code postal", max_length=10, validators=[code_postal_francais])
     ville = models.CharField(max_length=100)
 
     history = HistoricalRecords()
@@ -198,7 +240,7 @@ class Propriete(Horodatage):
     complement = models.CharField(
         "complément", max_length=255, blank=True, help_text="Bâtiment, escalier, étage, porte."
     )
-    code_postal = models.CharField("code postal", max_length=10)
+    code_postal = models.CharField("code postal", max_length=10, validators=[code_postal_francais])
     ville = models.CharField(max_length=100)
 
     etage = models.CharField("étage", max_length=20, blank=True)

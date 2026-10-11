@@ -22,6 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from contrats.models import Bail
+from core.champs import TelephoneField
 from core.models import Organisation
 from proprietes.models import Bailleur, Propriete, Horodatage
 
@@ -278,7 +279,7 @@ class Candidat(models.Model):
     date_naissance = models.DateField("date de naissance", null=True, blank=True)
     lieu_naissance = models.CharField("lieu de naissance", max_length=100, blank=True)
     email = models.EmailField("e-mail", blank=True)
-    telephone = models.CharField("téléphone", max_length=30, blank=True)
+    telephone = TelephoneField("téléphone", blank=True)
     profession = models.CharField(max_length=100, blank=True)
     employeur = models.CharField(max_length=150, blank=True)
     situation = models.CharField("situation professionnelle", max_length=15, choices=Situation.choices, blank=True)
@@ -317,7 +318,7 @@ class Garant(models.Model):
     prenom = models.CharField("prénom", max_length=100)
     adresse = models.CharField("adresse complète", max_length=255, help_text="Rue, code postal et ville.")
     email = models.EmailField("e-mail", blank=True)
-    telephone = models.CharField("téléphone", max_length=30, blank=True)
+    telephone = TelephoneField("téléphone", blank=True)
 
     # La personne, quelle que soit la ligne par laquelle elle apparaît.
     contact = models.ForeignKey(

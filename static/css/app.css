@@ -127,7 +127,7 @@ ul.liens-contact, .liens-contact ul { list-style: none; margin: 0; padding: 0; d
 .pastille-contact-bailleur { background: var(--carte); border-color: var(--acier); }
 .pastille-contact-candidat { background: var(--melon-clair); border-color: var(--melon); }
 .pastille-contact-locataire { background: var(--vert-clair); border-color: var(--vert); }
-.pastille-contact-garant { background: var(--carte); }
+.pastille-contact-garant, .pastille-contact-representant { background: var(--carte); }
 .fiche-entete.fiche-contact { padding-bottom: 20px; }
 button.bouton-corail[type=submit] { background: #e4574e; border-color: #e4574e; }
 button.bouton-corail[type=submit]:hover { background: #cf463d; border-color: #cf463d; }

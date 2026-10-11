@@ -13,6 +13,8 @@ from django.conf import settings
 from django.db import models
 from simple_history.models import HistoricalRecords
 
+from core.champs import TelephoneField, code_postal_francais, siren_valide
+
 from proprietes.models import Horodatage
 
 
@@ -27,7 +29,7 @@ class Organisation(Horodatage):
     raison_sociale = models.CharField("raison sociale", max_length=120, blank=True)
     forme_juridique = models.CharField("forme juridique", max_length=40, blank=True, help_text="SAS, SARL, EURL…")
     capital = models.PositiveIntegerField("capital social (€)", null=True, blank=True)
-    siren = models.CharField("SIREN", max_length=20, blank=True)
+    siren = models.CharField("SIREN", max_length=20, blank=True, validators=[siren_valide])
     rcs_ville = models.CharField("ville du RCS", max_length=80, blank=True)
     logo = models.FileField(
         upload_to="organisation/", blank=True,
@@ -35,9 +37,9 @@ class Organisation(Horodatage):
     )
 
     adresse = models.CharField(max_length=200, blank=True)
-    code_postal = models.CharField("code postal", max_length=10, blank=True)
+    code_postal = models.CharField("code postal", max_length=10, blank=True, validators=[code_postal_francais])
     ville = models.CharField(max_length=80, blank=True)
-    telephone = models.CharField("téléphone", max_length=30, blank=True)
+    telephone = TelephoneField("téléphone", blank=True)
     email = models.EmailField("e-mail", blank=True)
     site = models.URLField("site Internet", blank=True)
 

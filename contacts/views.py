@@ -12,7 +12,7 @@ from .models import Contact, normaliser
 
 CATEGORIES = [
     ("bailleur", "Bailleurs"), ("locataire", "Locataires"), ("candidat", "Candidats"),
-    ("ancien", "Anciens locataires"), ("garant", "Garants"),
+    ("ancien", "Anciens locataires"), ("garant", "Garants"), ("representant", "Représentants"),
 ]
 
 

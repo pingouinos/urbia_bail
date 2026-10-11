@@ -9,6 +9,8 @@ from django.db import models
 from django.urls import reverse
 from simple_history.models import HistoricalRecords
 
+from core.champs import TelephoneField
+
 from proprietes.models import Propriete
 from .base import Contrat
 from mandats.models import PLAFOND_BAIL_HORS_ZONE_TENDUE, PLAFOND_BAIL_ZONE_TENDUE, Mandat, controler_honoraires
@@ -476,7 +478,7 @@ class Locataire(models.Model):
     date_naissance = models.DateField("date de naissance", null=True, blank=True)
     lieu_naissance = models.CharField("lieu de naissance", max_length=100, blank=True)
     email = models.EmailField("e-mail", blank=True)
-    telephone = models.CharField("téléphone", max_length=30, blank=True)
+    telephone = TelephoneField("téléphone", blank=True)
     # En colocation, l'acte de caution doit désigner le colocataire garanti.
     garants = models.TextField(
         blank=True, help_text="Nom et adresse de chaque caution de ce locataire, une par ligne."
