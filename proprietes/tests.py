@@ -8,7 +8,7 @@ from django.urls import reverse
 from openpyxl import Workbook, load_workbook
 
 from . import tableur
-from .models import Bailleur, Propriete
+from .models import Bailleur, Immeuble, Propriete
 
 ENTETES = [
     "Réf. ICS lot", "Réf. ICS bailleur", "Type de bailleur", "Bailleur (nom ou raison sociale)",
@@ -225,6 +225,58 @@ class VuesTests(TestCase):
         self.assertNotContains(page, 'name="bailleur-nom"')
         reponse = self.client.post(reverse("proprietes:propriete_modifier", args=[nouvelle.pk]), propriete)
         self.assertIn("bailleur", reponse.context["form"].errors)
+
+    def immeuble(self, **autres):
+        """Saisie d'un immeuble de deux lots, la troisième ligne laissée vide."""
+        return {
+            "immeuble-nom": "Résidence du Canal", "immeuble-adresse": "8 quai de Brienne",
+            "immeuble-code_postal": "31000", "immeuble-ville": "Toulouse",
+            "communs-usage": "habitation", "communs-regime_juridique": "monopropriete", "communs-zone_tendue": "on",
+            "bailleur-type": "physique", "bailleur-nom": "Garcia", "bailleur-prenom": "Ines",
+            "lots-TOTAL_FORMS": "3", "lots-INITIAL_FORMS": "0", "lots-MIN_NUM_FORMS": "1", "lots-MAX_NUM_FORMS": "60",
+            "lots-0-complement": "Apt 1", "lots-0-nb_pieces": "2", "lots-0-surface": "41.5",
+            "lots-0-dernier_loyer": "620", "lots-0-charges": "40",
+            "lots-1-numero_appartement": "2", "lots-1-etage": "1", "lots-1-meuble": "on",
+            **autres,
+        }
+
+    def test_immeuble_et_ses_lots(self):
+        """Un immeuble se crée avec ses lots : chacun devient une propriété."""
+        self.assertContains(self.client.get(reverse("proprietes:propriete_creer")), reverse("proprietes:immeuble_creer"))
+        self.assertContains(self.client.get(reverse("proprietes:immeuble_creer")), "+ Ajouter un lot")
+        reponse = self.client.post(reverse("proprietes:immeuble_creer"), self.immeuble())
+        immeuble = Immeuble.objects.get()
+        self.assertRedirects(reponse, immeuble.get_absolute_url())
+        premier, second = immeuble.lots.order_by("pk")
+        self.assertEqual((premier.complement, premier.surface, premier.dernier_loyer), ("Apt 1", Decimal("41.5"), 620))
+        self.assertEqual((second.numero_appartement, second.etage, second.meuble), ("2", "1", True))
+        for lot in (premier, second):
+            self.assertEqual((lot.adresse, lot.ville, lot.bailleur.nom), ("8 quai de Brienne", "Toulouse", "Garcia"))
+            self.assertEqual((lot.type_habitat, lot.regime_juridique, lot.zone_tendue), ("collectif", "monopropriete", True))
+        self.assertEqual(Bailleur.objects.count(), 1)
+        page = self.client.get(immeuble.get_absolute_url())
+        self.assertContains(page, "2 lots")
+        self.assertContains(page, "Apt 1")
+        self.assertContains(self.client.get(reverse("proprietes:liste")), "Immeuble Résidence du Canal")
+        self.assertContains(self.client.get(premier.get_absolute_url()), immeuble.get_absolute_url())
+        # Un lot de plus reprend l'adresse et ce que les lots ont en commun.
+        page = self.client.get(reverse("proprietes:propriete_creer"), {"immeuble": immeuble.pk})
+        initial = page.context["form"].initial
+        self.assertEqual((initial["adresse"], initial["bailleur"], initial["regime_juridique"]),
+                         ("8 quai de Brienne", premier.bailleur_id, "monopropriete"))
+        # Corriger l'adresse de l'immeuble corrige celle de ses lots.
+        self.client.post(reverse("proprietes:immeuble_modifier", args=[immeuble.pk]), {
+            "nom": "Résidence du Canal", "adresse": "8 bis quai de Brienne", "code_postal": "31000", "ville": "Toulouse",
+        })
+        self.assertEqual(set(immeuble.lots.values_list("adresse", flat=True)), {"8 bis quai de Brienne"})
+
+    def test_immeuble_incomplet(self):
+        """Sans lot, ou avec un lot que rien ne distingue, rien n'est créé."""
+        sans_lot = {cle: valeur for cle, valeur in self.immeuble().items() if not cle.startswith("lots-") or cle.endswith("FORMS")}
+        self.assertEqual(self.client.post(reverse("proprietes:immeuble_creer"), sans_lot).status_code, 200)
+        reponse = self.client.post(reverse("proprietes:immeuble_creer"), self.immeuble(**{"lots-1-numero_appartement": ""}))
+        self.assertContains(reponse, "Indiquer une désignation ou un n° d&#x27;appartement.")
+        self.assertFalse(Immeuble.objects.exists() or Propriete.objects.exists() or Bailleur.objects.exists())
 
     def test_depenses_energie_incoherentes(self):
         bailleur = Bailleur.objects.create(nom="Durand")

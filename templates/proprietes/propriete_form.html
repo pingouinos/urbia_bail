@@ -3,6 +3,7 @@
 {% block contenu %}
 <p><a href="{% if propriete %}{{ propriete.get_absolute_url }}{% else %}{% url 'proprietes:liste' %}{% endif %}">← Retour</a></p>
 <h1>{% if propriete %}Modifier {{ propriete.adresse }}{% else %}Nouvelle propriété{% endif %}</h1>
+{% if not propriete and not request.GET.immeuble %}{% include "proprietes/_type_propriete.html" with type="unite" %}{% endif %}
 <form method="post" class="formulaire">
   {% csrf_token %}
   {{ form.non_field_errors }}

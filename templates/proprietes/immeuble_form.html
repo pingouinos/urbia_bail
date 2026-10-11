@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block titre %}Nouvel immeuble · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'proprietes:liste' %}">← Retour</a></p>
+<h1>Nouvelle propriété</h1>
+{% include "proprietes/_type_propriete.html" with type="immeuble" %}
+<p class="discret">L'adresse et les caractéristiques communes se saisissent une fois, puis une ligne par lot. Chaque lot devient une propriété, avec sa fiche, ses candidatures et ses baux. Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}{{ communs.non_field_errors }}
+  <fieldset>
+    <legend>Immeuble</legend>
+    {% for champ in form %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  <fieldset>
+    <legend>Commun à tous les lots</legend>
+    {% for champ in communs %}{% include "proprietes/_champ.html" %}{% endfor %}
+    <p class="discret pleine-largeur">Si les lots n'ont pas tous le même bailleur, créez ceux d'un premier bailleur, puis ajoutez les autres depuis la fiche de l'immeuble.</p>
+  </fieldset>
+  <fieldset id="nouveau-bailleur">
+    <legend>Nouveau bailleur</legend>
+    <p class="discret pleine-largeur">À remplir si le bailleur n'est pas dans la liste ci-dessus.</p>
+    {% for champ in nouveau_bailleur %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  <fieldset class="lots">
+    <legend>Lots</legend>
+    {{ lots.management_form }}
+    {% for erreur in lots.non_form_errors %}<p class="erreur pleine-largeur">Saisir au moins un lot.</p>{% endfor %}
+    <div class="pleine-largeur tableau-lots">
+      <table>
+        <thead><tr>{% for champ in lots.empty_form %}<th>{{ champ.label }}</th>{% endfor %}</tr></thead>
+        <tbody id="lignes-lots">
+        {% for ligne in lots %}
+          <tr>{% for champ in ligne %}<td{% if champ.errors %} class="en-erreur"{% endif %}>{{ champ }}{% for erreur in champ.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}</td>{% endfor %}</tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <template id="ligne-vide"><tr>{% for champ in lots.empty_form %}<td>{{ champ }}</td>{% endfor %}</tr></template>
+    <p class="pleine-largeur"><button type="button" class="bouton secondaire" id="ajouter-lot">+ Ajouter un lot</button> <small class="discret">Les lignes laissées vides sont ignorées. La surface, le DPE et le reste se complètent sur la fiche de chaque lot.</small></p>
+  </fieldset>
+  <div class="actions-formulaire"><button type="submit" class="bouton-corail">Créer l'immeuble et ses lots</button></div>
+</form>
+<script>
+  (function () {
+    // Le nouveau bailleur ne sert que si aucun bailleur existant n'est choisi.
+    var choix = document.getElementById("{{ communs.bailleur.id_for_label }}");
+    var nouveau = document.getElementById("nouveau-bailleur");
+    function majAffichage() { nouveau.hidden = Boolean(choix.value); }
+    choix.addEventListener("change", majAffichage);
+    majAffichage();
+    // Une ligne de plus dans le tableau des lots.
+    var total = document.getElementById("id_lots-TOTAL_FORMS");
+    var modele = document.getElementById("ligne-vide");
+    var maximum = Number(document.getElementById("id_lots-MAX_NUM_FORMS").value);
+    document.getElementById("ajouter-lot").addEventListener("click", function () {
+      var numero = Number(total.value);
+      if (numero >= maximum) return;
+      var conteneur = document.createElement("tbody");
+      conteneur.innerHTML = modele.innerHTML.replace(/__prefix__/g, numero);
+      var ligne = conteneur.firstElementChild;
+      document.getElementById("lignes-lots").appendChild(ligne);
+      total.value = numero + 1;
+      ligne.querySelector("input").focus();
+    });
+  })();
+</script>
+{% endblock %}

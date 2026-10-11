@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Bailleur, Propriete
+from .models import Bailleur, Immeuble, Propriete
 
 
 class RefIcsVideEnNullMixin:
@@ -60,7 +60,7 @@ class ProprieteForm(RefIcsVideEnNullMixin, forms.ModelForm):
 
     # Regroupement des champs à l'affichage.
     SECTIONS = [
-        ("Identification", ["ref_ics", "bailleur", "usage", "meuble", "actif"]),
+        ("Identification", ["ref_ics", "bailleur", "immeuble", "usage", "meuble", "actif"]),
         ("Localisation", [
             "adresse", "complement", "code_postal", "ville", "etage", "numero_appartement",
             "numero_parking", "numero_cellier", "identifiant_fiscal", "syndic",
@@ -89,6 +89,56 @@ class ProprieteForm(RefIcsVideEnNullMixin, forms.ModelForm):
         if mini is not None and maxi is not None and mini > maxi:
             self.add_error("depenses_energie_max", "Le maximum doit être supérieur au minimum.")
         return donnees
+
+
+class ImmeubleForm(forms.ModelForm):
+    class Meta:
+        model = Immeuble
+        fields = ["nom", "adresse", "code_postal", "ville"]
+
+
+class LotsCommunsForm(forms.ModelForm):
+    """Ce que les lots d'un immeuble créés ensemble ont en commun."""
+
+    class Meta:
+        model = Propriete
+        fields = [
+            "bailleur", "usage", "regime_juridique", "periode_construction", "chauffage", "eau_chaude",
+            "syndic", "zone_tendue", "parties_communes",
+        ]
+        widgets = {"parties_communes": forms.Textarea(attrs={"rows": 3})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["bailleur"].required = False
+        self.fields["bailleur"].empty_label = "Nouveau bailleur (ci-dessous)"
+
+
+class LotForm(forms.ModelForm):
+    """Une ligne du tableau des lots, à la création d'un immeuble."""
+
+    class Meta:
+        model = Propriete
+        fields = ["complement", "etage", "numero_appartement", "nb_pieces", "surface", "meuble", "dernier_loyer", "charges"]
+        labels = {
+            "complement": "Désignation", "numero_appartement": "N° d'appt", "nb_pieces": "Pièces",
+            "surface": "Surface (m²)", "dernier_loyer": "Loyer HC (€)", "charges": "Charges (€)",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["complement"].help_text = ""
+        self.fields["complement"].widget.attrs["placeholder"] = "Apt 3, 2e étage gauche…"
+
+    def clean(self):
+        donnees = super().clean()
+        if not donnees.get("complement") and not donnees.get("numero_appartement"):
+            # Sans cela, rien ne distinguerait deux lots à la même adresse.
+            self.add_error("complement", "Indiquer une désignation ou un n° d'appartement.")
+        return donnees
+
+
+LotFormSet = forms.formset_factory(LotForm, extra=3, min_num=1, validate_min=True, max_num=60)
 
 
 class ImportForm(forms.Form):

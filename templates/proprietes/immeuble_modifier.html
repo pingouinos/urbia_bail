@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titre %}Modifier l'immeuble · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{{ immeuble.get_absolute_url }}">← Retour</a></p>
+<h1>Modifier {{ immeuble }}</h1>
+<p class="discret">Une correction de l'adresse est reportée sur tous les lots de l'immeuble. Les baux et mandats déjà rédigés gardent l'adresse qu'ils portent.</p>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <fieldset>
+    <legend>Immeuble</legend>
+    {% for champ in form %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  <div class="actions-formulaire"><button type="submit" class="bouton-corail">Enregistrer</button></div>
+</form>
+{% endblock %}
