@@ -59,8 +59,5 @@
   <a class="carte" href="{% url 'candidatures:liste' %}"><strong>Candidatures</strong><span class="discret">{{ nb_candidatures }} à étudier</span></a>
   <a class="carte" href="{% url 'proprietes:liste' %}"><strong>Propriétés</strong><span class="discret">{{ nb_proprietes }} lot(s) actif(s)</span></a>
   <a class="carte" href="{% url 'mandats:registre' %}"><strong>Registre des mandats</strong><span class="discret">{{ nb_mandats }} en cours</span></a>
-  <a class="carte" href="{% url 'proprietes:importer' %}"><strong>Importer des propriétés</strong><span class="discret">Depuis un fichier Excel</span></a>
-  {% if est_admin %}<a class="carte" href="{% url 'administration' %}"><strong>Administration</strong><span class="discret">Agence, utilisateurs, modèles des documents</span></a>{% endif %}
 </div>
-<p class="discret">Connecté en tant que {% if est_admin %}administrateur{% else %}gestionnaire{% endif %}.</p>
 {% endblock %}

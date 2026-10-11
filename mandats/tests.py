@@ -317,6 +317,36 @@ class VuesTests(Donnees, TestCase):
         self.assertRedirects(reponse, propriete.get_absolute_url() + "?onglet=documents", fetch_redirect_response=False)
         self.assertEqual(Piece.objects.filter(type="identite").count(), 1)
 
+    def test_logo_de_l_agence_sur_le_document(self):
+        """Le logo déposé sur la fiche de l'agence prend la place de celui de
+        l'en-tête du modèle, sans être déformé."""
+        import re
+        import struct
+        import zipfile
+
+        from core.models import Organisation
+
+        mandat = self.creer_mandat()
+        sans_logo = generation.generer_docx("mandat_gestion.docx", mandat.contexte_document())
+        self.assertNotIn("word/media/logo-agence.png", zipfile.ZipFile(io.BytesIO(sans_logo)).namelist())
+        # Un PNG carré de 400 × 400 points, dans un cadre prévu pour un logo large.
+        png = b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" + struct.pack(">II", 400, 400) + b"\x08\x06\x00\x00\x00"
+        self.assertEqual(generation.dimensions_image(png), ("png", 400, 400))
+        organisation = Organisation.courante()
+        organisation.logo.save("logo.png", SimpleUploadedFile("logo.png", png), save=True)
+        archive = zipfile.ZipFile(io.BytesIO(generation.generer_docx("mandat_gestion.docx", mandat.contexte_document())))
+        self.assertEqual(archive.read("word/media/logo-agence.png"), png)
+        self.assertIn('Target="media/logo-agence.png"', archive.read("word/_rels/header1.xml.rels").decode())
+        entete = archive.read("word/header1.xml").decode()
+        cx, cy = map(int, re.search(r'<wp:extent cx="(\d+)" cy="(\d+)"', entete).groups())
+        self.assertEqual((cx, cy), (883920, 883920))
+        # Les autres images du document ne sont pas touchées.
+        self.assertIn("word/media/image8.png", archive.namelist())
+        # Un format que Word n'affiche pas laisse le logo du modèle.
+        organisation.logo.save("logo.webp", SimpleUploadedFile("logo.webp", b"RIFF0000WEBPVP8 "), save=True)
+        archive = zipfile.ZipFile(io.BytesIO(generation.generer_docx("mandat_gestion.docx", mandat.contexte_document())))
+        self.assertNotIn("word/media/logo-agence.png", archive.namelist())
+
     def test_registre_et_export(self):
         self.creer_mandat()
         self.creer_mandat(date_fin="2026-01-01")

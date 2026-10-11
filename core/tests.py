@@ -136,11 +136,17 @@ class OrganisationTests(TestCase):
         gestionnaire = self.connecter(GESTIONNAIRES)
         for page in pages:
             self.assertEqual(self.client.get(page).status_code, 403)
-        self.assertNotContains(self.client.get(reverse("accueil")), reverse("administration"))
+        accueil = self.client.get(reverse("accueil"))
+        self.assertNotContains(accueil, reverse("administration"))
+        # Le rôle se lit sous le nom, dans le panneau.
+        self.assertContains(accueil, '<span class="compte-role">Gestionnaire</span>')
         admin = self.connecter(ADMINISTRATEURS)
         accueil = self.client.get(reverse("accueil"))
         self.assertContains(accueil, reverse("administration"))
         self.assertNotContains(accueil, reverse("admin:index"))
+        self.assertContains(accueil, '<span class="compte-role">Administrateur</span>')
+        # Le tableau de bord ne porte plus d'action d'administration : une seule entrée, dans le panneau.
+        self.assertEqual(accueil.content.decode().count(f'href="{reverse("administration")}"'), 1)
         for page in pages:
             self.assertEqual(self.client.get(page).status_code, 200)
         self.assertContains(self.client.get(reverse("administration")), reverse("agence"))

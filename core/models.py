@@ -33,7 +33,8 @@ class Organisation(Horodatage):
     rcs_ville = models.CharField("ville du RCS", max_length=80, blank=True)
     logo = models.FileField(
         upload_to="organisation/", blank=True,
-        help_text="Image PNG, JPEG ou WebP de 1 Mo au maximum. Remplace le logo de l'application à l'écran.",
+        help_text="Image de 1 Mo au maximum. Elle remplace le logo de l'application à l'écran et, si elle est "
+                  "en PNG ou en JPEG, celui de l'en-tête des mandats et des baux.",
     )
 
     adresse = models.CharField(max_length=200, blank=True)
