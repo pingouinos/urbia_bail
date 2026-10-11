@@ -63,5 +63,23 @@
     {% for message in messages %}<p class="message{% if message.level_tag == 'error' %} message-erreur{% endif %}">{{ message }}</p>{% endfor %}
     {% block contenu %}{% endblock %}
   </main>
+  <script>
+    // Dans une liste, toute la ligne ouvre la fiche de son premier lien.
+    // Les autres liens, les boutons et la sélection de texte gardent leur rôle.
+    (function () {
+      document.querySelectorAll("main tbody tr, main ul.contacts > li").forEach(function (ligne) {
+        if (ligne.querySelector("input, select, textarea")) return;
+        var lien = ligne.querySelector("td:first-child a[href], a[href]");
+        if (!lien || lien.target === "_blank") return;
+        ligne.classList.add("ligne-lien");
+        ligne.addEventListener("click", function (evenement) {
+          if (evenement.target.closest("a, button, form, label")) return;
+          if (String(window.getSelection())) return;
+          if (evenement.ctrlKey || evenement.metaKey) { window.open(lien.href, "_blank"); return; }
+          window.location.href = lien.href;
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

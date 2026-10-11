@@ -1,10 +1,11 @@
 import base64
+import mimetypes
 
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
-from django.http import HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -16,9 +17,9 @@ from candidatures.models import Candidature
 from . import tableur
 from .forms import (
     BailleurForm, ImmeubleForm, ImportForm, LotFormSet, LotsCommunsForm, MiseEnLocationForm, NouveauBailleurForm,
-    ProprieteForm,
+    PieceForm, ProprieteForm,
 )
-from .models import Bailleur, Immeuble, Propriete
+from .models import Bailleur, Immeuble, Piece, Propriete
 
 # Ce qu'un nouveau lot reprend d'un lot déjà saisi dans le même immeuble.
 COMMUNS_IMMEUBLE = (
@@ -31,7 +32,7 @@ SITUATIONS = [
     ("a_louer", "À louer"), ("libre", "Libres ou sans bail"), ("preavis", "En préavis"), ("loue", "Loués"),
 ]
 # Onglets de la fiche d'un bien.
-ONGLETS = ("location", "informations", "candidatures", "contrats", "historique")
+ONGLETS = ("location", "informations", "candidatures", "contrats", "documents", "historique")
 # Anciens onglets, pour les favoris.
 ANCIENS_ONGLETS = {"baux": "contrats", "mandats": "contrats"}
 
@@ -113,6 +114,7 @@ def propriete(request, pk):
         etape = 2
     else:
         etape = 1
+    pieces = list(objet.pieces.select_related("depose_par"))
     return render(request, "proprietes/propriete.html", {
         "propriete": objet, "onglet": onglet, "situation": situation, "candidatures": candidatures,
         "toutes_candidatures": toutes, "retenue": retenue, "mandat": mandat, "mandats": mandats,
@@ -120,8 +122,52 @@ def propriete(request, pk):
             [*objet.baux.all(), *mandats], key=lambda contrat: contrat.debut or contrat.cree_le.date(), reverse=True,
         ),
         "etape": etape, "nouveau_bail": nouveau_bail,
+        "pieces": pieces, "piece_dpe": next((piece for piece in pieces if piece.type == Piece.Type.DPE), None),
+        "form_piece": PieceForm() if onglet == "documents" else None,
         "historique": objet.history.select_related("history_user")[:20] if onglet == "historique" else [],
     })
+
+
+@require_POST
+def piece_deposer(request, pk):
+    objet = get_object_or_404(Propriete, pk=pk)
+    form = PieceForm(request.POST, request.FILES)
+    if form.is_valid():
+        piece = form.save(commit=False)
+        piece.propriete, piece.depose_par = objet, request.user
+        piece.save()
+        if piece.type == Piece.Type.DPE and piece.date_document and piece.date_document != objet.date_dpe:
+            # La fiche suit le dernier DPE déposé.
+            if not objet.date_dpe or piece.date_document > objet.date_dpe:
+                objet.date_dpe = piece.date_document
+                objet.save()
+        messages.success(request, f"{piece.get_type_display()} déposé.")
+    else:
+        for erreurs in form.errors.values():
+            for erreur in erreurs:
+                messages.error(request, erreur)
+    return redirect(f"{objet.get_absolute_url()}?onglet=documents")
+
+
+def piece(request, pk, piece_pk):
+    objet = get_object_or_404(Piece, pk=piece_pk, propriete=pk)
+    try:
+        fichier = objet.fichier.open("rb")
+    except FileNotFoundError:
+        raise Http404
+    type_, _ = mimetypes.guess_type(objet.fichier.name)
+    reponse = FileResponse(fichier, content_type=type_ or "application/octet-stream")
+    reponse["X-Content-Type-Options"] = "nosniff"
+    return reponse
+
+
+@require_POST
+def piece_supprimer(request, pk, piece_pk):
+    objet = get_object_or_404(Piece, pk=piece_pk, propriete=pk)
+    objet.fichier.delete(save=False)
+    objet.delete()
+    messages.success(request, "Document supprimé.")
+    return redirect(f"{reverse('proprietes:propriete', args=[pk])}?onglet=documents")
 
 
 def mettre_en_location(request, pk):

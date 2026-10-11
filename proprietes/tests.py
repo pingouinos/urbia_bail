@@ -8,7 +8,10 @@ from django.urls import reverse
 from openpyxl import Workbook, load_workbook
 
 from . import tableur
-from .models import Bailleur, Immeuble, Propriete
+import datetime as dt
+import tempfile
+
+from .models import Bailleur, Immeuble, Piece, Propriete
 
 ENTETES = [
     "Réf. ICS lot", "Réf. ICS bailleur", "Type de bailleur", "Bailleur (nom ou raison sociale)",
@@ -277,6 +280,42 @@ class VuesTests(TestCase):
         reponse = self.client.post(reverse("proprietes:immeuble_creer"), self.immeuble(**{"lots-1-numero_appartement": ""}))
         self.assertContains(reponse, "Indiquer une désignation ou un n° d&#x27;appartement.")
         self.assertFalse(Immeuble.objects.exists() or Propriete.objects.exists() or Bailleur.objects.exists())
+
+    def test_documents_de_la_propriete(self):
+        """Le DPE et les autres diagnostics se déposent sur la fiche."""
+        propriete = Propriete.objects.create(
+            bailleur=Bailleur.objects.create(nom="Durand"), adresse="1 rue", code_postal="31000", ville="Toulouse",
+        )
+        deposer = reverse("proprietes:piece_deposer", args=[propriete.pk])
+        onglet = propriete.get_absolute_url() + "?onglet=documents"
+        with tempfile.TemporaryDirectory() as dossier, self.settings(MEDIA_ROOT=dossier):
+            self.assertContains(self.client.get(onglet), "Déposer un document")
+            # Un fichier qui n'est ni un PDF ni une image est refusé, même renommé.
+            faux = SimpleUploadedFile("dpe.pdf", b"<html>", content_type="application/pdf")
+            reponse = self.client.post(deposer, {"type": "dpe", "fichier": faux}, follow=True)
+            self.assertContains(reponse, "ni un PDF ni une image")
+            self.assertFalse(Piece.objects.exists())
+            dpe = SimpleUploadedFile("dpe.pdf", b"%PDF-1.7 essai", content_type="application/pdf")
+            reponse = self.client.post(deposer, {"type": "dpe", "date_document": "2023-04-12", "fichier": dpe})
+            self.assertRedirects(reponse, onglet)
+            piece = Piece.objects.get()
+            propriete.refresh_from_db()
+            self.assertEqual(propriete.date_dpe, dt.date(2023, 4, 12))
+            self.assertEqual((piece.expire_le, piece.perime, piece.depose_par.username), (dt.date(2033, 4, 12), False, "gestion"))
+            self.assertContains(self.client.get(onglet), "jusqu'au 12/04/2033")
+            self.assertContains(self.client.get(propriete.get_absolute_url() + "?onglet=informations"), "ouvrir le DPE")
+            fichier = self.client.get(reverse("proprietes:piece", args=[propriete.pk, piece.pk]))
+            self.assertEqual((fichier["Content-Type"], fichier.getvalue()), ("application/pdf", b"%PDF-1.7 essai"))
+            # Le document d'une propriété ne s'ouvre pas par l'adresse d'une autre.
+            self.assertEqual(self.client.get(reverse("proprietes:piece", args=[propriete.pk + 1, piece.pk])).status_code, 404)
+            self.client.post(reverse("proprietes:piece_supprimer", args=[propriete.pk, piece.pk]))
+            self.assertFalse(Piece.objects.exists())
+
+    def test_validite_des_diagnostics(self):
+        self.assertTrue(Piece(type="dpe", date_document=dt.date(2020, 5, 1)).perime)
+        self.assertTrue(Piece(type="erp", date_document=dt.date(2020, 5, 1)).perime)
+        self.assertIsNone(Piece(type="reglement", date_document=dt.date(2000, 1, 1)).expire_le)
+        self.assertIsNone(Piece(type="dpe").expire_le)
 
     def test_depenses_energie_incoherentes(self):
         bailleur = Bailleur.objects.create(nom="Durand")
