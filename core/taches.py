@@ -17,7 +17,7 @@ from mandats.models import Mandat
 from proprietes.models import Bailleur, Piece, Propriete
 
 # Rubriques, dans l'ordre d'affichage.
-RUBRIQUES = ["Mises en location", "Mandats", "Candidatures", "Baux", "Documents", "Fiches à compléter"]
+RUBRIQUES = ["Mises en location", "Loyers", "Mandats", "Candidatures", "Baux", "Documents", "Fiches à compléter"]
 # Un diagnostic est signalé un peu avant sa fin de validité.
 PREAVIS_VALIDITE = dt.timedelta(days=60)
 
@@ -93,6 +93,19 @@ def taches(locations):
             reverse("contrats:fin", args=[bail.pk]), "Confirmer le départ", urgent=True,
             detail=f"prévu le {bail.date_depart_prevue:%d/%m/%Y}",
         ))
+
+    # Loyers : une ligne par bail suivi qui a des loyers impayés.
+    suivis = Bail.objects.filter(suivi_loyers_depuis__isnull=False).select_related("propriete").prefetch_related("locataires")
+    for bail in suivis:
+        bail.completer_echeancier()
+        impayees = [e for e in bail.echeances.filter(paye_le__isnull=True) if e.impayee]
+        if impayees:
+            nombre, du = len(impayees), sum(e.total for e in impayees)
+            liste.append(Tache(
+                "Loyers", f"{nombre} loyer{'s' if nombre > 1 else ''} impayé{'s' if nombre > 1 else ''} : {bail.noms_locataires or 'locataire'}",
+                _adresse(bail.propriete), f"{bail.get_absolute_url()}#loyers", "Voir les loyers", urgent=True,
+                detail=f"{du:.2f} € depuis {impayees[-1].libelle}".replace(".", ","),
+            ))
 
     # Documents : diagnostics périmés ou qui le seront bientôt (le plus récent de chaque type).
     vus = set()
