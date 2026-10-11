@@ -1,6 +1,6 @@
 from django import forms
 
-from proprietes.forms import RefIcsVideEnNullMixin
+from proprietes.forms import NouveauBailleurForm, RefIcsVideEnNullMixin
 from proprietes.models import Bailleur, Propriete
 from documents.forms import FichierSigneMixin
 
@@ -142,10 +142,7 @@ class LogementForm(RefIcsVideEnNullMixin, forms.ModelForm):
         return [(titre, [self[nom] for nom in noms]) for titre, noms in self.SECTIONS]
 
 
-class ProprietaireForm(forms.ModelForm):
-    class Meta:
-        model = Bailleur
-        fields = ["type", "civilite", "nom", "prenom", "adresse", "code_postal", "ville", "email", "telephone"]
+ProprietaireForm = NouveauBailleurForm
 
 
 class LocataireForm(forms.ModelForm):
