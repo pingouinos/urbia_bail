@@ -14,6 +14,8 @@ admin.site.site_title = settings.NOM_APPLICATION
 urlpatterns = [
     path("", views.accueil, name="accueil"),
     path("sante/", views.sante, name="sante"),
+    path("agence/", views.agence, name="agence"),
+    path("logo-agence/", views.logo_agence, name="logo_agence"),
     path("proprietes/", include("proprietes.urls")),
     path("mandats/", include("mandats.urls")),
     path("candidatures/", include("candidatures.urls")),

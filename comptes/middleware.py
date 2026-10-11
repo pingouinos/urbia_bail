@@ -8,7 +8,7 @@ from .google import BACKEND
 
 # Formulaire du candidat, accessible par son lien personnel. Seules
 # pages servies sur l'adresse publique URL_LOCATAIRES.
-CHEMINS_LOCATAIRES = ("/locataire/", "/static/")
+CHEMINS_LOCATAIRES = ("/locataire/", "/static/", "/logo-agence/")
 # Pages accessibles sans être connecté.
 CHEMINS_PUBLICS = ("/connexion/", "/oidc/", "/sante/", "/admin/login/", *CHEMINS_LOCATAIRES)
 # Pages accessibles connecté mais avant la double authentification.

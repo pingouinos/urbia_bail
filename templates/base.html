@@ -12,7 +12,7 @@
 <body{% if user.is_authenticated %} class="avec-panneau"{% endif %}>
   <header class="entete{% if not user.is_authenticated %} entete-seule{% endif %}">
     {% if user.is_authenticated %}
-    <a class="marque" href="{% url 'accueil' %}"><img src="{% static 'img/logo-urbia-gestion.png' %}" alt="{{ nom_application }}" width="117" height="48"></a>
+    <a class="marque" href="{% url 'accueil' %}">{% if agence.logo %}<img src="{% url 'logo_agence' %}" alt="{{ agence.designation }}" height="48">{% else %}<img src="{% static 'img/logo-urbia-gestion.png' %}" alt="{{ nom_application }}" width="117" height="48">{% endif %}</a>
     <details class="ajouter">
       <summary class="bouton-entete">Ajouter</summary>
       <div class="ajouter-liste">
@@ -56,7 +56,7 @@
       })();
     </script>
     {% else %}
-    <span class="marque"><img src="{% static 'img/logo-urbia-gestion.png' %}" alt="URBIA Immobilier" width="117" height="48"></span>
+    <span class="marque">{% if agence.logo %}<img src="{% url 'logo_agence' %}" alt="{{ agence.designation }}" height="48">{% else %}<img src="{% static 'img/logo-urbia-gestion.png' %}" alt="{{ agence.designation }}" width="117" height="48">{% endif %}</span>
     {% endif %}
   </header>
   <main>

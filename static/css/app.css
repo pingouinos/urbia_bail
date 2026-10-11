@@ -303,3 +303,7 @@ dd { margin: 0; }
   table { display: block; overflow-x: auto; }
   .masquer-mobile { display: none; }
 }
+
+/* Fiche de l'agence. */
+.logo-agence { max-height: 64px; width: auto; }
+.balises code { display: inline-block; margin: 2px 4px 2px 0; }

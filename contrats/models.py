@@ -369,7 +369,10 @@ class Bail(Contrat):
         else:
             energie = "non communiqué"
         nb_mois = self.mois_depot_max
+        from core.models import Organisation
+
         return {
+            "agence": Organisation.courante().contexte_document(),
             "intitule": intitule,
             "regime": regime,
             "bailleur": bailleur.designation,

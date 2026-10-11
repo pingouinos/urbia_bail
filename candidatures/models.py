@@ -22,6 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from contrats.models import Bail
+from core.models import Organisation
 from proprietes.models import Bailleur, Propriete, Horodatage
 
 DUREE_CONSERVATION = dt.timedelta(days=90)
@@ -217,7 +218,7 @@ class Candidature(Horodatage):
             f"{timezone.localtime(self.lien_expire_le):%d/%m/%Y}.\n\n"
             "Cordialement,\n"
             + (f"{signataire}\n" if signataire else "")
-            + "URBIA Immobilier"
+            + Organisation.courante().designation
         )
 
     @classmethod
@@ -254,7 +255,7 @@ class Candidature(Horodatage):
             "Nous vous souhaitons pleine réussite dans votre recherche.\n\n"
             "Cordialement,\n"
             + (f"{signataire}\n" if signataire else "")
-            + "URBIA Immobilier"
+            + Organisation.courante().designation
         )
 
 

@@ -1,8 +1,16 @@
 from django.conf import settings
+from django.utils.functional import SimpleLazyObject
+
+from .models import Organisation
 
 
 def application(request):
-    return {"nom_application": settings.NOM_APPLICATION, "rubrique": rubrique(request)}
+    return {
+        "nom_application": settings.NOM_APPLICATION,
+        "rubrique": rubrique(request),
+        # Lue seulement par les pages qui l'affichent.
+        "agence": SimpleLazyObject(Organisation.courante),
+    }
 
 
 def rubrique(request):

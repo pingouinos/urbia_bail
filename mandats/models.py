@@ -160,10 +160,13 @@ class Mandat(Contrat):
     @classmethod
     def depuis_propriete(cls, propriete):
         """Mandat prérempli à partir des fiches du bien et du bailleur."""
+        from core.models import Organisation
+
         bailleur = propriete.bailleur
         loyer = (propriete.dernier_loyer or 0) + (propriete.charges or 0)
         return cls(
             propriete=propriete,
+            taux_gestion=Organisation.courante().taux_gestion,
             mandant=bailleur.designation,
             mandant_adresse=bailleur.adresse,
             mandant_code_postal_ville=f"{bailleur.code_postal} {bailleur.ville}".strip(),
@@ -235,7 +238,10 @@ class Mandat(Contrat):
             self.BaseGestion.HORS_CHARGES: " (hors charges)",
             self.BaseGestion.CHARGES_COMPRISES: " charges comprises",
         }[self.base_gestion]
+        from core.models import Organisation
+
         return {
+            "agence": Organisation.courante().contexte_document(),
             "numero": self.numero,
             "mandant": self.mandant,
             "mandant_adresse": self.mandant_adresse,
