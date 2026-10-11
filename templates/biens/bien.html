@@ -2,28 +2,89 @@
 {% block titre %}{{ bien.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <p><a href="{% url 'biens:liste' %}">← Biens</a></p>
-<div class="titre-actions">
-  <h1>{{ bien.adresse }}{% if bien.complement %}, {{ bien.complement }}{% endif %}</h1>
-  <div class="actions"><a class="bouton-petit" href="{% url 'biens:bien_modifier' bien.pk %}">Modifier</a></div>
-</div>
-<p class="discret">{{ bien.code_postal }} {{ bien.ville }} · {{ bien.get_usage_display }}{% if bien.meuble %} meublé{% endif %} · Réf. ICS {{ bien.ref_ics|default:"non renseignée" }}{% if not bien.actif %} · <strong>plus géré par l'agence</strong>{% endif %}</p>
 
+<section class="carte fiche-entete">
+  <div class="titre-actions">
+    <h1>{{ bien.adresse }}{% if bien.complement %}, {{ bien.complement }}{% endif %}</h1>
+    <div class="actions"><a class="bouton-petit" href="{% url 'biens:bien_modifier' bien.pk %}">Modifier</a></div>
+  </div>
+  <p class="pastilles">
+    <span class="pastille">{{ bien.get_usage_display }}{% if bien.meuble %} meublé{% endif %}</span>
+    <span class="pastille pastille-{{ situation.code }}">{{ situation.libelle }}</span>
+    {% if bien.a_louer %}<span class="pastille pastille-a_louer">À louer</span>{% endif %}
+    {% if not bien.actif %}<span class="pastille pastille-libre">Plus géré par l'agence</span>{% endif %}
+  </p>
+  <p>Appartient à <a href="{{ bien.bailleur.get_absolute_url }}"><strong>{{ bien.bailleur }}</strong></a>{% if mandat %} · <a href="{{ mandat.get_absolute_url }}">mandat n° {{ mandat.numero }}</a>{% else %} · <span class="alerte">aucun mandat en cours</span>{% endif %}</p>
+  <p class="discret">{{ bien.code_postal }} {{ bien.ville }}{% if bien.surface %} · {{ bien.surface }} m²{% endif %}{% if bien.nb_pieces %} · {{ bien.nb_pieces }} pièce{{ bien.nb_pieces|pluralize }}{% endif %}{% if bien.ref_ics %} · réf. ICS {{ bien.ref_ics }}{% endif %}</p>
+  <nav class="onglets" aria-label="Rubriques de la fiche">
+    <a href="?onglet=location"{% if onglet == "location" %} aria-current="page"{% endif %}>Location</a>
+    <a href="?onglet=informations"{% if onglet == "informations" %} aria-current="page"{% endif %}>Informations générales</a>
+    <a href="?onglet=candidatures"{% if onglet == "candidatures" %} aria-current="page"{% endif %}>Candidatures{% if toutes_candidatures %} ({{ toutes_candidatures|length }}){% endif %}</a>
+    <a href="?onglet=baux"{% if onglet == "baux" %} aria-current="page"{% endif %}>Baux{% if baux %} ({{ baux|length }}){% endif %}</a>
+    <a href="?onglet=mandats"{% if onglet == "mandats" %} aria-current="page"{% endif %}>Mandats{% if mandats %} ({{ mandats|length }}){% endif %}</a>
+    <a href="?onglet=historique"{% if onglet == "historique" %} aria-current="page"{% endif %}>Historique</a>
+  </nav>
+</section>
+
+{% if onglet == "location" or onglet == "informations" %}{% with manquants=bien.champs_manquants_pour_bail %}{% if manquants %}
+<p class="message">À compléter avant de rédiger un bail : {{ manquants|join:", " }}. <a href="{% url 'biens:bien_modifier' bien.pk %}">Compléter la fiche</a></p>
+{% endif %}{% endwith %}{% endif %}
+
+{% if onglet == "location" %}
 {% if bien.location_interdite %}<p class="message alerte-fond">Logement classé G au DPE : il ne peut plus faire l'objet d'un nouveau bail d'habitation depuis le 1er janvier 2025.</p>{% endif %}
-{% with manquants=bien.champs_manquants_pour_bail %}{% if manquants %}
-<p class="message">À compléter avant de rédiger un bail : {{ manquants|join:", " }}.</p>
-{% endif %}{% endwith %}
+<section class="carte">
+  <h2>Location</h2>
+  {% if etape %}
+  <ol class="etapes" aria-label="Étapes de la mise en location">
+    <li{% if etape == 1 %} aria-current="step"{% else %} class="faite"{% endif %}><span>1</span> Mandat</li>
+    <li{% if etape == 2 %} aria-current="step"{% elif etape > 2 %} class="faite"{% endif %}><span>2</span> Mise en location</li>
+    <li{% if etape == 3 %} aria-current="step"{% elif etape > 3 %} class="faite"{% endif %}><span>3</span> Candidatures</li>
+    <li{% if etape == 4 %} aria-current="step"{% elif etape > 4 %} class="faite"{% endif %}><span>4</span> Bail</li>
+    <li{% if etape == 5 %} aria-current="step"{% elif etape > 5 %} class="faite"{% endif %}><span>5</span> Signature</li>
+    <li{% if etape == 6 %} aria-current="step"{% endif %}><span>6</span> Entrée dans les lieux</li>
+  </ol>
+  {% endif %}
+  {% if situation.bail %}
+  <p><strong>{{ situation.bail.noms_locataires|default:"Locataire à renseigner" }}</strong> · <a href="{{ situation.bail.get_absolute_url }}">bail du {{ situation.bail.date_effet|date:"d/m/Y" }}</a>{% if not situation.bail.date_signature %} · <span class="alerte">à faire signer</span>{% endif %}{% if situation.bail.conge_recu_le %} · congé {% if situation.bail.conge_origine == "bailleur" %}du bailleur{% else %}du locataire{% endif %} le {{ situation.bail.conge_recu_le|date:"d/m/Y" }}{% endif %}</p>
+  {% endif %}
+  {% if situation.a_venir %}
+  <p>Prochain locataire : <strong>{{ situation.a_venir.noms_locataires|default:"à renseigner" }}</strong>, entrée le {{ situation.a_venir.date_effet|date:"d/m/Y" }} · <a href="{{ situation.a_venir.get_absolute_url }}">bail</a>{% if not situation.a_venir.date_signature %} · <span class="alerte">à faire signer</span>{% endif %}</p>
+  {% endif %}
+  {% if bien.a_louer %}
+  <p>À louer depuis le {{ bien.mise_en_location_le|date:"d/m/Y" }} · disponible le {{ bien.disponible_le|date:"d/m/Y" }}{% if bien.dernier_loyer %} · {{ bien.dernier_loyer }} € hors charges{% if bien.charges %} + {{ bien.charges }} € de charges{% endif %}{% endif %} · <a href="{% url 'biens:mettre_en_location' bien.pk %}">modifier</a></p>
+  {% endif %}
+  {% if situation.code == "sans_bail" and not bien.a_louer %}<p class="discret">Si ce logement est déjà loué, saisissez son bail en cours : l'application saura qu'il est occupé.</p>{% endif %}
+  {% if candidatures %}
+  <ul class="choix">
+    {% for candidature in candidatures %}
+    <li><a href="{{ candidature.get_absolute_url }}"><strong>{{ candidature.noms|default:"Candidature" }}</strong><span class="discret">{{ candidature.get_statut_display }}{% with taux=candidature.taux_effort %}{% if taux is not None %} · taux d'effort {{ taux }} %{% endif %}{% endwith %}{% if candidature.rempli_le %} · dossier complété par le candidat{% elif candidature.lien_valide %} · lien envoyé, en attente du candidat{% else %} · lien à envoyer{% endif %}</span></a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <div class="actions-location">
+    {% if situation.code == "loue" %}
+      {% if not situation.bail.date_signature %}<a class="bouton" href="{{ situation.bail.get_absolute_url }}">Faire signer le bail</a>{% endif %}
+      <a class="bouton{% if not situation.bail.date_signature %} secondaire{% endif %}" href="{% url 'baux:fin' situation.bail.pk %}">Départ du locataire</a>
+    {% elif situation.a_venir %}
+      <a class="bouton" href="{{ situation.a_venir.get_absolute_url }}">{% if situation.a_venir.date_signature %}Ouvrir le bail{% else %}Faire signer le bail{% endif %}</a>
+    {% elif retenue %}
+      <a class="bouton" href="{% url 'baux:creer' %}?candidature={{ retenue.pk }}">Rédiger le bail de {{ retenue.noms|default:"la candidature retenue" }}</a>
+      {% if bien.est_habitation %}<a class="bouton secondaire" href="{% url 'candidatures:creer' %}?bien={{ bien.pk }}">Enregistrer une candidature</a>{% endif %}
+    {% elif not mandat %}
+      <a class="bouton" href="{% url 'mandats:creer' %}?bien={{ bien.pk }}">Créer le mandat</a>
+      {% if not bien.a_louer %}<a class="bouton secondaire" href="{% url 'biens:mettre_en_location' bien.pk %}">Mettre en location</a>{% endif %}
+    {% elif not bien.a_louer %}
+      <a class="bouton" href="{% url 'biens:mettre_en_location' bien.pk %}">Mettre en location</a>
+    {% elif bien.est_habitation %}
+      <a class="bouton" href="{% url 'candidatures:creer' %}?bien={{ bien.pk }}">Enregistrer une candidature</a>
+    {% endif %}
+    {% if situation.code != "loue" and not situation.a_venir and not retenue %}<a href="{% url 'baux:creer' %}?bien={{ bien.pk }}">Rédiger un bail sans candidature</a>{% endif %}
+    {% if situation.code == "preavis" %}<a href="{% url 'baux:fin' situation.bail.pk %}">Confirmer le départ du locataire</a>{% endif %}
+  </div>
+</section>
 
+{% elif onglet == "informations" %}
 <div class="grille">
-  <section class="carte">
-    <h2>Bailleur et mandat</h2>
-    <p><a href="{{ bien.bailleur.get_absolute_url }}">{{ bien.bailleur }}</a><br><span class="discret">{{ bien.bailleur.get_type_display }}</span></p>
-    {% with mandat=bien.mandat_en_cours %}
-    {% if mandat %}<p><a href="{{ mandat.get_absolute_url }}">Mandat n° {{ mandat.numero }}</a>{% if mandat.alertes %} <span class="alerte">à vérifier</span>{% endif %}</p>
-    {% else %}<p class="discret">Aucun mandat en cours. <a href="{% url 'mandats:creer' %}?bien={{ bien.pk }}">Créer le mandat</a></p>{% endif %}
-    {% endwith %}
-    <p><a href="{% url 'candidatures:creer' %}?bien={{ bien.pk }}">Enregistrer une candidature</a>{% with nb=bien.candidatures.count %}{% if nb %} · <a href="{% url 'candidatures:liste' %}?bien={{ bien.pk }}">{{ nb }} candidature{{ nb|pluralize }}</a>{% endif %}{% endwith %}</p>
-    <p><a href="{% url 'baux:creer' %}?bien={{ bien.pk }}">Rédiger un bail</a>{% with nb=bien.baux.count %}{% if nb %} · {{ nb }} {{ nb|pluralize:"bail,baux" }} au dossier{% endif %}{% endwith %}</p>
-  </section>
   <section class="carte">
     <h2>Description</h2>
     <dl>
@@ -36,6 +97,7 @@
       {% if bien.numero_appartement or bien.numero_parking or bien.numero_cellier %}<dt>Numéros</dt><dd>{% if bien.numero_appartement %}appartement {{ bien.numero_appartement }} {% endif %}{% if bien.numero_parking %}parking {{ bien.numero_parking }} {% endif %}{% if bien.numero_cellier %}cellier {{ bien.numero_cellier }}{% endif %}</dd>{% endif %}
       {% if bien.identifiant_fiscal %}<dt>Identifiant fiscal</dt><dd>{{ bien.identifiant_fiscal }}</dd>{% endif %}
       {% if bien.syndic %}<dt>Syndic</dt><dd>{{ bien.syndic }}</dd>{% endif %}
+      <dt>Réf. ICS</dt><dd>{{ bien.ref_ics|default:"—" }}</dd>
     </dl>
   </section>
   <section class="carte">
@@ -50,7 +112,6 @@
     </dl>
   </section>
 </div>
-
 <section class="carte">
   <h2>Équipements et annexes</h2>
   <dl>
@@ -65,6 +126,85 @@
   </dl>
 </section>
 
+{% elif onglet == "candidatures" %}
+<section class="carte">
+  <div class="titre-actions">
+    <h2>Candidatures</h2>
+    {% if bien.est_habitation %}<a class="bouton-petit" href="{% url 'candidatures:creer' %}?bien={{ bien.pk }}">Enregistrer une candidature</a>{% endif %}
+  </div>
+  {% if toutes_candidatures %}
+  <table>
+    <thead><tr><th>Candidats</th><th>Revenus nets</th><th>Taux d'effort</th><th>Reçue le</th><th>Statut</th></tr></thead>
+    <tbody>
+    {% for candidature in toutes_candidatures %}
+      <tr{% if candidature.statut == "non_retenue" or candidature.statut == "desistement" %} class="inactif"{% endif %}>
+        <td><a href="{{ candidature.get_absolute_url }}">{{ candidature.noms|default:"Sans nom" }}</a></td>
+        <td>{% if candidature.revenus %}{{ candidature.revenus|floatformat:0 }} €{% else %}—{% endif %}</td>
+        <td>{% with taux=candidature.taux_effort %}{% if taux is not None %}{{ taux }} %{% else %}—{% endif %}{% endwith %}</td>
+        <td>{{ candidature.cree_le|date:"d/m/Y" }}</td>
+        <td>{% if candidature.bail %}<a href="{{ candidature.bail.get_absolute_url }}">bail rédigé</a>{% else %}{{ candidature.get_statut_display }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="discret">Les candidatures non retenues sont effacées trois mois après la décision.</p>
+  {% else %}
+  <p class="discret">Aucune candidature pour ce logement.</p>
+  {% endif %}
+</section>
+
+{% elif onglet == "baux" %}
+<section class="carte">
+  <div class="titre-actions">
+    <h2>Baux</h2>
+    <a href="{% url 'baux:creer' %}?bien={{ bien.pk }}">Rédiger un bail sans candidature</a>
+  </div>
+  {% if baux %}
+  <table>
+    <thead><tr><th>Locataires</th><th>Prise d'effet</th><th>Loyer HC</th><th>État</th><th>Document</th></tr></thead>
+    <tbody>
+    {% for bail in baux %}
+      <tr{% if not bail.en_cours %} class="inactif"{% endif %}>
+        <td><a href="{{ bail.get_absolute_url }}">{{ bail.noms_locataires|default:"Locataire à renseigner" }}</a></td>
+        <td>{{ bail.date_effet|date:"d/m/Y" }}</td>
+        <td>{{ bail.loyer }} €</td>
+        <td>{% if not bail.en_cours %}terminé le {{ bail.date_fin_effective|date:"d/m/Y" }}{% elif bail.conge_recu_le %}préavis, départ le {{ bail.date_depart_prevue|date:"d/m/Y" }}{% elif bail.date_signature %}signé{% else %}à signer{% endif %}</td>
+        <td class="liens"><a href="{% url 'baux:pdf' bail.pk %}">PDF</a> <a href="{% url 'baux:word' bail.pk %}">Word</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="discret">Aucun bail enregistré pour ce logement.</p>
+  {% endif %}
+</section>
+
+{% elif onglet == "mandats" %}
+<section class="carte">
+  <div class="titre-actions">
+    <h2>Bailleur et mandats</h2>
+    {% if not mandat %}<a class="bouton-petit" href="{% url 'mandats:creer' %}?bien={{ bien.pk }}">Créer le mandat</a>{% endif %}
+  </div>
+  <p><a href="{{ bien.bailleur.get_absolute_url }}">{{ bien.bailleur }}</a><br><span class="discret">{{ bien.bailleur.get_type_display }}</span></p>
+  {% if mandats %}
+  <table>
+    <thead><tr><th>Mandat</th><th>Signé le</th><th>État</th></tr></thead>
+    <tbody>
+    {% for m in mandats %}
+      <tr{% if not m.en_cours %} class="inactif"{% endif %}>
+        <td><a href="{{ m.get_absolute_url }}">Mandat n° {{ m.numero }}</a></td>
+        <td>{{ m.date_signature|date:"d/m/Y"|default:"—" }}</td>
+        <td>{% if m.en_cours %}{% if m.alertes %}<span class="alerte">à vérifier</span>{% else %}en cours{% endif %}{% else %}terminé le {{ m.date_fin|date:"d/m/Y" }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="discret">Aucun mandat de gestion pour ce logement.</p>
+  {% endif %}
+</section>
+
+{% else %}
 <section class="carte">
   <h2>Historique</h2>
   <ul class="historique">
@@ -73,4 +213,5 @@
   {% endfor %}
   </ul>
 </section>
+{% endif %}
 {% endblock %}

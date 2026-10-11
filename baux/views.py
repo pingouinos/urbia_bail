@@ -10,8 +10,10 @@ from biens.models import Bien
 from candidatures.models import Candidature
 from documents import views as documents
 
-from .forms import BailForm, FichierSigneForm, LocataireFormSet, LogementForm, ProprietaireForm
-from .models import Bail
+from django.utils import timezone
+
+from .forms import BailForm, FichierSigneForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm
+from .models import Bail, ajouter_mois
 
 MODELE = "bail_habitation.docx"
 # Logements proposés à la fois à l'étape « Logement ».
@@ -102,6 +104,10 @@ def bail_editer(request, pk=None):
                     if candidature:
                         candidature.bail = objet
                         candidature.save(update_fields=["bail", "modifie_le"])
+                    if nouveau and objet.bien.a_louer:
+                        # Le bail rédigé clôt la mise en location.
+                        objet.bien.mise_en_location_le = objet.bien.disponible_le = None
+                        objet.bien.save(update_fields=["mise_en_location_le", "disponible_le", "modifie_le"])
                 if nouveau:
                     request.session["bail_cree"] = objet.pk
                 else:
@@ -153,6 +159,36 @@ def nouveau_logement(request):
             messages.success(request, "Logement enregistré. Sa fiche pourra être complétée plus tard.")
             return redirect(f"{reverse('baux:creer')}?bien={bien.pk}")
     return render(request, "baux/nouveau_logement.html", {"logement": logement, "proprietaire": proprietaire})
+
+
+def fin(request, pk):
+    """Départ du locataire en une page : le congé reçu et la fin du préavis
+    sont proposés d'avance, puis le départ effectif une fois le préavis fini."""
+    objet = get_object_or_404(Bail.objects.select_related("bien"), pk=pk)
+    aujourd_hui = timezone.localdate()
+    initial = {}
+    if not objet.conge_recu_le:
+        initial = {
+            "conge_origine": Bail.Origine.LOCATAIRE, "conge_recu_le": aujourd_hui,
+            "date_depart_prevue": ajouter_mois(aujourd_hui, objet.mois_preavis),
+        }
+    elif not objet.date_fin_effective and objet.date_depart_prevue <= aujourd_hui:
+        initial = {"date_fin_effective": objet.date_depart_prevue}
+    form = FinBailForm(request.POST or None, instance=objet, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        objet = form.save()
+        if objet.date_fin_effective:
+            messages.success(request, f"Départ enregistré : logement libre depuis le {objet.date_fin_effective:%d/%m/%Y}.")
+        elif objet.conge_recu_le:
+            messages.success(request, f"Congé enregistré : logement libre le {objet.date_depart_prevue:%d/%m/%Y}.")
+        else:
+            messages.success(request, "Bail enregistré.")
+        bien = objet.bien
+        if (objet.conge_recu_le or objet.date_fin_effective) and not bien.a_louer and not bien.situation.a_venir:
+            # Le départ ouvre la mise en location du logement.
+            return redirect("biens:mettre_en_location", pk=bien.pk)
+        return redirect(bien)
+    return render(request, "baux/fin.html", {"bail": objet, "form": form})
 
 
 def telecharger(request, pk, format_):

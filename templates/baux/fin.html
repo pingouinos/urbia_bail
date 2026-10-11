@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block titre %}Départ du locataire · {{ bail.bien.adresse }} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{{ bail.bien.get_absolute_url }}">← {{ bail.bien.adresse }}</a></p>
+<h1>Départ du locataire</h1>
+<p class="discret">{{ bail.noms_locataires|default:"Locataire à renseigner" }} · <a href="{{ bail.get_absolute_url }}">bail du {{ bail.date_effet|date:"d/m/Y" }}</a></p>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <fieldset>
+    <legend>Congé</legend>
+    <div class="champ pleine-largeur{% if form.conge_origine.errors %} en-erreur{% endif %}">
+      <span class="libelle">{{ form.conge_origine.label }} :</span>
+      <div class="choix-radio">{% for radio in form.conge_origine %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
+      {% for erreur in form.conge_origine.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
+    </div>
+    <p class="discret pleine-largeur">Préavis du locataire : {{ bail.mois_preavis }} mois pour ce logement ({% if bail.mois_preavis == 1 %}meublé ou zone tendue{% else %}logement nu hors zone tendue{% endif %}) ; la date de départ proposée en découle. Congé du bailleur : il prend effet au terme du bail, le {{ bail.date_fin|date:"d/m/Y" }}, et doit être donné {% if bail.meuble %}trois{% else %}six{% endif %} mois avant.</p>
+    {% include "biens/_champ.html" with champ=form.conge_recu_le %}
+    {% include "biens/_champ.html" with champ=form.date_depart_prevue %}
+  </fieldset>
+  <fieldset>
+    <legend>Départ effectif</legend>
+    {% include "biens/_champ.html" with champ=form.date_fin_effective %}
+  </fieldset>
+  <button type="submit">Enregistrer</button>
+</form>
+{% endblock %}

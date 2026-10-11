@@ -77,6 +77,24 @@ button.danger[type=submit] { background: var(--erreur); border-color: var(--erre
 .message-erreur, .alerte-fond { background: var(--erreur-clair); border-color: #f6c9c6; color: var(--erreur); }
 .succes { display: inline-block; margin: 0 0 8px; padding: 4px 12px; border-radius: 999px; background: var(--vert); font-weight: 600; }
 
+/* Situation locative d'un bien */
+.pastille { display: inline-block; padding: 2px 10px; border: 1px solid var(--bord); border-radius: 999px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+.pastille-loue { background: var(--vert-clair); border-color: var(--vert); }
+.pastille-preavis { background: var(--melon-clair); border-color: var(--melon); }
+.pastille-libre { background: var(--erreur-clair); border-color: #f6c9c6; color: var(--erreur); }
+.pastille-sans_bail { background: var(--fond); color: var(--discret); }
+.pastille-a_louer { background: var(--acier); border-color: var(--acier); color: #fff; }
+.pastilles { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+
+/* Fiche d'un bien : en-tête puis onglets */
+.fiche-entete { border-top: 4px solid var(--melon); padding-bottom: 0; }
+.fiche-entete p { margin: 0 0 6px; }
+.onglets { display: flex; flex-wrap: wrap; gap: 4px; margin: 16px -8px 0; padding-top: 10px; border-top: 1px solid var(--bord); }
+.onglets a { padding: 8px 12px; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; text-decoration: none; font-weight: 500; white-space: nowrap; }
+.onglets a:hover { background: var(--melon-clair); }
+.onglets a[aria-current=page] { border-bottom-color: var(--corail); font-weight: 700; }
+.actions-location { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin: 16px 0 8px; }
+
 /* Accueil */
 .accroche { display: grid; grid-template-columns: 1fr minmax(280px, 420px); gap: 16px 32px; align-items: center; padding: 28px 32px; border-radius: var(--rayon); background: var(--melon-clair); border: 1px solid #fbd9cb; }
 .accroche h1 { margin-bottom: 4px; }
@@ -141,6 +159,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--acier); }
 .facultatif .champ.obligatoire > label::after, .garants .champ.obligatoire > label::after { content: none; }
 .etapes-dossier { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
 label.case { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
+.libelle { font-weight: 500; }
+.choix-radio { display: flex; flex-wrap: wrap; gap: 4px 24px; }
 .en-erreur input, .en-erreur select, .en-erreur textarea { border-color: var(--erreur); }
 .sous-formulaire { border-bottom: 1px solid var(--bord); padding-bottom: 12px; margin-bottom: 12px; }
 .titre-locataire { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }

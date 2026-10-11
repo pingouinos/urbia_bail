@@ -21,10 +21,26 @@ class BailleurForm(RefIcsVideEnNullMixin, forms.ModelForm):
         ]
 
 
+class MiseEnLocationForm(forms.ModelForm):
+    """Ce qu'il faut pour proposer le logement : la date de disponibilité et
+    le loyer demandé."""
+
+    class Meta:
+        model = Bien
+        fields = ["disponible_le", "dernier_loyer", "charges"]
+        widgets = {"disponible_le": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
+        labels = {"dernier_loyer": "Loyer mensuel hors charges proposé (€)", "charges": "Charges mensuelles (€)"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["disponible_le"].required = True
+        self.fields["dernier_loyer"].required = True
+
+
 class BienForm(RefIcsVideEnNullMixin, forms.ModelForm):
     class Meta:
         model = Bien
-        exclude = ["cree_le", "modifie_le"]
+        exclude = ["cree_le", "modifie_le", "disponible_le"]
         widgets = {
             "date_dpe": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             **{
