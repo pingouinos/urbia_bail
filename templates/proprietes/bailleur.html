@@ -5,7 +5,7 @@
 <div class="titre-actions">
   <h1>{{ bailleur }}</h1>
   <div class="actions">
-    <a href="{% url 'proprietes:propriete_creer' %}?bailleur={{ bailleur.pk }}">Ajouter un bien</a>
+    <a href="{% url 'proprietes:propriete_creer' %}?bailleur={{ bailleur.pk }}&amp;suite=mandat">Ajouter un bien</a>
     <a class="bouton-petit" href="{% url 'proprietes:bailleur_modifier' bailleur.pk %}">Modifier</a>
   </div>
 </div>

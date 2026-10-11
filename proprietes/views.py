@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 
 from contrats.models import Bail
 from candidatures.models import Candidature
+from mandats.models import Mandat
 
 from . import tableur
 from .forms import (
@@ -55,6 +56,8 @@ def _proprietes_filtres(request):
         proprietes = proprietes.filter(usage=usage)
     if request.GET.get("inactifs") != "1":
         proprietes = proprietes.filter(actif=True)
+    if request.GET.get("mandat") == "sans":
+        proprietes = proprietes.filter(~Exists(Mandat.objects.filter(propriete=OuterRef("pk"), date_fin__isnull=True)))
     situation = request.GET.get("situation")
     if situation in dict(SITUATIONS):
         aujourd_hui = timezone.localdate()
@@ -229,6 +232,10 @@ def propriete_editer(request, pk=None):
                 if creer_bailleur:
                     objet.bailleur = nouveau_bailleur.save()
                 objet.save()
+            if pk is None and request.GET.get("suite") == "mandat":
+                # Parcours « mandat d'abord » : la fiche créée, on rédige son mandat.
+                messages.success(request, "Propriété enregistrée. Voici son mandat, prérempli.")
+                return redirect(f"{reverse('mandats:creer')}?propriete={objet.pk}")
             messages.success(request, "Fiche enregistrée.")
             return redirect(objet)
     return render(request, "proprietes/propriete_form.html", {
@@ -268,8 +275,9 @@ def immeuble_creer(request):
                     lot.adresse, lot.code_postal, lot.ville = objet.adresse, objet.code_postal, objet.ville
                     lot.save()
                     nombre += 1
-            messages.success(request, f"Immeuble créé avec {nombre} lot{'s' if nombre > 1 else ''}. "
-                                      "Chaque lot a sa fiche, à compléter avant de rédiger un bail.")
+            suite = ("Rédigez maintenant le mandat de chaque lot." if request.GET.get("suite") == "mandat"
+                     else "Chaque lot a sa fiche, à compléter avant de rédiger un bail.")
+            messages.success(request, f"Immeuble créé avec {nombre} lot{'s' if nombre > 1 else ''}. {suite}")
             return redirect(objet)
     return render(request, "proprietes/immeuble_form.html", {
         "form": form, "communs": communs, "nouveau_bailleur": nouveau_bailleur, "lots": lots,
@@ -278,11 +286,15 @@ def immeuble_creer(request):
 
 def immeuble(request, pk):
     objet = get_object_or_404(Immeuble, pk=pk)
-    lots = list(objet.lots.select_related("bailleur").prefetch_related("baux__locataires").order_by("complement", "pk"))
+    lots = list(
+        objet.lots.select_related("bailleur").prefetch_related("baux__locataires", "mandats").order_by("complement", "pk")
+    )
+    for lot in lots:
+        lot.mandat = next((m for m in lot.mandats.all() if m.date_fin is None), None)
     codes = [lot.situation.code for lot in lots]
     return render(request, "proprietes/immeuble.html", {
         "immeuble": objet, "lots": lots, "nb_loues": sum(code in ("loue", "preavis") for code in codes),
-        "nb_a_louer": sum(lot.a_louer for lot in lots),
+        "nb_a_louer": sum(lot.a_louer for lot in lots), "nb_sans_mandat": sum(lot.mandat is None for lot in lots),
         "bailleurs": list(dict.fromkeys(lot.bailleur for lot in lots)),
     })
 

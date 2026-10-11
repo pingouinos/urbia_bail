@@ -5,10 +5,7 @@
     <h1>Bonjour {{ user.first_name|default:user.username }}</h1>
     <p>Suivez chaque mise en location depuis la fiche du logement : mandat, candidatures, bail, signature.</p>
   </div>
-  <form method="get" action="{% url 'contrats:creer' %}" class="recherche">
-    <input type="search" name="q" placeholder="Adresse ou référence" aria-label="Logement à louer">
-    <button type="submit">Nouveau contrat</button>
-  </form>
+  <div class="accroche-action"><a class="bouton bouton-corail" href="{% url 'contrats:choisir' %}">+ Nouveau contrat</a></div>
 </section>
 {% if agence_manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ agence_manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux. <a href="{% url 'agence' %}">Compléter la fiche</a></p>{% endif %}
 

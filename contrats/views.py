@@ -70,6 +70,11 @@ def bail(request, pk):
     })
 
 
+def choisir(request):
+    """« Nouveau contrat » : un mandat avec le bailleur, ou un bail avec le locataire."""
+    return render(request, "contrats/choisir.html")
+
+
 def bail_editer(request, pk=None):
     objet = get_object_or_404(Bail, pk=pk) if pk else None
     # Bail rédigé depuis une candidature retenue : logement, date d'entrée et

@@ -16,10 +16,9 @@
     <details class="ajouter">
       <summary class="bouton-entete">Ajouter</summary>
       <div class="ajouter-liste">
-        <a href="{% url 'contrats:creer' %}">Bail d'habitation<span class="discret">Contrat de location ; la propriété peut être créée en chemin</span></a>
-        <a href="{% url 'mandats:creer' %}">Mandat de gestion<span class="discret">Contrat avec le bailleur, inscrit au registre</span></a>
+        <a href="{% url 'mandats:creer' %}">Mandat de gestion<span class="discret">Nouvelle propriété confiée à l'agence : sa fiche, puis son mandat</span></a>
+        <a href="{% url 'contrats:creer' %}">Bail d'habitation<span class="discret">Contrat de location d'une propriété du portefeuille</span></a>
         <a href="{% url 'candidatures:creer' %}">Candidature<span class="discret">Pour une propriété à louer</span></a>
-        <a href="{% url 'proprietes:propriete_creer' %}">Propriété<span class="discret">Un logement, ou un immeuble et ses lots</span></a>
         <a href="{% url 'contacts:nouveau' %}">Contact<span class="discret">Propriétaire, locataire ou garant</span></a>
       </div>
     </details>
@@ -29,8 +28,8 @@
     </button>
     <nav class="menu" id="menu-principal" aria-label="Menu principal">
       <a href="{% url 'accueil' %}"{% if rubrique == "accueil" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="12" width="8" height="9" rx="1.5"/><rect x="3" y="15" width="8" height="6" rx="1.5"/></svg>Tableau de bord</a>
-      <a href="{% url 'proprietes:liste' %}"{% if rubrique == "proprietes" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></svg>Propriétés</a>
       <a href="{% url 'contrats:liste' %}"{% if rubrique == "contrats" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>Contrats</a>
+      <a href="{% url 'proprietes:liste' %}"{% if rubrique == "proprietes" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></svg>Propriétés</a>
       <a href="{% url 'contacts:liste' %}"{% if rubrique == "contacts" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18.5 14.8c1.7.8 2.7 2.5 3 5.200"/></svg>Contacts</a>
     </nav>
     <div class="compte">
