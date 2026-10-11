@@ -108,7 +108,8 @@ class OrganisationTests(TestCase):
             reponse = self.client.get(reverse("logo_agence"))
             self.assertEqual(reponse.status_code, 200)
             self.assertEqual(reponse["Content-Type"], "image/png")
-            reponse.close()
+            # Lu sans fermer la réponse : sa fermeture couperait la connexion à la base du test.
+            self.assertTrue(reponse.getvalue().startswith(b"\x89PNG"))
 
     def test_taux_propose_sur_un_nouveau_mandat(self):
         Organisation.objects.create(taux_gestion="6.5")
