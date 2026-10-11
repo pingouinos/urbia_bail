@@ -37,6 +37,9 @@ class ContactForm(forms.ModelForm):
         donnees = super().clean()
         if donnees.get("nature") == Contact.Nature.PERSONNE and not donnees.get("prenom"):
             self.add_error("prenom", "Indiquer le prénom, ou choisir « Entreprise ».")
+        if donnees.get("nature") == Contact.Nature.ENTREPRISE:
+            # Une société n'a ni civilité, ni prénom, ni naissance.
+            donnees.update(civilite="", prenom="", date_naissance=None, lieu_naissance="")
         # Pas de doublon : même nom et même prénom, sauf dates de naissance différentes.
         if donnees.get("nom"):
             naissance = donnees.get("date_naissance")

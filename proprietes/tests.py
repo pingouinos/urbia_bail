@@ -350,6 +350,9 @@ class VuesTests(TestCase):
             "type": "sci_familiale", "nom": "SCI ESGT", "civilite": "Mme", "prenom": "Ignoré",
             "representant_civilite": "Mme", "representant_nom": "Garcia", "representant_prenom": "Elodie",
             "representant_qualite": "gérante", "siren": "732 829 320", "telephone": "0612345678",
+            "associes-TOTAL_FORMS": "2", "associes-INITIAL_FORMS": "0",
+            "associes-0-civilite": "Mme", "associes-0-nom": "Garcia", "associes-0-prenom": "Elodie", "associes-0-parts": "60",
+            "associes-1-civilite": "M.", "associes-1-nom": "Garcia", "associes-1-prenom": "Tom", "associes-1-parts": "40",
         }
         self.assertContains(self.client.get(reverse("proprietes:bailleur_creer")), "js/bailleur.js")
         self.client.post(reverse("proprietes:bailleur_creer"), donnees)
@@ -360,12 +363,34 @@ class VuesTests(TestCase):
         societe, personne = bailleur.contact, bailleur.representant
         self.assertEqual((societe.nature, societe.nom, societe.prenom), ("entreprise", "SCI ESGT", ""))
         self.assertEqual((personne.nature, personne.nom, personne.prenom, personne.civilite), ("personne", "Garcia", "Elodie", "Mme"))
-        self.assertEqual(Contact.objects.count(), 2)
-        self.assertEqual(dict(personne.etiquettes), {"representant": "Représentant"})
+        # Les associés ont leur fiche ; la gérante, aussi associée, n'en a qu'une.
+        self.assertEqual(Contact.objects.count(), 3)
+        self.assertEqual(dict(personne.etiquettes), {"representant": "Représentant", "associe": "Associé"})
+        tom = Contact.objects.get(prenom="Tom")
+        self.assertEqual(dict(tom.etiquettes), {"associe": "Associé"})
+        self.assertIn("Associé de SCI ESGT", [lien.libelle for lien in tom.liens])
+        self.assertContains(self.client.get(bailleur.get_absolute_url()), "GARCIA Tom</a> (40 %)")
+        self.assertContains(self.client.get(societe.get_absolute_url()), "GARCIA Tom")
+        self.assertContains(self.client.get(reverse("contacts:liste"), {"categorie": "associe"}), "GARCIA Tom")
+        # Les parts ne dépassent pas 100 %.
+        reponse = self.client.post(reverse("proprietes:bailleur_modifier", args=[bailleur.pk]), {
+            **donnees, "associes-INITIAL_FORMS": "0", "associes-0-parts": "70",
+        })
+        self.assertContains(reponse, "elles ne peuvent dépasser 100 %")
+        # La fiche contact d'une société ne porte ni civilité ni prénom, même si on en envoie.
+        page = self.client.get(reverse("contacts:modifier", args=[societe.pk]))
+        self.assertContains(page, "sa fiche de bailleur")
+        self.client.post(reverse("contacts:modifier", args=[societe.pk]), {
+            "nature": "entreprise", "nom": "SCI ESGT", "civilite": "Mme", "prenom": "Elodie", "date_naissance": "1980-01-01",
+        })
+        societe.refresh_from_db()
+        self.assertEqual((societe.civilite, societe.prenom, societe.date_naissance), ("", "", None))
         self.assertContains(self.client.get(personne.get_absolute_url()), "SCI ESGT")
         self.assertContains(self.client.get(societe.get_absolute_url()), "GARCIA Elodie")
         self.assertContains(self.client.get(reverse("contacts:liste"), {"categorie": "representant"}), "GARCIA Elodie")
         # Changer de représentant relie la société à une autre personne.
+        donnees = {cle: valeur for cle, valeur in donnees.items() if not cle.startswith("associes-")}
+        donnees.update({"associes-TOTAL_FORMS": "0", "associes-INITIAL_FORMS": "0"})
         self.client.post(reverse("proprietes:bailleur_modifier", args=[bailleur.pk]), {**donnees, "representant_nom": "Faure", "representant_prenom": "Paul"})
         bailleur.refresh_from_db()
         self.assertEqual(bailleur.representant.nom, "Faure")
@@ -373,6 +398,7 @@ class VuesTests(TestCase):
         self.client.post(reverse("proprietes:bailleur_modifier", args=[bailleur.pk]), {**donnees, "type": "physique", "nom": "Garcia", "prenom": "Elodie"})
         bailleur.refresh_from_db()
         self.assertEqual((bailleur.representant, bailleur.representant_nom, bailleur.siren, bailleur.prenom), (None, "", "", "Elodie"))
+        self.assertFalse(bailleur.associes.exists())
 
     def test_controles_de_saisie(self):
         """Téléphone, e-mail, code postal et SIREN sont contrôlés à la saisie."""
@@ -383,6 +409,7 @@ class VuesTests(TestCase):
             self.assertEqual(normaliser_telephone(saisi), attendu)
         reponse = self.client.post(reverse("proprietes:bailleur_creer"), {
             "type": "morale", "nom": "Bernard SA", "siren": "123 456 789", "telephone": "06 12 34", "email": "contact@",
+            "associes-TOTAL_FORMS": "0", "associes-INITIAL_FORMS": "0",
         })
         erreurs = reponse.context["form"].errors
         self.assertEqual(set(erreurs), {"siren", "telephone", "email"})

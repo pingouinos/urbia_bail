@@ -20,6 +20,7 @@
       <div class="choix-radio">{% for radio in form.nature %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
       {% for erreur in form.nature.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
     </div>
+    {% if contact.entreprise %}{% for bailleur in contact.bailleurs.all %}<p class="discret pleine-largeur">Le représentant, les associés et le SIREN de cette société se saisissent sur <a href="{% url 'proprietes:bailleur_modifier' bailleur.pk %}">sa fiche de bailleur</a>.</p>{% endfor %}{% endif %}
     {% if not contact %}<p class="discret pleine-largeur">Un propriétaire reçoit aussi sa fiche de bailleur, à laquelle se rattachent ses propriétés. Un locataire ou un garant saisi ici pourra être relié plus tard à une candidature ou à un bail qui porte le même nom.</p>{% endif %}
   </fieldset>
   {% for titre, champs in form.sections %}
@@ -30,4 +31,21 @@
   {% endfor %}
   <button type="submit" class="bouton-corail">Enregistrer</button>
 </form>
+<script>
+  // Une entreprise n'a ni civilité, ni prénom, ni naissance : seuls les champs
+  // de la nature choisie sont affichés.
+  (function () {
+    var form = document.querySelector("main form.formulaire");
+    var PERSONNE = ["civilite", "prenom", "date_naissance", "lieu_naissance"];
+    var libelle = form.querySelector("label[for='" + form.querySelector("[name=nom]").id + "']");
+    function majAffichage() {
+      var choix = form.querySelector("[name=nature]:checked");
+      var entreprise = Boolean(choix) && choix.value === "entreprise";
+      PERSONNE.forEach(function (nom) { form.querySelector("[name=" + nom + "]").closest(".champ").hidden = entreprise; });
+      libelle.textContent = (entreprise ? "Raison sociale" : "Nom") + "\u00a0:";
+    }
+    form.querySelectorAll("[name=nature]").forEach(function (radio) { radio.addEventListener("change", majAffichage); });
+    majAffichage();
+  })();
+</script>
 {% endblock %}
