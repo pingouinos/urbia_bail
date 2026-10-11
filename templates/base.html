@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script>document.documentElement.classList.add("js");</script>
 </head>
-<body>
+<body{% if user.is_authenticated %} class="avec-panneau"{% endif %}>
   <header class="entete{% if not user.is_authenticated %} entete-seule{% endif %}">
     {% if user.is_authenticated %}
     <a class="marque" href="{% url 'accueil' %}"><img src="{% static 'img/logo-urbia-gestion.png' %}" alt="{{ nom_application }}" width="117" height="48"></a>
@@ -19,11 +19,12 @@
       Menu
     </button>
     <nav class="menu" id="menu-principal" aria-label="Menu principal">
-      <a href="{% url 'baux:liste' %}"{% if rubrique == "baux" %} aria-current="page"{% endif %}>Baux</a>
-      <a href="{% url 'candidatures:liste' %}"{% if rubrique == "candidatures" %} aria-current="page"{% endif %}>Candidatures</a>
-      <a href="{% url 'biens:liste' %}"{% if rubrique == "biens" %} aria-current="page"{% endif %}>Biens</a>
-      <a href="{% url 'biens:bailleurs' %}"{% if rubrique == "bailleurs" %} aria-current="page"{% endif %}>Bailleurs</a>
-      <a href="{% url 'mandats:registre' %}"{% if rubrique == "mandats" %} aria-current="page"{% endif %}>Mandats</a>
+      <a href="{% url 'accueil' %}"{% if rubrique == "accueil" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="12" width="8" height="9" rx="1.5"/><rect x="3" y="15" width="8" height="6" rx="1.5"/></svg>Tableau de bord</a>
+      <a href="{% url 'biens:liste' %}"{% if rubrique == "biens" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></svg>Biens</a>
+      <a href="{% url 'candidatures:liste' %}"{% if rubrique == "candidatures" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18.5 14.8c1.7.8 2.7 2.5 3 5.200"/></svg>Candidatures</a>
+      <a href="{% url 'baux:liste' %}"{% if rubrique == "baux" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>Contrats</a>
+      <a href="{% url 'mandats:registre' %}"{% if rubrique == "mandats" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="m9 13 2 2 4-4.5"/></svg>Mandats</a>
+      <a href="{% url 'biens:bailleurs' %}"{% if rubrique == "bailleurs" %} aria-current="page"{% endif %}><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.8 3.4-6 7-6s6.300 2.200 7 6"/></svg>Bailleurs</a>
     </nav>
     <div class="compte">
       <span>{{ user.get_full_name|default:user.username }}</span>
@@ -31,7 +32,8 @@
       <form method="post" action="{% url 'deconnexion' %}">{% csrf_token %}<button type="submit" class="lien">Se déconnecter</button></form>
     </div>
     <script>
-      // Sur téléphone, le menu et le compte se déplient sous l'en-tête.
+      // Sur ordinateur, le menu est un panneau à gauche ; sur téléphone, il
+      // se déplie sous l'en-tête.
       (function () {
         var bouton = document.querySelector(".bouton-menu");
         bouton.addEventListener("click", function () {

@@ -20,7 +20,7 @@
     <a href="?onglet=location"{% if onglet == "location" %} aria-current="page"{% endif %}>Location</a>
     <a href="?onglet=informations"{% if onglet == "informations" %} aria-current="page"{% endif %}>Informations générales</a>
     <a href="?onglet=candidatures"{% if onglet == "candidatures" %} aria-current="page"{% endif %}>Candidatures{% if toutes_candidatures %} ({{ toutes_candidatures|length }}){% endif %}</a>
-    <a href="?onglet=baux"{% if onglet == "baux" %} aria-current="page"{% endif %}>Baux{% if baux %} ({{ baux|length }}){% endif %}</a>
+    <a href="?onglet=baux"{% if onglet == "baux" %} aria-current="page"{% endif %}>Contrats{% if baux %} ({{ baux|length }}){% endif %}</a>
     <a href="?onglet=mandats"{% if onglet == "mandats" %} aria-current="page"{% endif %}>Mandats{% if mandats %} ({{ mandats|length }}){% endif %}</a>
     <a href="?onglet=historique"{% if onglet == "historique" %} aria-current="page"{% endif %}>Historique</a>
   </nav>
@@ -156,7 +156,7 @@
 {% elif onglet == "baux" %}
 <section class="carte">
   <div class="titre-actions">
-    <h2>Baux</h2>
+    <h2>Contrats</h2>
     <a href="{% url 'baux:creer' %}?bien={{ bien.pk }}">Rédiger un bail sans candidature</a>
   </div>
   {% if baux %}

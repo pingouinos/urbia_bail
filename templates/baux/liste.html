@@ -1,34 +1,34 @@
 {% extends "base.html" %}
-{% block titre %}Baux · {{ nom_application }}{% endblock %}
+{% block titre %}Contrats · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <div class="titre-actions">
-  <h1>Baux</h1>
+  <h1>Contrats</h1>
   <div class="actions"><a class="bouton-petit" href="{% url 'baux:creer' %}">Nouveau bail</a></div>
 </div>
 <form class="filtres" method="get">
   <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Adresse, locataire, référence…" aria-label="Rechercher">
   <select name="etat" aria-label="État">
-    <option value="">Tous les baux</option>
+    <option value="">Tous les contrats</option>
     <option value="en_cours"{% if request.GET.etat == "en_cours" %} selected{% endif %}>En cours</option>
     <option value="termines"{% if request.GET.etat == "termines" %} selected{% endif %}>Terminés</option>
   </select>
   <button type="submit">Filtrer</button>
 </form>
-<p class="discret">{{ page.paginator.count }} bail(s)</p>
-<table>
-  <thead><tr><th>Logement</th><th>Locataires</th><th>Type</th><th>Prise d'effet</th><th>Loyer HC</th><th>État</th></tr></thead>
+<p class="discret">{{ page.paginator.count }} contrat(s)</p>
+<table class="contrats">
+  <thead><tr><th>Bien</th><th>Locataires</th><th class="masquer-mobile">Prise d'effet</th><th>Date de fin</th><th class="masquer-mobile">Loyer HC</th><th>État</th></tr></thead>
   <tbody>
   {% for bail in page %}
     <tr{% if not bail.en_cours %} class="inactif"{% endif %}>
-      <td><a href="{{ bail.get_absolute_url }}">{{ bail.bien.adresse }}</a><br><span class="discret">{{ bail.bien.code_postal }} {{ bail.bien.ville }}</span></td>
-      <td>{% for locataire in bail.locataires.all %}{{ locataire }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-      <td>{{ bail.get_type_display }}</td>
-      <td>{{ bail.date_effet|date:"d/m/Y" }}</td>
-      <td>{{ bail.loyer }} €</td>
-      <td>{% if not bail.en_cours %}terminé{% elif bail.conge_recu_le %}préavis, départ le {{ bail.date_depart_prevue|date:"d/m/Y" }}{% elif bail.alertes %}<span class="alerte">à vérifier</span>{% elif bail.date_signature %}signé{% else %}à signer{% endif %}</td>
+      <td><a href="{{ bail.get_absolute_url }}"><strong>{{ bail.bien.adresse }}{% if bail.bien.complement %}, {{ bail.bien.complement }}{% endif %}</strong></a><br><span class="discret">{{ bail.bien.code_postal }} {{ bail.bien.ville }} · {{ bail.get_type_display }}</span></td>
+      <td>{{ bail.noms_locataires|default:"—" }}</td>
+      <td class="masquer-mobile">{{ bail.date_effet|date:"d/m/Y" }}</td>
+      <td>{% if bail.date_fin_effective %}{{ bail.date_fin_effective|date:"d/m/Y" }}{% elif bail.date_depart_prevue %}{{ bail.date_depart_prevue|date:"d/m/Y" }}<br><span class="discret">départ prévu</span>{% else %}{{ bail.date_fin|date:"d/m/Y" }}{% endif %}</td>
+      <td class="masquer-mobile">{{ bail.loyer }} €</td>
+      <td>{% if not bail.en_cours %}<span class="pastille pastille-sans_bail">Terminé</span>{% elif bail.conge_recu_le %}<span class="pastille pastille-preavis">Préavis</span>{% elif not bail.date_signature %}<span class="pastille pastille-libre">À signer</span>{% elif bail.alertes %}<span class="pastille pastille-libre">À vérifier</span>{% else %}<span class="pastille pastille-loue">En cours</span>{% endif %}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="6" class="discret">Aucun bail. Un bail se rédige depuis la fiche d'un bien ou avec « Nouveau bail ».</td></tr>
+    <tr><td colspan="6" class="discret">Aucun contrat. Un bail se rédige depuis la fiche d'un bien, une fois un candidat retenu.</td></tr>
   {% endfor %}
   </tbody>
 </table>

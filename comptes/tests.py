@@ -67,7 +67,7 @@ class DoubleAuthentificationTests(TestCase):
 
     def test_premiere_connexion_enrole_un_appareil(self):
         reponse = self.client.get(reverse("mfa"))
-        self.assertContains(reponse, "<svg")
+        self.assertContains(reponse, '<div class="qr">')
         appareil = TOTPDevice.objects.get(user=self.user, confirmed=False)
 
         reponse = self.client.post(reverse("mfa"), {"code": code_courant(appareil), "next": "/"})
@@ -85,7 +85,7 @@ class DoubleAuthentificationTests(TestCase):
     def test_appareil_confirme_pas_de_nouveau_qr(self):
         appareil = TOTPDevice.objects.create(user=self.user, confirmed=True)
         reponse = self.client.get(reverse("mfa"))
-        self.assertNotContains(reponse, "<svg")
+        self.assertNotContains(reponse, '<div class="qr">')
         reponse = self.client.post(reverse("mfa"), {"code": code_courant(appareil)})
         self.assertRedirects(reponse, "/")
 
@@ -120,7 +120,7 @@ class DoubleAuthentificationTests(TestCase):
 
     def test_premiere_connexion_enrole_un_appareil(self):
         reponse = self.client.get(reverse("mfa"))
-        self.assertContains(reponse, "<svg")
+        self.assertContains(reponse, '<div class="qr">')
         appareil = TOTPDevice.objects.get(user=self.user, confirmed=False)
 
         reponse = self.client.post(reverse("mfa"), {"code": code_courant(appareil), "next": "/"})
@@ -138,7 +138,7 @@ class DoubleAuthentificationTests(TestCase):
     def test_appareil_confirme_pas_de_nouveau_qr(self):
         appareil = TOTPDevice.objects.create(user=self.user, confirmed=True)
         reponse = self.client.get(reverse("mfa"))
-        self.assertNotContains(reponse, "<svg")
+        self.assertNotContains(reponse, '<div class="qr">')
         reponse = self.client.post(reverse("mfa"), {"code": code_courant(appareil)})
         self.assertRedirects(reponse, "/")
 
