@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from docx import Document
 from openpyxl import load_workbook
 
@@ -78,7 +79,9 @@ class MandatTests(Donnees, TestCase):
         self.assertEqual(mandat.alertes, [])
 
     def test_part_locataire_superieure_a_celle_du_bailleur(self):
-        mandat = self.creer_mandat(honoraires_bail_locataire=390, honoraires_edl_locataire=117)
+        mandat = self.creer_mandat(
+            honoraires_bail_bailleur=0, honoraires_bail_locataire=390, honoraires_edl_bailleur=0, honoraires_edl_locataire=117,
+        )
         self.assertEqual(len(mandat.alertes), 2)
         self.assertIn("dépasse celle du bailleur", mandat.alertes[0])
 
@@ -215,17 +218,50 @@ class VuesTests(Donnees, TestCase):
             reponse = self.client.get(reverse("mandats:pdf", args=[mandat.pk]), follow=True)
         self.assertContains(reponse, "indisponible (le service ne répond pas)")
 
-    def test_depot_du_mandat_signe(self):
-        mandat = self.creer_mandat()
+    def test_signature_du_mandat(self):
+        """La date de signature ne se saisit pas à la rédaction : elle
+        s'enregistre une fois le mandat signé, avec ou sans le scan."""
+        propriete = self.creer_propriete()
+        page = self.client.get(reverse("mandats:creer"), {"propriete": propriete.pk})
+        self.assertNotIn("date_signature", page.context["form"].fields)
+        mandat = self.creer_mandat(propriete)
+        self.assertContains(self.client.get(mandat.get_absolute_url()), "À signer")
+        deposer = reverse("mandats:deposer_signe", args=[mandat.pk])
+        demain = timezone.localdate() + timezone.timedelta(days=1)
+        reponse = self.client.post(deposer, {"date_signature": demain.isoformat()}, follow=True)
+        self.assertContains(reponse, "ne peut pas être dans le futur")
+        # La date seule suffit ; le scan suit quand il est disponible.
+        reponse = self.client.post(deposer, {"date_signature": "2026-09-15"}, follow=True)
+        self.assertContains(reponse, "Signé le 15/09/2026")
+        mandat.refresh_from_db()
+        self.assertEqual((str(mandat.date_signature), bool(mandat.fichier_signe)), ("2026-09-15", False))
         fichier = SimpleUploadedFile("scan.pdf", b"%PDF-1.4 signe", content_type="application/pdf")
-        self.client.post(reverse("mandats:deposer_signe", args=[mandat.pk]), {"fichier_signe": fichier})
+        self.client.post(deposer, {"date_signature": "2026-09-15", "fichier_signe": fichier})
         reponse = self.client.get(reverse("mandats:fichier_signe", args=[mandat.pk]))
         self.assertEqual(b"".join(reponse.streaming_content), b"%PDF-1.4 signe")
         reponse = self.client.post(
-            reverse("mandats:deposer_signe", args=[mandat.pk]),
-            {"fichier_signe": SimpleUploadedFile("virus.exe", b"MZ")}, follow=True,
+            deposer, {"date_signature": "2026-09-15", "fichier_signe": SimpleUploadedFile("virus.exe", b"MZ")}, follow=True,
         )
         self.assertContains(reponse, "Fournir un PDF ou une image")
+
+    def test_honoraires_proposes_au_metre_carre(self):
+        """Visite, dossier et bail : plafond par m² selon la zone, reporté sur
+        la part du bailleur et celle du locataire."""
+        tendue = Mandat.depuis_propriete(self.creer_propriete())
+        self.assertEqual((tendue.honoraires_bail_bailleur, tendue.honoraires_bail_locataire), (Decimal("390.00"), Decimal("390.00")))
+        ailleurs = Mandat.depuis_propriete(self.creer_propriete(zone_tendue=False, surface=Decimal("52.5")))
+        self.assertEqual((ailleurs.honoraires_bail_bailleur, ailleurs.honoraires_bail_locataire), (Decimal("420.00"), Decimal("420.00")))
+        # L'état des lieux : 3 €/m² quelle que soit la zone.
+        self.assertEqual((tendue.honoraires_edl_bailleur, tendue.honoraires_edl_locataire), (Decimal("117.00"), Decimal("117.00")))
+        self.assertEqual((ailleurs.honoraires_edl_bailleur, ailleurs.honoraires_edl_locataire), (Decimal("157.50"), Decimal("157.50")))
+        self.assertEqual(ailleurs.alertes, [])
+        # Sans surface, ou pour un parking, rien n'est proposé.
+        self.assertEqual(Mandat.depuis_propriete(self.creer_propriete(surface=None)).honoraires_bail_locataire, 0)
+        page = self.client.get(reverse("mandats:creer"), {"propriete": tendue.propriete.pk})
+        self.assertContains(page, "39 m² × 10 €/m² (zone tendue) = 390 €")
+        self.assertContains(page, "39 m² × 3 €/m² = 117 €")
+        self.assertContains(page, 'name="honoraires_edl_bailleur" value="117.00"')
+        self.assertContains(page, 'name="honoraires_bail_locataire" value="390.00"')
 
     def test_registre_et_export(self):
         self.creer_mandat()

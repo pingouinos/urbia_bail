@@ -1,17 +1,19 @@
 from django import forms
+from django.utils import timezone
 
 from proprietes.models import Propriete
 from documents.forms import FichierSigneMixin
 
-from .models import Mandat
+from .models import (
+    PLAFOND_BAIL_HORS_ZONE_TENDUE, PLAFOND_BAIL_ZONE_TENDUE, PLAFOND_ETAT_DES_LIEUX, Mandat, plafonds_locataire,
+)
 
 
 class MandatForm(forms.ModelForm):
     class Meta:
         model = Mandat
-        exclude = ["cree_le", "modifie_le", "fichier_signe"]
+        exclude = ["cree_le", "modifie_le", "fichier_signe", "date_signature"]
         widgets = {
-            "date_signature": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "date_fin": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "designation": forms.Textarea(attrs={"rows": 2}),
             "observations": forms.Textarea(attrs={"rows": 3}),
@@ -23,7 +25,7 @@ class MandatForm(forms.ModelForm):
             "propriete", "mandant", "mandant_adresse", "mandant_code_postal_ville",
             "designation", "adresse_bien", "loyer_cc", "charges",
         ]),
-        ("Durée", ["date_signature", "duree_ans", "reconductions", "date_fin"]),
+        ("Durée", ["duree_ans", "reconductions", "date_fin"]),
         ("Gestion", ["taux_gestion", "base_gestion", "assurance_loyers_impayes", "taux_assurance"]),
         ("Honoraires de location", [
             "honoraires_bail_bailleur", "honoraires_bail_locataire",
@@ -55,16 +57,55 @@ class MandatForm(forms.ModelForm):
     def sections(self):
         return [(titre, [self[nom] for nom in noms]) for titre, noms in self.SECTIONS]
 
-    def clean(self):
-        donnees = super().clean()
-        loyer, charges = donnees.get("loyer_cc"), donnees.get("charges")
-        if loyer is not None and charges is not None and charges > loyer:
-            self.add_error("charges", "Les charges ne peuvent dépasser le loyer charges comprises.")
-        return donnees
+    @property
+    def base_honoraires(self):
+        """Rappel des calculs proposés : « 39 m² × 10 €/m² (zone tendue) = 390 € »."""
+        from documents.generation import montant
+
+        propriete = getattr(self.instance, "propriete", None)
+        plafonds = plafonds_locataire(propriete) if propriete else None
+        if not plafonds:
+            return []
+        tendue = propriete.zone_tendue
+        taux = PLAFOND_BAIL_ZONE_TENDUE if tendue else PLAFOND_BAIL_HORS_ZONE_TENDUE
+        surface = montant(propriete.surface)
+        return [
+            f"Visite, dossier et bail : {surface} m² × {montant(taux)} €/m² "
+            f"({'zone tendue' if tendue else 'hors zone tendue'}) = {montant(plafonds[0])} €",
+            f"État des lieux : {surface} m² × {montant(PLAFOND_ETAT_DES_LIEUX)} €/m² = {montant(plafonds[1])} €",
+        ]
 
 
-class FichierSigneForm(FichierSigneMixin, forms.ModelForm):
+class SignatureForm(forms.ModelForm):
+    """Enregistrement de la signature d'un mandat : sa date, et le scan de
+    l'exemplaire signé s'il est disponible."""
+
     class Meta:
         model = Mandat
-        fields = ["fichier_signe"]
-        widgets = {"fichier_signe": FichierSigneMixin.WIDGET}
+        fields = ["date_signature", "fichier_signe"]
+        widgets = {
+            "date_signature": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "fichier_signe": FichierSigneMixin.WIDGET,
+        }
+        labels = {"date_signature": "Signé le", "fichier_signe": "Exemplaire signé (scan)"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["date_signature"].required = True
+        if not self.instance.date_signature:
+            self.initial["date_signature"] = timezone.localdate()
+
+    def clean_date_signature(self):
+        date = self.cleaned_data["date_signature"]
+        if date > timezone.localdate():
+            raise forms.ValidationError("La date de signature ne peut pas être dans le futur.")
+        return date
+
+    def clean_fichier_signe(self):
+        fichier = self.cleaned_data.get("fichier_signe")
+        if fichier and hasattr(fichier, "content_type"):
+            if not fichier.name.lower().endswith((".pdf", ".jpg", ".jpeg", ".png")):
+                raise forms.ValidationError("Fournir un PDF ou une image.")
+            if fichier.size > FichierSigneMixin.TAILLE_MAX:
+                raise forms.ValidationError("Fichier trop volumineux (20 Mo au maximum).")
+        return fichier
