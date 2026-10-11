@@ -11,7 +11,7 @@ from openpyxl.styles import Font
 from proprietes.models import Propriete
 from documents import views as documents
 
-from .forms import FichierSigneForm, MandatForm
+from .forms import MandatForm, SignatureForm
 from .models import Mandat
 
 MODELE = "mandat_gestion.docx"
@@ -72,7 +72,7 @@ def mandat(request, pk):
     return render(request, "mandats/mandat.html", {
         "mandat": objet,
         "historique": objet.history.select_related("history_user")[:10],
-        "form_signe": FichierSigneForm(instance=objet),
+        "form_signe": SignatureForm(instance=objet),
     })
 
 
@@ -113,13 +113,14 @@ def telecharger(request, pk, format_):
 @require_POST
 def deposer_signe(request, pk):
     objet = get_object_or_404(Mandat, pk=pk)
-    form = FichierSigneForm(request.POST, request.FILES, instance=objet)
+    form = SignatureForm(request.POST, request.FILES, instance=objet)
     if form.is_valid():
         form.save()
-        messages.success(request, "Mandat signé enregistré.")
+        messages.success(request, f"Signature du mandat enregistrée au {objet.date_signature:%d/%m/%Y}.")
     else:
-        for erreur in form.errors.get("fichier_signe", []):
-            messages.error(request, erreur)
+        for erreurs in form.errors.values():
+            for erreur in erreurs:
+                messages.error(request, erreur)
     return redirect(objet)
 
 

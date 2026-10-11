@@ -168,9 +168,18 @@ class Mandat(Contrat):
 
         bailleur = propriete.bailleur
         loyer = (propriete.dernier_loyer or 0) + (propriete.charges or 0)
+        # Honoraires de location proposés au plafond légal par m², selon la
+        # zone ; la part du bailleur égale celle du locataire.
+        honoraires_bail, honoraires_edl = (
+            plafond.quantize(Decimal("0.01")) for plafond in plafonds_locataire(propriete) or (Decimal("0"), Decimal("0"))
+        )
         return cls(
             propriete=propriete,
             taux_gestion=Organisation.courante().taux_gestion,
+            honoraires_bail_bailleur=honoraires_bail,
+            honoraires_bail_locataire=honoraires_bail,
+            honoraires_edl_bailleur=honoraires_edl,
+            honoraires_edl_locataire=honoraires_edl,
             mandant=bailleur.designation,
             mandant_adresse=bailleur.adresse,
             mandant_code_postal_ville=f"{bailleur.code_postal} {bailleur.ville}".strip(),
