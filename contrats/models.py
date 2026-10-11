@@ -4,9 +4,11 @@ du décret n° 2015-587 du 29 mai 2015 : annexe 1 pour le logement nu, annexe
 
 import calendar
 import datetime as dt
+from decimal import Decimal
 
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from core.champs import TelephoneField
@@ -125,6 +127,9 @@ class Bail(Contrat):
         "fin effective", null=True, blank=True, help_text="Date de départ du locataire."
     )
     fichier_signe = models.FileField("bail signé (scan)", upload_to="baux/", blank=True)
+    # Suivi des loyers : l'échéancier court à partir de ce mois. Sans date, le
+    # bail n'est pas suivi (bail ancien dont les loyers sont tenus ailleurs).
+    suivi_loyers_depuis = models.DateField("suivi des loyers depuis", null=True, blank=True, editable=False)
 
     history = HistoricalRecords()
 
@@ -172,6 +177,37 @@ class Bail(Contrat):
     @property
     def date_fin(self):
         return ajouter_mois(self.date_effet, self.duree_mois) - dt.timedelta(days=1)
+
+    def completer_echeancier(self, aujourd_hui=None):
+        """Crée les échéances manquantes, du début du suivi au mois prochain
+        (pour envoyer l'avis d'échéance à l'avance), sans dépasser la fin du
+        bail. Le premier et le dernier mois sont calculés au prorata des
+        jours. Une échéance déjà créée n'est jamais recalculée."""
+        if not self.suivi_loyers_depuis:
+            return []
+        aujourd_hui = aujourd_hui or timezone.localdate()
+        dernier_jour = self.date_fin_effective or ajouter_mois(aujourd_hui.replace(day=1), 2) - dt.timedelta(days=1)
+        mois = max(self.suivi_loyers_depuis, self.date_effet).replace(day=1)
+        existantes = set(self.echeances.values_list("periode", flat=True))
+        creees = []
+        while mois <= dernier_jour:
+            fin_mois = ajouter_mois(mois, 1) - dt.timedelta(days=1)
+            debut, fin = max(mois, self.date_effet), min(fin_mois, dernier_jour if self.date_fin_effective else fin_mois)
+            if mois not in existantes and debut <= fin:
+                part = Decimal((fin - debut).days + 1) / Decimal(fin_mois.day)
+                jour = min(self.jour_paiement, fin_mois.day)
+                if self.a_echoir:
+                    exigible = max(mois.replace(day=jour), debut)
+                else:
+                    suivant = ajouter_mois(mois, 1)
+                    exigible = suivant.replace(day=min(self.jour_paiement, calendar.monthrange(suivant.year, suivant.month)[1]))
+                creees.append(Echeance.objects.create(
+                    bail=self, periode=mois, debut=debut, fin=fin, exigible_le=exigible,
+                    loyer=(self.loyer * part).quantize(Decimal("0.01")),
+                    charges=((self.charges or 0) * part).quantize(Decimal("0.01")),
+                ))
+            mois = ajouter_mois(mois, 1)
+        return creees
 
     @property
     def mois_depot_max(self):
@@ -520,3 +556,105 @@ class Locataire(models.Model):
             return ""
         texte = f", né(e) le {self.date_naissance:%d/%m/%Y}"
         return texte + (f" à {self.lieu_naissance}" if self.lieu_naissance else "")
+
+
+MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre",
+        "décembre"]
+
+
+class Echeance(models.Model):
+    """Loyer d'un mois pour un bail suivi : ce qui est dû, pour quand, et si
+    c'est payé. Elle donne l'avis d'échéance, puis la quittance une fois le
+    paiement pointé. Ce n'est pas de la comptabilité : ni compte du mandant,
+    ni reversement, ni paiement partiel."""
+
+    # Un loyer est signalé impayé quelques jours après sa date d'exigibilité.
+    TOLERANCE = dt.timedelta(days=5)
+
+    bail = models.ForeignKey(Bail, on_delete=models.CASCADE, related_name="echeances")
+    periode = models.DateField("mois")  # premier jour du mois
+    debut = models.DateField("du")
+    fin = models.DateField("au")
+    loyer = _montant(verbose_name="loyer hors charges (€)")
+    charges = _montant(verbose_name="charges (€)", default=0)
+    exigible_le = models.DateField("exigible le")
+    paye_le = models.DateField("payé le", null=True, blank=True)
+    modifie_le = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-periode"]
+        verbose_name = "échéance de loyer"
+        constraints = [models.UniqueConstraint(fields=["bail", "periode"], name="echeance_unique_par_mois")]
+
+    def __str__(self):
+        return f"Loyer de {self.libelle} · {self.bail.propriete.adresse}"
+
+    def get_absolute_url(self):
+        return f"{self.bail.get_absolute_url()}#loyers"
+
+    @property
+    def libelle(self):
+        return f"{MOIS[self.periode.month - 1]} {self.periode.year}"
+
+    @property
+    def total(self):
+        return self.loyer + self.charges
+
+    @property
+    def partielle(self):
+        """Mois incomplet (entrée ou sortie en cours de mois), calculé au prorata."""
+        return self.debut != self.periode or self.fin != ajouter_mois(self.periode, 1) - dt.timedelta(days=1)
+
+    @property
+    def payee(self):
+        return self.paye_le is not None
+
+    @property
+    def etat(self):
+        """(code de pastille, libellé)."""
+        aujourd_hui = timezone.localdate()
+        if self.payee:
+            return "loue", f"Payé le {self.paye_le:%d/%m/%Y}"
+        if self.exigible_le + self.TOLERANCE < aujourd_hui:
+            return "libre", "Impayé"
+        if self.exigible_le <= aujourd_hui:
+            return "preavis", "À encaisser"
+        return "sans_bail", "À venir"
+
+    @property
+    def impayee(self):
+        return self.etat[0] == "libre"
+
+    @property
+    def nom_fichier(self):
+        noms = " ".join(locataire.nom.upper() for locataire in self.bail.locataires.all())
+        return f"{'Quittance' if self.payee else 'Avis d échéance'} {self.libelle} {noms}".strip()[:120]
+
+    def contexte_document(self):
+        """Valeurs pour les modèles Word de l'avis d'échéance et de la quittance."""
+        from core.models import Organisation
+        from documents.generation import montant
+
+        bail, propriete = self.bail, self.bail.propriete
+
+        def date(valeur):
+            return valeur.strftime("%d/%m/%Y") if valeur else ""
+
+        return {
+            "agence": Organisation.courante().contexte_document(),
+            "bailleur": propriete.bailleur.designation,
+            "locataires": bail.noms_locataires,
+            "adresse": ", ".join(m for m in [propriete.adresse, propriete.complement,
+                                              f"{propriete.code_postal} {propriete.ville}"] if m),
+            "periode": self.libelle,
+            "debut": date(self.debut),
+            "fin": date(self.fin),
+            "loyer": montant(self.loyer),
+            "charges": montant(self.charges),
+            "libelle_charges": "Forfait de charges" if bail.mode_charges == "forfait" else "Provision pour charges",
+            "total": montant(self.total),
+            "exigible_le": date(self.exigible_le),
+            "paye_le": date(self.paye_le),
+            "date": date(timezone.localdate()),
+            "lieu": bail.lieu_signature,
+        }

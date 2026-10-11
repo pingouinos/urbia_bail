@@ -50,6 +50,46 @@
   </section>
 </div>
 
+<section class="carte" id="loyers">
+  <div class="titre-actions">
+    <h2>Loyers</h2>
+    {% if bail.suivi_loyers_depuis %}<span class="discret">suivis depuis {{ bail.suivi_loyers_depuis|date:"F Y" }}</span>{% endif %}
+  </div>
+  {% if echeances %}
+  <table class="loyers">
+    <thead><tr><th>Mois</th><th>Montant</th><th>Exigible le</th><th>État</th><th>Documents</th><th>Paiement</th></tr></thead>
+    <tbody>
+    {% for echeance in echeances %}
+      <tr>
+        <td>{{ echeance.libelle|capfirst }}{% if echeance.partielle %}<br><span class="discret">du {{ echeance.debut|date:"d/m" }} au {{ echeance.fin|date:"d/m" }}, au prorata</span>{% endif %}</td>
+        <td>{{ echeance.total }} €<br><span class="discret">dont {{ echeance.charges }} € de charges</span></td>
+        <td>{{ echeance.exigible_le|date:"d/m/Y" }}</td>
+        <td><span class="pastille pastille-{{ echeance.etat.0 }}">{{ echeance.etat.1 }}</span></td>
+        <td class="liens">{% if echeance.payee %}<a href="{% url 'contrats:echeance_quittance' echeance.pk %}">Quittance</a>{% else %}<a href="{% url 'contrats:echeance_avis' echeance.pk %}">Avis d'échéance</a>{% endif %}</td>
+        <td>
+          <form method="post" action="{% url 'contrats:echeance_pointer' echeance.pk %}" class="en-ligne">
+            {% csrf_token %}
+            {% if echeance.payee %}<button type="submit" name="action" value="annuler" class="lien" onclick="return confirm('Annuler le paiement de {{ echeance.libelle }} ?');">Annuler</button>
+            {% else %}<input type="date" name="paye_le" value="{{ aujourd_hui }}" max="{{ aujourd_hui }}" aria-label="Date du paiement de {{ echeance.libelle }}"> <button type="submit" class="bouton-petit secondaire">Payé</button>{% endif %}
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="discret">Les douze derniers mois. L'avis d'échéance se télécharge avant le paiement ; une fois le loyer pointé, il laisse la place à la quittance. Les montants d'un mois déjà créé ne changent pas si le loyer du bail est modifié ensuite.</p>
+  {% elif bail.suivi_loyers_depuis %}
+  <p class="discret">Aucune échéance pour l'instant.</p>
+  {% else %}
+  <p class="discret">Le suivi des loyers n'est pas activé pour ce bail. Une fois activé, chaque mois donne un avis d'échéance, puis une quittance quand le paiement est pointé.</p>
+  <form method="post" action="{% url 'contrats:loyers_suivre' bail.pk %}" class="en-ligne">
+    {% csrf_token %}
+    <label>Premier mois suivi <input type="month" name="depuis" value="{{ mois_propose }}" required></label>
+    <button type="submit">Suivre les loyers</button>
+  </form>
+  {% endif %}
+</section>
+
 <section class="carte">
   <h2>Honoraires de location</h2>
   <dl>
