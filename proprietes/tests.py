@@ -377,6 +377,9 @@ class VuesTests(TestCase):
         self.assertEqual((bailleur.prenom, bailleur.civilite, bailleur.telephone), ("", "", "06 12 34 56 78"))
         self.assertEqual(bailleur.designation, "SCI ESGT, représentée par Madame GARCIA Elodie, gérante")
         self.assertEqual(str(bailleur), "SCI ESGT")
+        # Le SIREN mène à la fiche de la société, où son extrait RNE se télécharge.
+        self.assertEqual(bailleur.lien_annuaire, "https://annuaire-entreprises.data.gouv.fr/entreprise/732829320")
+        self.assertContains(self.client.get(bailleur.get_absolute_url()), bailleur.lien_annuaire)
         societe, personne = bailleur.contact, bailleur.representant
         self.assertEqual((societe.nature, societe.nom, societe.prenom), ("entreprise", "SCI ESGT", ""))
         self.assertEqual((personne.nature, personne.nom, personne.prenom, personne.civilite), ("personne", "Garcia", "Elodie", "Mme"))
