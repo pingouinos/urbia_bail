@@ -30,14 +30,17 @@
       <span class="pastille">{{ contact.get_nature_display }}</span>
     </div>
     <div class="coordonnees">{% if contact.email %}<span>{{ contact.email }}</span>{% endif %}{% if contact.telephone %}<span>{{ contact.telephone }}</span>{% endif %}{% if not contact.email and not contact.telephone %}<span class="discret">Coordonnées non renseignées</span>{% endif %}</div>
-    {% if contact.liens|length > 3 %}
+    {% if contact.relations %}<div class="relations">{% for relation in contact.relations %}<span>{% if relation.url %}<a href="{{ relation.url }}">{{ relation.libelle }}</a>{% else %}{{ relation.libelle }}{% endif %}{% if relation.precision %} <span class="discret">({{ relation.precision }})</span>{% endif %}</span>{% endfor %}</div>{% endif %}
+    {% with liens=contact.liens_propres %}
+    {% if liens|length > 3 %}
     <details class="liens-contact">
-      <summary>{% with nb=contact.proprietes|length %}{% if nb and nb == contact.liens|length %}{{ nb }} propriétés{% else %}{{ contact.liens|length }} liens{% endif %}{% endwith %}</summary>
-      <ul>{% for lien in contact.liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} · {{ lien.precision }}{% endif %}</li>{% endfor %}</ul>
+      <summary>{% with nb=contact.proprietes|length %}{% if nb == liens|length %}{{ nb }} propriétés{% else %}{{ liens|length }} liens{% endif %}{% endwith %}</summary>
+      <ul>{% for lien in liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} · {{ lien.precision }}{% endif %}</li>{% endfor %}</ul>
     </details>
-    {% elif contact.liens %}
-    <ul class="liens-contact">{% for lien in contact.liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} · {{ lien.precision }}{% endif %}</li>{% endfor %}</ul>
-    {% else %}<div class="liens-contact">Aucun lien pour l'instant</div>{% endif %}
+    {% elif liens %}
+    <ul class="liens-contact">{% for lien in liens %}<li><a href="{{ lien.url }}">{{ lien.libelle }}</a>{% if lien.precision %} · {{ lien.precision }}{% endif %}</li>{% endfor %}</ul>
+    {% elif not contact.relations %}<div class="liens-contact">Aucun lien pour l'instant</div>{% endif %}
+    {% endwith %}
   </li>
   {% endfor %}
 </ul>
