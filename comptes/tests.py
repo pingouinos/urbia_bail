@@ -45,7 +45,7 @@ class ConnexionTests(TestCase):
             reverse("connexion"), {"username": "gestion", "password": "mot-de-passe-solide"}
         )
         self.assertRedirects(reponse, reverse("accueil"))
-        self.assertContains(self.client.get(reverse("accueil")), "gestionnaire")
+        self.assertContains(self.client.get(reverse("accueil")), "Gestionnaire")
 
 
 def code_courant(appareil):

@@ -357,3 +357,6 @@ dd { margin: 0; }
 
 /* Entrée « Administration » du panneau, quand on s'y trouve. */
 .lien-admin[aria-current=page] { background: var(--melon-clair); color: var(--acier); font-weight: 600; }
+
+/* Rôle sous le nom de la personne connectée. */
+.compte-role { display: block; font-size: 0.8rem; font-weight: 400; color: var(--discret); }
