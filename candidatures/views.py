@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from biens.models import Bien
+from proprietes.models import Propriete
 
 from .forms import (
     CandidatureForm, DossierLocataireForm, ReponseForm, candidat_formset, candidat_locataire_formset,
@@ -30,35 +30,35 @@ def liste(request):
     # Pas de tâche planifiée sur le NAS : la purge passe aussi à chaque
     # consultation de la liste.
     Candidature.purger()
-    candidatures = Candidature.objects.select_related("bien", "bail").prefetch_related("candidats")
+    candidatures = Candidature.objects.select_related("propriete", "bail").prefetch_related("candidats")
     q = request.GET.get("q", "").strip()
     if q:
         candidatures = candidatures.filter(
-            Q(bien__adresse__icontains=q) | Q(bien__ville__icontains=q) | Q(bien__ref_ics__icontains=q)
+            Q(propriete__adresse__icontains=q) | Q(propriete__ville__icontains=q) | Q(propriete__ref_ics__icontains=q)
             | Q(candidats__nom__icontains=q) | Q(candidats__prenom__icontains=q)
         ).distinct()
-    bien = None
-    if request.GET.get("bien", "").isdigit():
-        bien = get_object_or_404(Bien, pk=request.GET["bien"])
-        candidatures = candidatures.filter(bien=bien)
+    propriete = None
+    if request.GET.get("propriete", "").isdigit():
+        propriete = get_object_or_404(Propriete, pk=request.GET["propriete"])
+        candidatures = candidatures.filter(propriete=propriete)
     if request.GET.get("statut") in Candidature.Statut.values:
         candidatures = candidatures.filter(statut=request.GET["statut"])
     page = Paginator(candidatures, 50).get_page(request.GET.get("page"))
     parametres = request.GET.copy()
     parametres.pop("page", None)
     return render(request, "candidatures/liste.html", {
-        "page": page, "parametres": parametres.urlencode(), "statuts": Candidature.Statut.choices, "bien": bien,
+        "page": page, "parametres": parametres.urlencode(), "statuts": Candidature.Statut.choices, "propriete": propriete,
     })
 
 
 def candidature(request, pk):
-    objet = get_object_or_404(Candidature.objects.select_related("bien__bailleur", "decide_par", "bail"), pk=pk)
+    objet = get_object_or_404(Candidature.objects.select_related("propriete__bailleur", "decide_par", "bail"), pk=pk)
     return render(request, "candidatures/candidature.html", {"candidature": objet})
 
 
 def candidature_editer(request, pk=None):
     objet = get_object_or_404(Candidature, pk=pk) if pk else None
-    initial = {"bien": request.GET["bien"]} if objet is None and request.GET.get("bien") else {}
+    initial = {"propriete": request.GET["propriete"]} if objet is None and request.GET.get("propriete") else {}
     form = CandidatureForm(request.POST or None, instance=objet, initial=initial)
     candidats = candidat_formset(request.POST or None, form.instance)
     if request.method == "POST" and form.is_valid() and candidats.is_valid():
@@ -92,7 +92,7 @@ def decider(request, pk):
 
 
 def reponse(request, pk):
-    objet = get_object_or_404(Candidature.objects.select_related("bien"), pk=pk)
+    objet = get_object_or_404(Candidature.objects.select_related("propriete"), pk=pk)
     if objet.statut != Candidature.Statut.NON_RETENUE:
         messages.error(request, "La réponse ne s'envoie qu'à une candidature non retenue.")
         return redirect(objet)
@@ -107,7 +107,7 @@ def reponse(request, pk):
                     "candidature": objet, "form": form, "destinataires": destinataires, "envoi": False,
                 })
             EmailMessage(
-                subject=f"Votre candidature pour le logement {objet.bien.adresse}, {objet.bien.ville}",
+                subject=f"Votre candidature pour le logement {objet.propriete.adresse}, {objet.propriete.ville}",
                 body=form.cleaned_data["texte"],
                 to=destinataires,
             ).send()
@@ -128,10 +128,10 @@ def effacer(request, pk):
     if objet.bail_id:
         messages.error(request, "Cette candidature est devenue un bail : elle reste au dossier du locataire.")
         return redirect(objet)
-    bien = objet.bien
+    propriete = objet.propriete
     objet.delete()
     messages.success(request, "Candidature et données du candidat effacées.")
-    return redirect(f"{reverse('candidatures:liste')}?bien={bien.pk}")
+    return redirect(f"{reverse('candidatures:liste')}?propriete={propriete.pk}")
 
 
 def adresse_lien(request, jeton):
@@ -145,7 +145,7 @@ def adresse_lien(request, jeton):
 
 def lien(request, pk):
     """Lien personnel du candidat, et message pour le lui envoyer."""
-    objet = get_object_or_404(Candidature.objects.select_related("bien"), pk=pk)
+    objet = get_object_or_404(Candidature.objects.select_related("propriete"), pk=pk)
     if request.method == "POST" and request.POST.get("action") == "creer":
         if not objet.lien_possible:
             messages.error(request, "Le lien s'envoie à une candidature à l'étude ou retenue, avant la rédaction du bail.")
@@ -161,7 +161,7 @@ def lien(request, pk):
     destinataires = sorted({c.email for c in objet.candidats.all() if c.email})
     sujet = (
         f"Votre {'bail' if objet.statut == Candidature.Statut.RETENUE else 'candidature'} "
-        f"pour le logement {objet.bien.adresse}, {objet.bien.ville}"
+        f"pour le logement {objet.propriete.adresse}, {objet.propriete.ville}"
     )
     if request.method == "POST" and request.POST.get("action") == "envoyer" and form.is_valid():
         if envoi_configure() and destinataires:

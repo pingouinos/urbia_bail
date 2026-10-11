@@ -11,8 +11,8 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("baux", "0001_initial"),
-        ("biens", "0003_identifiant_fiscal"),
+        ("contrats", "0001_initial"),
+        ("proprietes", "0003_identifiant_fiscal"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -113,7 +113,7 @@ class Migration(migrations.Migration):
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
                         related_name="candidature",
-                        to="baux.bail",
+                        to="contrats.bail",
                     ),
                 ),
                 (
@@ -121,7 +121,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.PROTECT,
                         related_name="candidatures",
-                        to="biens.bien",
+                        to="proprietes.bien",
                     ),
                 ),
                 (

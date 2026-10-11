@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titre %}{% if propriete %}Modifier le bien{% else %}Nouvelle propriété{% endif %} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{% if propriete %}{{ propriete.get_absolute_url }}{% else %}{% url 'proprietes:liste' %}{% endif %}">← Retour</a></p>
+<h1>{% if propriete %}Modifier {{ propriete.adresse }}{% else %}Nouvelle propriété{% endif %}</h1>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for titre, champs in form.sections %}
+  <fieldset>
+    <legend>{{ titre }}</legend>
+    {% for champ in champs %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  {% endfor %}
+  <button type="submit">Enregistrer</button>
+</form>
+{% endblock %}

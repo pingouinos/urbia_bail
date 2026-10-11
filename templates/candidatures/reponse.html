@@ -3,13 +3,13 @@
 {% block contenu %}
 <p><a href="{{ candidature.get_absolute_url }}">← Candidature</a></p>
 <h1>Réponse au candidat</h1>
-<p class="discret">Pour {{ candidature.noms }} · {{ candidature.bien }}<br>Destinataire(s) : {{ destinataires|join:", "|default:"aucune adresse e-mail sur la fiche" }}</p>
+<p class="discret">Pour {{ candidature.noms }} · {{ candidature.propriete }}<br>Destinataire(s) : {{ destinataires|join:", "|default:"aucune adresse e-mail sur la fiche" }}</p>
 <p class="message">Le message reste neutre : aucun motif de refus n'est à donner au candidat. Il l'informe de l'effacement de ses données sous trois mois.</p>
 <form method="post" class="formulaire">
   {% csrf_token %}
   <fieldset>
     <legend>Message</legend>
-    {% include "biens/_champ.html" with champ=form.texte %}
+    {% include "proprietes/_champ.html" with champ=form.texte %}
   </fieldset>
   {% if envoi and destinataires %}
   <button type="submit" name="action" value="envoyer">Envoyer l'e-mail</button>

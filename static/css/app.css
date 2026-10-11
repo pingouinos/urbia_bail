@@ -103,6 +103,10 @@ button.danger[type=submit] { background: var(--erreur); border-color: var(--erre
 .pastille-preavis { background: var(--melon-clair); border-color: var(--melon); }
 .pastille-libre { background: var(--erreur-clair); border-color: #f6c9c6; color: var(--erreur); }
 .pastille-sans_bail { background: var(--fond); color: var(--discret); }
+.pastille-type-bail { background: var(--melon-clair); border-color: var(--melon); }
+.pastille-type-mandat { background: var(--carte); border-color: var(--acier); }
+.bouton-petit.secondaire { background: var(--carte); color: var(--acier); }
+.bouton-petit.secondaire:hover { background: var(--melon-clair); }
 .pastille-a_louer { background: var(--acier); border-color: var(--acier); color: #fff; }
 .pastilles { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 

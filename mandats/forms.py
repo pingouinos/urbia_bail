@@ -1,6 +1,6 @@
 from django import forms
 
-from biens.models import Bien
+from proprietes.models import Propriete
 from documents.forms import FichierSigneMixin
 
 from .models import Mandat
@@ -19,7 +19,7 @@ class MandatForm(forms.ModelForm):
 
     SECTIONS = [
         ("Bien et mandant", [
-            "bien", "mandant", "mandant_adresse", "mandant_code_postal_ville",
+            "propriete", "mandant", "mandant_adresse", "mandant_code_postal_ville",
             "designation", "adresse_bien", "loyer_cc", "charges",
         ]),
         ("Durée", ["date_signature", "duree_ans", "reconductions", "date_fin"]),
@@ -33,10 +33,10 @@ class MandatForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["bien"].queryset = Bien.objects.filter(actif=True).select_related("bailleur")
+        self.fields["propriete"].queryset = Propriete.objects.filter(actif=True).select_related("bailleur")
         if self.instance.pk:
             # Le bien d'un mandat enregistré ne change plus.
-            self.fields["bien"].disabled = True
+            self.fields["propriete"].disabled = True
 
     def sections(self):
         return [(titre, [self[nom] for nom in noms]) for titre, noms in self.SECTIONS]

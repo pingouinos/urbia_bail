@@ -28,7 +28,7 @@ from .models import Modele
 # remplissage d'essai.
 MODELES = {
     "mandat_gestion.docx": ("Mandat de gestion", "mandats.Mandat"),
-    "bail_habitation.docx": ("Bail d'habitation (nu ou meublé)", "baux.Bail"),
+    "bail_habitation.docx": ("Bail d'habitation (nu ou meublé)", "contrats.Bail"),
 }
 TAILLE_MAX = 10 * 1024 * 1024
 

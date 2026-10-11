@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from biens.models import Bien
+from proprietes.models import Propriete
 from documents import views as documents
 
 from .forms import FichierSigneForm, MandatForm
@@ -19,10 +19,10 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def _mandats_filtres(request):
-    mandats = Mandat.objects.select_related("bien")
+    mandats = Mandat.objects.select_related("propriete")
     q = request.GET.get("q", "").strip()
     if q:
-        filtre = Q(mandant__icontains=q) | Q(adresse_bien__icontains=q) | Q(bien__ref_ics__icontains=q)
+        filtre = Q(mandant__icontains=q) | Q(adresse_bien__icontains=q) | Q(propriete__ref_ics__icontains=q)
         if q.isdigit():
             filtre |= Q(numero=int(q))
         mandats = mandats.filter(filtre)
@@ -46,7 +46,7 @@ def registre_export(request):
     feuille = classeur.active
     feuille.title = "Registre des mandats"
     entetes = [
-        "N°", "Date de signature", "Mandant", "Adresse du mandant", "Bien", "Durée",
+        "N°", "Date de signature", "Mandant", "Adresse du mandant", "Propriété", "Durée",
         "Fin", "Réf. ICS lot",
     ]
     feuille.append(entetes)
@@ -56,7 +56,7 @@ def registre_export(request):
         feuille.append([
             mandat.numero, mandat.date_signature, mandat.mandant,
             f"{mandat.mandant_adresse} {mandat.mandant_code_postal_ville}", mandat.adresse_bien,
-            mandat.duree_texte, mandat.date_fin, mandat.bien.ref_ics,
+            mandat.duree_texte, mandat.date_fin, mandat.propriete.ref_ics,
         ])
     for colonne, largeur in zip("ABCDEFGH", [6, 14, 36, 40, 40, 30, 12, 12]):
         feuille.column_dimensions[colonne].width = largeur
@@ -68,7 +68,7 @@ def registre_export(request):
 
 
 def mandat(request, pk):
-    objet = get_object_or_404(Mandat.objects.select_related("bien__bailleur"), pk=pk)
+    objet = get_object_or_404(Mandat.objects.select_related("propriete__bailleur"), pk=pk)
     return render(request, "mandats/mandat.html", {
         "mandat": objet,
         "historique": objet.history.select_related("history_user")[:10],
@@ -79,15 +79,15 @@ def mandat(request, pk):
 def mandat_editer(request, pk=None):
     objet = get_object_or_404(Mandat, pk=pk) if pk else None
     if objet is None and request.method == "GET":
-        if not request.GET.get("bien"):
+        if not request.GET.get("propriete"):
             # Premier temps : choisir le bien, pour préremplir le mandat.
-            sous_mandat = Mandat.objects.filter(date_fin__isnull=True).values("bien")
-            biens = Bien.objects.filter(actif=True).exclude(pk__in=sous_mandat)
-            return render(request, "mandats/choisir_bien.html", {
-                "biens": biens.select_related("bailleur"),
+            sous_mandat = Mandat.objects.filter(date_fin__isnull=True).values("propriete")
+            proprietes = Propriete.objects.filter(actif=True).exclude(pk__in=sous_mandat)
+            return render(request, "mandats/choisir_propriete.html", {
+                "proprietes": proprietes.select_related("bailleur"),
             })
-        bien = get_object_or_404(Bien.objects.select_related("bailleur"), pk=request.GET["bien"])
-        form = MandatForm(instance=Mandat.depuis_bien(bien))
+        propriete = get_object_or_404(Propriete.objects.select_related("bailleur"), pk=request.GET["propriete"])
+        form = MandatForm(instance=Mandat.depuis_propriete(propriete))
     else:
         form = MandatForm(request.POST or None, instance=objet)
         if form.is_valid():

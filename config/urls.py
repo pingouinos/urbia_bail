@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.generic import RedirectView
 
 from candidatures import views as candidatures_views
 from comptes import views as comptes_views
@@ -13,11 +14,14 @@ admin.site.site_title = settings.NOM_APPLICATION
 urlpatterns = [
     path("", views.accueil, name="accueil"),
     path("sante/", views.sante, name="sante"),
-    path("biens/", include("biens.urls")),
+    path("proprietes/", include("proprietes.urls")),
     path("mandats/", include("mandats.urls")),
     path("candidatures/", include("candidatures.urls")),
-    path("baux/", include("baux.urls")),
+    path("contrats/", include("contrats.urls")),
     path("modeles/", include("documents.urls")),
+    # Anciennes adresses, pour les favoris et les liens déjà envoyés.
+    re_path(r"^biens/(?P<suite>.*)$", RedirectView.as_view(url="/proprietes/%(suite)s", query_string=True)),
+    re_path(r"^baux/(?P<suite>.*)$", RedirectView.as_view(url="/contrats/%(suite)s", query_string=True)),
     # Formulaire du candidat, seule partie ouverte sans connexion.
     path("locataire/merci/", candidatures_views.formulaire_locataire_merci, name="formulaire_locataire_merci"),
     path("locataire/<str:jeton>/", candidatures_views.formulaire_locataire, name="formulaire_locataire"),

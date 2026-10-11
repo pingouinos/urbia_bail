@@ -21,8 +21,8 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
-from baux.models import Bail
-from biens.models import Bailleur, Bien, Horodatage
+from contrats.models import Bail
+from proprietes.models import Bailleur, Propriete, Horodatage
 
 DUREE_CONSERVATION = dt.timedelta(days=90)
 # Durée de validité du lien envoyé au candidat pour compléter ses
@@ -51,7 +51,9 @@ class Candidature(Horodatage):
         VISALE = "visale", "Visale"
         AUTRE = "autre", "Autre garantie"
 
-    bien = models.ForeignKey(Bien, on_delete=models.PROTECT, related_name="candidatures")
+    propriete = models.ForeignKey(
+        Propriete, on_delete=models.PROTECT, related_name="candidatures", verbose_name="propriété",
+    )
     nombre_locataires = models.PositiveSmallIntegerField(
         "nombre de locataires", default=1,
         validators=[MinValueValidator(1), MaxValueValidator(MAX_LOCATAIRES)],
@@ -96,7 +98,7 @@ class Candidature(Horodatage):
         verbose_name = "candidature"
 
     def __str__(self):
-        return f"{self.noms or 'Candidature'} · {self.bien.adresse}"
+        return f"{self.noms or 'Candidature'} · {self.propriete.adresse}"
 
     def get_absolute_url(self):
         return reverse("candidatures:candidature", args=[self.pk])
@@ -118,7 +120,7 @@ class Candidature(Horodatage):
     def taux_effort(self):
         """Part des revenus mensuels nets consacrée au loyer charges comprises,
         en pourcentage, sur la base du dernier loyer du bien."""
-        loyer = (self.bien.dernier_loyer or 0) + (self.bien.charges or 0)
+        loyer = (self.propriete.dernier_loyer or 0) + (self.propriete.charges or 0)
         if not loyer or not self.revenus:
             return None
         return round(loyer * 100 / self.revenus)
@@ -126,18 +128,18 @@ class Candidature(Horodatage):
     @property
     def alertes(self):
         alertes = []
-        mandat = self.bien.mandat_en_cours
+        mandat = self.propriete.mandat_en_cours
         if (self.garantie == self.Garantie.PERSONNE and mandat and mandat.assurance_loyers_impayes
                 and not self.candidats.filter(
-                    contrat__in=[Candidat.Contrat.ETUDIANT, Candidat.Contrat.APPRENTI]).exists()):
+                    situation__in=[Candidat.Situation.ETUDIANT, Candidat.Situation.APPRENTI]).exists()):
             alertes.append(
                 "Le mandat prévoit une assurance loyers impayés : le bailleur ne peut pas exiger en plus "
                 "une caution, sauf pour un étudiant ou un apprenti (art. 22-1 de la loi du 6 juillet 1989)."
             )
-        if self.bien.location_interdite:
+        if self.propriete.location_interdite:
             alertes.append("Logement classé G au DPE : il ne peut plus être loué comme résidence principale.")
         if not self.bail_id:
-            empechement = Bail.empechement(self.bien, self.date_entree_souhaitee)
+            empechement = Bail.empechement(self.propriete, self.date_entree_souhaitee)
             if empechement:
                 alertes.append(empechement[1])
         return alertes
@@ -190,12 +192,12 @@ class Candidature(Horodatage):
     @classmethod
     def par_jeton(cls, jeton):
         """Candidature dont le lien est encore valable, ou None."""
-        candidature = cls.objects.select_related("bien").filter(jeton=jeton).first() if jeton else None
+        candidature = cls.objects.select_related("propriete").filter(jeton=jeton).first() if jeton else None
         return candidature if candidature and candidature.lien_valide else None
 
     def texte_lien(self, lien, signataire=""):
-        bien = self.bien
-        logement = f"le logement situé {bien.adresse}, {bien.code_postal} {bien.ville}"
+        propriete = self.propriete
+        logement = f"le logement situé {propriete.adresse}, {propriete.code_postal} {propriete.ville}"
         if self.statut == self.Statut.RETENUE:
             debut = f"Votre candidature pour {logement} a été retenue. Pour préparer votre bail"
         else:
@@ -237,11 +239,11 @@ class Candidature(Horodatage):
         return detail.get(cls._meta.label, 0)
 
     def texte_refus(self, signataire=""):
-        bien = self.bien
+        propriete = self.propriete
         return (
             "Madame, Monsieur,\n\n"
-            f"Nous vous remercions de l'intérêt que vous avez porté au logement situé {bien.adresse}, "
-            f"{bien.code_postal} {bien.ville}. Après étude des dossiers reçus, nous sommes au regret de "
+            f"Nous vous remercions de l'intérêt que vous avez porté au logement situé {propriete.adresse}, "
+            f"{propriete.code_postal} {propriete.ville}. Après étude des dossiers reçus, nous sommes au regret de "
             "vous informer que votre candidature n'a pas été retenue.\n\n"
             "Les informations vous concernant seront supprimées de nos fichiers dans un délai de trois "
             "mois. Vous pouvez en demander l'effacement immédiat en répondant à ce message.\n\n"
@@ -253,7 +255,7 @@ class Candidature(Horodatage):
 
 
 class Candidat(models.Model):
-    class Contrat(models.TextChoices):
+    class Situation(models.TextChoices):
         CDI = "cdi", "CDI"
         CDD = "cdd", "CDD"
         INTERIM = "interim", "Intérim"
@@ -274,7 +276,7 @@ class Candidat(models.Model):
     telephone = models.CharField("téléphone", max_length=30, blank=True)
     profession = models.CharField(max_length=100, blank=True)
     employeur = models.CharField(max_length=150, blank=True)
-    contrat = models.CharField("type de contrat", max_length=15, choices=Contrat.choices, blank=True)
+    situation = models.CharField("situation professionnelle", max_length=15, choices=Situation.choices, blank=True)
     date_embauche = models.DateField("date d'embauche", null=True, blank=True)
     revenus_mensuels = models.DecimalField(
         "revenus mensuels nets (€)", max_digits=9, decimal_places=2, null=True, blank=True

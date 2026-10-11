@@ -50,19 +50,20 @@ jobs:
           docker compose exec -T web python manage.py shell -v0 -c "
           import datetime as dt
           from decimal import Decimal
-          from baux.models import Bail, Locataire
-          from biens.models import Bailleur, Bien
+          from contrats.models import Bail, Locataire
           from documents.generation import convertir_pdf, generer_docx
           from mandats.models import Mandat
+          from proprietes.models import Bailleur, Propriete
           bailleur = Bailleur.objects.create(civilite='M.', nom='Essai', prenom='Jean', adresse='1 rue de la Paix',
                                              code_postal='31000', ville='Toulouse')
-          bien = Bien.objects.create(bailleur=bailleur, adresse='5 rue du Taur', code_postal='31000', ville='Toulouse',
-                                     surface=Decimal('39'), nb_pieces=2, meuble=True, zone_tendue=True,
-                                     type_habitat='collectif', regime_juridique='copropriete', classe_dpe='D',
-                                     dernier_loyer=Decimal('700'), charges=Decimal('50'))
-          mandat = Mandat.depuis_bien(bien)
+          propriete = Propriete.objects.create(bailleur=bailleur, adresse='5 rue du Taur', code_postal='31000',
+                                               ville='Toulouse', surface=Decimal('39'), nb_pieces=2, meuble=True,
+                                               zone_tendue=True, type_habitat='collectif',
+                                               regime_juridique='copropriete', classe_dpe='D',
+                                               dernier_loyer=Decimal('700'), charges=Decimal('50'))
+          mandat = Mandat.depuis_propriete(propriete)
           mandat.save()
-          bail = Bail.depuis_bien(bien)
+          bail = Bail.depuis_propriete(propriete)
           bail.date_effet, bail.irl_trimestre, bail.irl_valeur = dt.date(2026, 11, 1), '2e trimestre 2026', Decimal('146.68')
           bail.save()
           Locataire.objects.create(bail=bail, civilite='Mme', nom='Martin', prenom='Julie')

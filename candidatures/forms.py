@@ -1,6 +1,6 @@
 from django import forms
 
-from biens.models import Bien
+from proprietes.models import Propriete
 
 from .models import MAX_LOCATAIRES, Candidat, Candidature, Garant
 
@@ -11,7 +11,7 @@ class CandidatureForm(forms.ModelForm):
     class Meta:
         model = Candidature
         fields = [
-            "bien", "nombre_locataires", "lien_dossierfacile", "dossier_verifie", "garantie",
+            "propriete", "nombre_locataires", "lien_dossierfacile", "dossier_verifie", "garantie",
             "date_entree_souhaitee", "notes",
         ]
         widgets = {
@@ -22,11 +22,11 @@ class CandidatureForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["bien"].queryset = Bien.objects.filter(
-            actif=True, usage=Bien.Usage.HABITATION
+        self.fields["propriete"].queryset = Propriete.objects.filter(
+            actif=True, usage=Propriete.Usage.HABITATION
         ).select_related("bailleur")
         if self.instance.pk:
-            self.fields["bien"].disabled = True
+            self.fields["propriete"].disabled = True
 
 
 class CandidatForm(forms.ModelForm):
@@ -39,7 +39,7 @@ class CandidatForm(forms.ModelForm):
         model = Candidat
         fields = [
             "nom", "prenom", "email", "telephone", "civilite", "date_naissance", "lieu_naissance",
-            "profession", "employeur", "contrat", "date_embauche", "revenus_mensuels",
+            "profession", "employeur", "situation", "date_embauche", "revenus_mensuels",
         ]
         widgets = {"date_naissance": DATE, "date_embauche": DATE}
 
@@ -93,14 +93,14 @@ class DossierLocataireForm(forms.ModelForm):
 
 class CandidatLocataireForm(forms.ModelForm):
     OBLIGATOIRES = (
-        "civilite", "date_naissance", "lieu_naissance", "email", "telephone", "contrat", "revenus_mensuels",
+        "civilite", "date_naissance", "lieu_naissance", "email", "telephone", "situation", "revenus_mensuels",
     )
 
     class Meta:
         model = Candidat
         fields = [
             "civilite", "nom", "prenom", "date_naissance", "lieu_naissance", "email", "telephone",
-            "profession", "employeur", "contrat", "date_embauche", "revenus_mensuels",
+            "profession", "employeur", "situation", "date_embauche", "revenus_mensuels",
         ]
         widgets = {"date_naissance": DATE, "date_embauche": DATE}
 
@@ -108,7 +108,6 @@ class CandidatLocataireForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for nom in self.OBLIGATOIRES:
             self.fields[nom].required = True
-        self.fields["contrat"].label = "Situation professionnelle"
         self.fields["employeur"].help_text = "Ou établissement, pour un étudiant."
         self.fields["revenus_mensuels"].help_text = (
             "Salaires, pensions, bourses et allocations, avant impôt. Indiquez 0 si vous n'avez pas de revenus."

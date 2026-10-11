@@ -13,7 +13,8 @@ from django.db.models import Max
 from django.urls import reverse
 from simple_history.models import HistoricalRecords
 
-from biens.models import Bien, Horodatage
+from contrats.base import Contrat
+from proprietes.models import Propriete
 
 # Plafonds des honoraires de location imputables au locataire, en euros TTC
 # par m² de surface habitable (décret n° 2014-890 du 1er août 2014).
@@ -24,22 +25,22 @@ PLAFOND_ETAT_DES_LIEUX = Decimal("3")
 NOMBRES = {1: "un", 2: "deux", 3: "trois", 4: "quatre", 5: "cinq", 6: "six"}
 
 
-def plafonds_locataire(bien):
+def plafonds_locataire(propriete):
     """Plafonds (bail, état des lieux) de la part locataire, ou None si le
     bien n'y est pas soumis ou si sa surface est inconnue."""
-    if not bien.est_habitation or not bien.surface:
+    if not propriete.est_habitation or not propriete.surface:
         return None
-    par_m2 = PLAFOND_BAIL_ZONE_TENDUE if bien.zone_tendue else PLAFOND_BAIL_HORS_ZONE_TENDUE
-    return bien.surface * par_m2, bien.surface * PLAFOND_ETAT_DES_LIEUX
+    par_m2 = PLAFOND_BAIL_ZONE_TENDUE if propriete.zone_tendue else PLAFOND_BAIL_HORS_ZONE_TENDUE
+    return propriete.surface * par_m2, propriete.surface * PLAFOND_ETAT_DES_LIEUX
 
 
-def controler_honoraires(bien, bail_bailleur, bail_locataire, edl_bailleur, edl_locataire):
+def controler_honoraires(propriete, bail_bailleur, bail_locataire, edl_bailleur, edl_locataire):
     """Points contraires à l'article 5 I de la loi du 6 juillet 1989 : la part
     du locataire ne peut excéder celle du bailleur ni le plafond par m² de
     surface habitable."""
     from documents.generation import montant
 
-    if not bien.est_habitation:
+    if not propriete.est_habitation:
         return []
     alertes = []
     prestations = [
@@ -52,7 +53,7 @@ def controler_honoraires(bien, bail_bailleur, bail_locataire, edl_bailleur, edl_
                 f"Honoraires de {libelle} : la part du locataire ({montant(locataire)} €) dépasse "
                 f"celle du bailleur ({montant(bailleur)} €), ce que la loi interdit."
             )
-    plafonds = plafonds_locataire(bien)
+    plafonds = plafonds_locataire(propriete)
     if plafonds is None:
         if bail_locataire or edl_locataire:
             alertes.append("Surface habitable du bien inconnue : plafonds non vérifiés.")
@@ -61,7 +62,7 @@ def controler_honoraires(bien, bail_bailleur, bail_locataire, edl_bailleur, edl_
         if locataire > plafond:
             alertes.append(
                 f"Honoraires de {libelle} : la part du locataire ({montant(locataire)} €) dépasse "
-                f"le plafond légal de {montant(plafond)} € pour {montant(bien.surface)} m²."
+                f"le plafond légal de {montant(plafond)} € pour {montant(propriete.surface)} m²."
             )
     return alertes
 
@@ -70,14 +71,18 @@ def _montant(**options):
     return models.DecimalField(max_digits=9, decimal_places=2, **options)
 
 
-class Mandat(Horodatage):
+class Mandat(Contrat):
+    TYPE = "Mandat"
+
     class BaseGestion(models.TextChoices):
         ENCAISSEMENTS = "encaissements", "Encaissements mensuels"
         HORS_CHARGES = "hors_charges", "Encaissements hors charges"
         CHARGES_COMPRISES = "charges_comprises", "Encaissements charges comprises"
 
     numero = models.PositiveIntegerField("numéro au registre", unique=True, editable=False)
-    bien = models.ForeignKey(Bien, on_delete=models.PROTECT, related_name="mandats")
+    propriete = models.ForeignKey(
+        Propriete, on_delete=models.PROTECT, related_name="mandats", verbose_name="propriété",
+    )
 
     # Parties, reprises de la fiche du bailleur et du bien puis figées : le
     # mandat signé ne change pas si la fiche évolue.
@@ -90,7 +95,6 @@ class Mandat(Horodatage):
     charges = _montant(verbose_name="dont charges (€)", default=0)
 
     # Durée
-    date_signature = models.DateField("date de signature", null=True, blank=True)
     duree_ans = models.PositiveSmallIntegerField("durée initiale (ans)", default=3)
     reconductions = models.PositiveSmallIntegerField(
         "reconductions tacites", default=0, help_text="Nombre de reconductions prévues (0 si aucune)."
@@ -154,24 +158,46 @@ class Mandat(Horodatage):
         raise IntegrityError("Impossible d'attribuer un numéro de mandat.")
 
     @classmethod
-    def depuis_bien(cls, bien):
+    def depuis_propriete(cls, propriete):
         """Mandat prérempli à partir des fiches du bien et du bailleur."""
-        bailleur = bien.bailleur
-        loyer = (bien.dernier_loyer or 0) + (bien.charges or 0)
+        bailleur = propriete.bailleur
+        loyer = (propriete.dernier_loyer or 0) + (propriete.charges or 0)
         return cls(
-            bien=bien,
+            propriete=propriete,
             mandant=bailleur.designation,
             mandant_adresse=bailleur.adresse,
             mandant_code_postal_ville=f"{bailleur.code_postal} {bailleur.ville}".strip(),
-            designation=bien.designation,
-            adresse_bien=f"{bien.adresse} {bien.code_postal} {bien.ville.upper()}",
+            designation=propriete.designation,
+            adresse_bien=f"{propriete.adresse} {propriete.code_postal} {propriete.ville.upper()}",
             loyer_cc=loyer or None,
-            charges=bien.charges or 0,
+            charges=propriete.charges or 0,
         )
 
     @property
     def en_cours(self):
         return self.date_fin is None
+
+    @property
+    def parties(self):
+        return self.mandant
+
+    @property
+    def debut(self):
+        return self.date_signature
+
+    @property
+    def echeance(self):
+        return self.date_fin, ""
+
+    @property
+    def etat(self):
+        if not self.en_cours:
+            return "sans_bail", "Terminé"
+        if not self.signe:
+            return "libre", "À signer"
+        if self.alertes:
+            return "libre", "À vérifier"
+        return "loue", "En cours"
 
     @property
     def duree_texte(self):
@@ -196,7 +222,7 @@ class Mandat(Horodatage):
     @property
     def alertes(self):
         return controler_honoraires(
-            self.bien, self.honoraires_bail_bailleur, self.honoraires_bail_locataire,
+            self.propriete, self.honoraires_bail_bailleur, self.honoraires_bail_locataire,
             self.honoraires_edl_bailleur, self.honoraires_edl_locataire,
         )
 

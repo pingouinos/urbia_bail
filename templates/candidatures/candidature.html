@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block titre %}Candidature · {{ candidature.bien.adresse }} · {{ nom_application }}{% endblock %}
+{% block titre %}Candidature · {{ candidature.propriete.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'candidatures:liste' %}?bien={{ candidature.bien.pk }}">← Candidatures pour ce logement</a></p>
+<p><a href="{% url 'candidatures:liste' %}?propriete={{ candidature.propriete.pk }}">← Candidatures pour ce logement</a></p>
 <div class="titre-actions">
   <h1>{{ candidature.noms|default:"Candidature" }}</h1>
   <div class="actions"><a class="bouton-petit" href="{% url 'candidatures:modifier' candidature.pk %}">Modifier</a></div>
@@ -13,10 +13,10 @@
 <div class="grille">
   <section class="carte">
     <h2>Logement</h2>
-    <p><a href="{{ candidature.bien.get_absolute_url }}">{{ candidature.bien }}</a><br><span class="discret">{{ candidature.bien.designation }}</span></p>
+    <p><a href="{{ candidature.propriete.get_absolute_url }}">{{ candidature.propriete }}</a><br><span class="discret">{{ candidature.propriete.designation }}</span></p>
     <dl>
-      <dt>Loyer HC</dt><dd>{% if candidature.bien.dernier_loyer %}{{ candidature.bien.dernier_loyer }} €{% else %}—{% endif %}</dd>
-      <dt>Charges</dt><dd>{% if candidature.bien.charges %}{{ candidature.bien.charges }} €{% else %}—{% endif %}</dd>
+      <dt>Loyer HC</dt><dd>{% if candidature.propriete.dernier_loyer %}{{ candidature.propriete.dernier_loyer }} €{% else %}—{% endif %}</dd>
+      <dt>Charges</dt><dd>{% if candidature.propriete.charges %}{{ candidature.propriete.charges }} €{% else %}—{% endif %}</dd>
       <dt>Locataires</dt><dd>{{ candidature.locataires_attendus }}</dd>
       <dt>Entrée souhaitée</dt><dd>{{ candidature.date_entree_souhaitee|date:"d/m/Y"|default:"—" }}</dd>
     </dl>
@@ -43,7 +43,7 @@
       <tr>
         <td>{{ candidat }}{% if candidat.date_naissance %}<br><span class="discret">né(e) le {{ candidat.date_naissance|date:"d/m/Y" }}{% if candidat.lieu_naissance %} à {{ candidat.lieu_naissance }}{% endif %}</span>{% endif %}{% for garant in candidat.garants.all %}<br><span class="discret">Garant : {{ garant.ligne_bail }}{% if garant.email or garant.telephone %} · {{ garant.email }} {{ garant.telephone }}{% endif %}</span>{% endfor %}</td>
         <td>{{ candidat.email }}<br>{{ candidat.telephone }}</td>
-        <td>{{ candidat.profession|default:"—" }}{% if candidat.employeur %} chez {{ candidat.employeur }}{% endif %}{% if candidat.contrat %}<br><span class="discret">{{ candidat.get_contrat_display }}{% if candidat.date_embauche %} depuis le {{ candidat.date_embauche|date:"d/m/Y" }}{% endif %}</span>{% endif %}</td>
+        <td>{{ candidat.profession|default:"—" }}{% if candidat.employeur %} chez {{ candidat.employeur }}{% endif %}{% if candidat.situation %}<br><span class="discret">{{ candidat.get_situation_display }}{% if candidat.date_embauche %} depuis le {{ candidat.date_embauche|date:"d/m/Y" }}{% endif %}</span>{% endif %}</td>
         <td>{% if candidat.revenus_mensuels %}{{ candidat.revenus_mensuels|floatformat:0 }} €{% else %}—{% endif %}</td>
       </tr>
     {% endfor %}
@@ -65,7 +65,7 @@
     {% if candidature.statut != "desistement" %}<button type="submit" name="statut" value="desistement" class="secondaire">Le candidat se désiste</button>{% endif %}
     {% if candidature.decidee %}<button type="submit" name="statut" value="a_etudier" class="lien">Remettre à l'étude</button>{% endif %}
   </form>
-  {% if candidature.statut == "retenue" %}<p><a class="bouton-petit" href="{% url 'baux:creer' %}?candidature={{ candidature.pk }}">Rédiger le bail</a></p>{% endif %}
+  {% if candidature.statut == "retenue" %}<p><a class="bouton-petit" href="{% url 'contrats:creer' %}?candidature={{ candidature.pk }}">Rédiger le bail</a></p>{% endif %}
   {% if candidature.statut == "non_retenue" %}
   <p>{% if candidature.refus_envoye_le %}Réponse envoyée le {{ candidature.refus_envoye_le|date:"d/m/Y" }}.{% else %}<a href="{% url 'candidatures:reponse' candidature.pk %}">Préparer la réponse au candidat</a>{% endif %}</p>
   {% endif %}
