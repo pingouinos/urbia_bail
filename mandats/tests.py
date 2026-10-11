@@ -329,6 +329,10 @@ class VuesTests(Donnees, TestCase):
         mandat = self.creer_mandat()
         sans_logo = generation.generer_docx("mandat_gestion.docx", mandat.contexte_document())
         self.assertNotIn("word/media/logo-agence.png", zipfile.ZipFile(io.BytesIO(sans_logo)).namelist())
+        # Le modèle livré porte une image d'emplacement marquée LOGO ; sans logo d'agence elle ne s'imprime pas.
+        modele = zipfile.ZipFile(generation.MODELES_PAR_DEFAUT / "mandat_gestion.docx").read("word/header1.xml").decode()
+        self.assertIn('descr="logo"', modele)
+        self.assertNotIn('descr="logo"', zipfile.ZipFile(io.BytesIO(sans_logo)).read("word/header1.xml").decode())
         # Un PNG carré de 400 × 400 points, dans un cadre prévu pour un logo large.
         png = b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" + struct.pack(">II", 400, 400) + b"\x08\x06\x00\x00\x00"
         self.assertEqual(generation.dimensions_image(png), ("png", 400, 400))

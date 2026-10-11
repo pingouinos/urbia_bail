@@ -24,6 +24,7 @@
     <a class="bouton secondaire" href="{% url 'contrats:word' bail.pk %}">Version Word, modifiable</a>
     <a href="{% url 'contrats:modifier' bail.pk %}">Modifier le bail</a>
     {% if bail.en_cours %}<a href="{% url 'contrats:fin' bail.pk %}">{% if bail.conge_recu_le %}Confirmer le départ du locataire{% else %}Départ du locataire{% endif %}</a>{% endif %}
+    {% if not bail.signe or est_administrateur %}<form method="post" action="{% url 'contrats:supprimer' bail.pk %}" onsubmit="return confirm('{% if bail.signe %}Ce bail est signé. Le supprimer définitivement, avec son exemplaire signé ?{% else %}Supprimer définitivement ce bail ?{% endif %}');">{% csrf_token %}<button type="submit" class="lien lien-danger">{% if bail.signe %}Supprimer ce bail signé{% else %}Supprimer ce bail{% endif %}</button></form>{% endif %}
   </div>
 </section>
 

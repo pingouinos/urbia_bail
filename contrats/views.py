@@ -8,6 +8,8 @@ from django.views.decorators.http import require_POST
 
 from proprietes.models import Propriete
 from candidatures.models import Candidature
+from comptes.roles import est_administrateur
+from contacts.models import Contact
 from mandats.models import Mandat
 from documents import views as documents
 
@@ -214,6 +216,37 @@ def fin(request, pk):
             return redirect("proprietes:mettre_en_location", pk=propriete.pk)
         return redirect(propriete)
     return render(request, "contrats/fin.html", {"bail": objet, "form": form})
+
+
+@require_POST
+def supprimer(request, pk):
+    """Supprime un bail rédigé par erreur ou resté sans suite. Un bail signé
+    engage les parties : il se termine par le départ du locataire, et seul un
+    administrateur peut le supprimer."""
+    objet = get_object_or_404(Bail.objects.select_related("propriete"), pk=pk)
+    if objet.signe and not est_administrateur(request.user):
+        messages.error(request, "Ce bail est signé : seul un administrateur peut le supprimer. "
+                                "Pour y mettre fin, utilisez « Départ du locataire ».")
+        return redirect(objet)
+    propriete, signe = objet.propriete, objet.signe
+    candidature = Candidature.objects.filter(bail=objet).first()
+    with transaction.atomic():
+        if objet.fichier_signe:
+            objet.fichier_signe.delete(save=False)
+        objet.delete()
+        Contact.effacer_orphelins()
+        suite = ""
+        if candidature:
+            # La candidature retenue retrouve son étape : « rédiger le bail ».
+            suite = " La candidature retenue est conservée : le bail peut être rédigé à nouveau."
+        elif not signe and propriete.situation.code in ("libre", "sans_bail") and not propriete.situation.a_venir:
+            # Le bail avait clos la mise en location : elle reprend.
+            propriete.mise_en_location_le = timezone.localdate()
+            propriete.disponible_le = max(objet.date_effet, timezone.localdate())
+            propriete.save(update_fields=["mise_en_location_le", "disponible_le", "modifie_le"])
+            suite = " Le logement est de nouveau proposé à la location."
+    messages.success(request, f"Bail supprimé.{suite}")
+    return redirect(propriete)
 
 
 def telecharger(request, pk, format_):

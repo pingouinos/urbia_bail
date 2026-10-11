@@ -72,24 +72,51 @@ def dimensions_image(contenu):
     return None
 
 
+EMPLACEMENT = re.compile(r'<wp:docPr[^>]*(?:descr|title)="logo"', re.I)
+
+
+def retirer_emplacement(contenu_docx):
+    """Sans logo d'agence, retire de l'en-tête l'image d'emplacement (celle
+    dont le texte de remplacement est « logo »). Un vrai logo placé dans un
+    modèle sans ce texte de remplacement est laissé tel quel."""
+    with zipfile.ZipFile(io.BytesIO(contenu_docx)) as source:
+        parties = {nom: source.read(nom) for nom in source.namelist()}
+    retire = False
+    for nom in [n for n in parties if re.fullmatch(r"word/header\d*\.xml", n)]:
+        xml = parties[nom].decode("utf-8")
+        nouveau = re.sub(
+            r"<w:drawing>.*?</w:drawing>", lambda d: "" if EMPLACEMENT.search(d.group(0)) else d.group(0), xml, flags=re.S,
+        )
+        if nouveau != xml:
+            parties[nom], retire = nouveau.encode("utf-8"), True
+    if not retire:
+        return contenu_docx
+    sortie = io.BytesIO()
+    with zipfile.ZipFile(sortie, "w", zipfile.ZIP_DEFLATED) as cible:
+        for nom, donnees in parties.items():
+            cible.writestr(nom, donnees)
+    return sortie.getvalue()
+
+
 def placer_logo(contenu_docx):
     """Remplace le logo de l'en-tête par celui que l'agence a déposé sur sa
-    fiche. Le logo d'un modèle est l'image dont le texte de remplacement est
-    « logo », sinon la première image de l'en-tête. Il garde la place prévue
-    par le modèle, sans être déformé."""
+    fiche. L'emplacement du logo dans un modèle est l'image dont le texte de
+    remplacement est « logo » (les modèles livrés portent une image neutre
+    marquée LOGO), sinon la première image de l'en-tête. Le logo garde la
+    place prévue par le modèle, sans être déformé."""
     from core.models import Organisation
 
-    logo = Organisation.courante().logo
-    if not logo:
-        return contenu_docx
-    try:
-        with logo.open("rb") as fichier:
-            image = fichier.read()
-    except OSError:
-        return contenu_docx
-    dimensions = dimensions_image(image)
+    logo, image, dimensions = Organisation.courante().logo, b"", None
+    if logo:
+        try:
+            with logo.open("rb") as fichier:
+                image = fichier.read()
+        except OSError:
+            image = b""
+        dimensions = dimensions_image(image)
     if dimensions is None or not all(dimensions[1:]):
-        return contenu_docx
+        # Pas de logo utilisable : l'image d'emplacement ne doit pas s'imprimer.
+        return retirer_emplacement(contenu_docx)
     extension, largeur, hauteur = dimensions
     media = f"media/logo-agence.{extension}"
     sortie = io.BytesIO()
@@ -102,8 +129,7 @@ def placer_logo(contenu_docx):
                 continue
             xml = parties[nom].decode("utf-8")
             images = [d for d in re.finditer(r"<w:drawing>.*?</w:drawing>", xml, re.S) if "r:embed=" in d.group(0)]
-            choisie = next((d for d in images if re.search(r'<wp:docPr[^>]*(?:descr|title)="logo"', d.group(0), re.I)),
-                           images[0] if images else None)
+            choisie = next((d for d in images if EMPLACEMENT.search(d.group(0))), images[0] if images else None)
             if choisie is None:
                 continue
             dessin = choisie.group(0)
