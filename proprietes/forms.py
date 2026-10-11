@@ -1,5 +1,7 @@
 from django import forms
 
+from core.fichiers import controler_fichier
+
 from .models import Associe, Bailleur, Immeuble, Piece, Propriete, cle_adresse
 
 
@@ -248,8 +250,6 @@ class PieceForm(forms.ModelForm):
     """Dépôt d'un document sur la fiche d'une propriété."""
 
     TAILLE_MAX = 20 * 1024 * 1024
-    # Premiers octets des formats acceptés.
-    SIGNATURES = (b"%PDF", b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n")
 
     class Meta:
         model = Piece
@@ -268,16 +268,7 @@ class PieceForm(forms.ModelForm):
         ]
 
     def clean_fichier(self):
-        fichier = self.cleaned_data["fichier"]
-        if not fichier.name.lower().endswith((".pdf", ".jpg", ".jpeg", ".png")):
-            raise forms.ValidationError("Fournir un PDF ou une image (JPEG, PNG).")
-        if fichier.size > self.TAILLE_MAX:
-            raise forms.ValidationError("Fichier trop volumineux (20 Mo au maximum).")
-        debut = fichier.read(8)
-        fichier.seek(0)
-        if not debut.startswith(self.SIGNATURES):
-            raise forms.ValidationError("Ce fichier n'est ni un PDF ni une image.")
-        return fichier
+        return controler_fichier(self.cleaned_data["fichier"], self.TAILLE_MAX)
 
 
 class ImportForm(forms.Form):

@@ -16,6 +16,7 @@ urlpatterns = [
     path("sante/", views.sante, name="sante"),
     path("administration/", views.administration, name="administration"),
     path("administration/agence/", views.agence, name="agence"),
+    path("administration/journal/", views.journal, name="journal"),
     path("administration/utilisateurs/", views.utilisateurs, name="utilisateurs"),
     path("administration/utilisateurs/nouveau/", views.utilisateur_editer, name="utilisateur_creer"),
     path("administration/utilisateurs/<int:pk>/", views.utilisateur_editer, name="utilisateur_modifier"),

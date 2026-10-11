@@ -6,7 +6,7 @@ from comptes.roles import est_administrateur
 from .models import Organisation
 
 # Pages de l'administration, pour mettre son entrée de menu en évidence.
-ADMINISTRATION = ("administration", "agence", "utilisateurs", "utilisateur_creer", "utilisateur_modifier")
+ADMINISTRATION = ("administration", "agence", "journal", "utilisateurs", "utilisateur_creer", "utilisateur_modifier")
 
 
 def application(request):

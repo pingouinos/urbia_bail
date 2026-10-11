@@ -1,5 +1,7 @@
 from django import forms
 
+from core.fichiers import controler_fichier
+
 
 class FichierSigneMixin:
     """Dépôt du scan d'un document signé (champ « fichier_signe »)."""
@@ -11,8 +13,4 @@ class FichierSigneMixin:
         fichier = self.cleaned_data["fichier_signe"]
         if not fichier:
             raise forms.ValidationError("Choisir un fichier.")
-        if not fichier.name.lower().endswith((".pdf", ".jpg", ".jpeg", ".png")):
-            raise forms.ValidationError("Fournir un PDF ou une image.")
-        if fichier.size > self.TAILLE_MAX:
-            raise forms.ValidationError("Fichier trop volumineux (20 Mo au maximum).")
-        return fichier
+        return controler_fichier(fichier, self.TAILLE_MAX)

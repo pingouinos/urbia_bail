@@ -20,6 +20,7 @@ from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from core.champs import TelephoneField, code_postal_francais, siren_valide
+from core.fichiers import nom_aleatoire
 
 
 @dataclass(frozen=True)
@@ -481,7 +482,7 @@ class Propriete(Horodatage):
 
 def dossier_piece(piece, nom):
     """Les pièces d'un bailleur (identité, RIB) sont rangées à part de celles des propriétés."""
-    return f"{'bailleurs' if piece.bailleur_id else 'proprietes'}/{nom}"
+    return f"{'bailleurs' if piece.bailleur_id else 'proprietes'}/{nom_aleatoire(nom)}"
 
 
 class Piece(models.Model):

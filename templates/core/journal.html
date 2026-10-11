@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titre %}Journal de sécurité · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><span class="fil-ici">Journal de sécurité</span></nav>
+<h1>Journal de sécurité</h1>
+<p class="discret">Qui a fait quoi, quand et depuis quelle adresse : connexions, documents ouverts, exports, suppressions, changements de droits. Les lignes sont gardées un an. Les modifications des fiches elles-mêmes se lisent dans l'historique de chaque fiche.</p>
+<form class="filtres" method="get">
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Utilisateur, objet, adresse IP…" aria-label="Rechercher">
+  <select name="action" aria-label="Action">
+    <option value="">Toutes les actions</option>
+    {% for action in actions %}<option value="{{ action }}"{% if request.GET.action == action %} selected{% endif %}>{{ action|capfirst }}</option>{% endfor %}
+  </select>
+  <button type="submit">Filtrer</button>
+</form>
+<p class="discret">{{ page.paginator.count }} événement(s)</p>
+<table>
+  <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Objet</th><th>Adresse IP</th></tr></thead>
+  <tbody>
+  {% for evenement in page %}
+    <tr>
+      <td>{{ evenement.date|date:"d/m/Y H:i:s" }}</td>
+      <td>{{ evenement.identifiant|default:"—" }}</td>
+      <td>{% if evenement.action == "connexion refusée" or evenement.action == "suppression" %}<span class="pastille pastille-libre">{{ evenement.action|capfirst }}</span>{% else %}{{ evenement.action|capfirst }}{% endif %}</td>
+      <td>{{ evenement.objet }}{% if evenement.detail %}<br><span class="discret">{{ evenement.detail }}</span>{% endif %}</td>
+      <td>{{ evenement.ip|default:"—" }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" class="discret">Aucun événement.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% include "proprietes/_pagination.html" %}
+{% endblock %}

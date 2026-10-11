@@ -227,3 +227,46 @@ class OrganisationTests(TestCase):
         # Une propriété hors mandat est comptée en une seule ligne.
         Propriete.objects.create(bailleur=sci, adresse="5 rue du Taur", code_postal="31000", ville="Toulouse")
         self.assertIn("1 propriété sans mandat en cours", {tache.titre for tache in taches([])})
+
+    def test_entetes_de_securite(self):
+        reponse = self.client.get(reverse("connexion"))
+        self.assertIn("frame-ancestors 'none'", reponse["Content-Security-Policy"])
+        self.assertIn("https://data.geopf.fr", reponse["Content-Security-Policy"])
+        self.assertIn("camera=()", reponse["Permissions-Policy"])
+        self.assertIn("no-store", reponse["Cache-Control"])
+        # Le parcours du candidat ne laisse fuir son lien personnel ni par le Referer ni par un cache.
+        public = self.client.get("/locataire/jeton-inconnu/")
+        self.assertEqual(public["Referrer-Policy"], "no-referrer")
+
+    def test_limite_de_debit_du_formulaire_public(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        with self.settings(LIMITE_FORMULAIRE_PUBLIC=3):
+            codes = [self.client.get("/locataire/jeton-inconnu/").status_code for _ in range(5)]
+            self.assertEqual(codes[3:], [429, 429])
+            self.assertNotIn(429, codes[:3])
+            # Les pages internes ne sont pas concernées.
+            self.assertEqual(self.client.get(reverse("connexion")).status_code, 200)
+        cache.clear()
+
+    def test_journal_de_securite(self):
+        from .models import Evenement
+
+        self.client.post(reverse("connexion"), {"username": "inconnu", "password": "faux"})
+        self.assertTrue(Evenement.objects.filter(action="connexion refusée", identifiant="inconnu").exists())
+        admin = self.connecter(ADMINISTRATEURS)
+        self.assertTrue(Evenement.objects.filter(action="connexion", identifiant=admin.username).exists())
+        self.client.post(reverse("utilisateur_creer"), {
+            "first_name": "Lina", "last_name": "Roux", "email": "lina@agence.fr", "is_active": "on", "role": GESTIONNAIRES,
+        })
+        cree = Evenement.objects.get(action="compte créé")
+        self.assertEqual((cree.objet, cree.utilisateur), ("lina@agence.fr", admin))
+        self.client.get(reverse("proprietes:exporter"))
+        self.assertTrue(Evenement.objects.filter(action="export", objet="Propriétés").exists())
+        page = self.client.get(reverse("journal"))
+        self.assertContains(page, "Compte créé")
+        self.assertContains(self.client.get(reverse("journal"), {"action": "export"}), "1 événement(s)")
+        # Réservé aux administrateurs.
+        self.connecter(GESTIONNAIRES)
+        self.assertEqual(self.client.get(reverse("journal")).status_code, 403)

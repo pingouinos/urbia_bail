@@ -12,6 +12,7 @@ from proprietes.models import Propriete
 from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from contacts.models import Contact
+from core.journal import noter
 from mandats.models import Mandat
 from documents import views as documents
 
@@ -340,6 +341,7 @@ def supprimer(request, pk):
             propriete.disponible_le = max(objet.date_effet, timezone.localdate())
             propriete.save(update_fields=["mise_en_location_le", "disponible_le", "modifie_le"])
             suite = " Le logement est de nouveau proposé à la location."
+    noter(request, "suppression", f"Bail · {propriete}", "signé" if signe else "non signé")
     messages.success(request, f"Bail supprimé.{suite}")
     return redirect(propriete)
 
@@ -362,4 +364,4 @@ def deposer_signe(request, pk):
 
 
 def fichier_signe(request, pk):
-    return documents.fichier_signe(get_object_or_404(Bail, pk=pk))
+    return documents.fichier_signe(request, get_object_or_404(Bail, pk=pk))

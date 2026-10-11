@@ -1,6 +1,9 @@
-import base64
-import mimetypes
+import re
+import time
+import uuid
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
@@ -15,6 +18,8 @@ from django.views.decorators.http import require_POST
 from contrats.models import Bail
 from candidatures.models import Candidature
 from contacts.models import Contact
+from core.fichiers import servir
+from core.journal import noter
 from mandats.models import Mandat
 
 from . import tableur
@@ -177,15 +182,9 @@ def bailleur_piece_deposer(request, pk):
 
 
 def piece(request, pk):
-    objet = get_object_or_404(Piece, pk=pk)
-    try:
-        fichier = objet.fichier.open("rb")
-    except FileNotFoundError:
-        raise Http404
-    type_, _ = mimetypes.guess_type(objet.fichier.name)
-    reponse = FileResponse(fichier, content_type=type_ or "application/octet-stream")
-    reponse["X-Content-Type-Options"] = "nosniff"
-    return reponse
+    objet = get_object_or_404(Piece.objects.select_related("propriete", "bailleur"), pk=pk)
+    noter(request, "document ouvert", f"{objet.get_type_display()} · {objet.cible}")
+    return servir(objet.fichier)
 
 
 @require_POST
@@ -194,6 +193,7 @@ def piece_supprimer(request, pk):
     defaut = f"{objet.propriete.get_absolute_url()}?onglet=documents" if objet.propriete else objet.bailleur.get_absolute_url()
     objet.fichier.delete(save=False)
     objet.delete()
+    noter(request, "suppression", "Document")
     messages.success(request, "Document supprimé.")
     return redirect(_retour(request, defaut))
 
@@ -295,6 +295,7 @@ def propriete_supprimer(request, pk):
         for piece in objet.pieces.all():
             piece.fichier.delete(save=False)
         objet.delete()
+    noter(request, "suppression", f"Propriété · {libelle}")
     messages.success(request, f"Propriété supprimée : {libelle}.")
     return redirect("proprietes:liste")
 
@@ -416,6 +417,7 @@ def bailleur_supprimer(request, pk):
             piece.fichier.delete(save=False)
         objet.delete()
         Contact.effacer_orphelins()
+    noter(request, "suppression", f"Bailleur · {nom}")
     messages.success(request, f"Bailleur supprimé : {nom}.")
     return redirect(f"{reverse('contacts:liste')}?categorie=bailleur")
 
@@ -426,6 +428,7 @@ def immeuble_supprimer(request, pk):
     objet = get_object_or_404(Immeuble, pk=pk)
     nom, nombre = str(objet), objet.lots.count()
     objet.delete()
+    noter(request, "suppression", f"Immeuble · {nom}")
     messages.success(request, f"Immeuble supprimé : {nom}." + (
         f" Ses {nombre} lots sont conservés, sans immeuble." if nombre > 1 else " Son lot est conservé." if nombre else ""))
     return redirect("proprietes:liste")
@@ -439,10 +442,30 @@ def modele(request):
 
 def exporter(request):
     proprietes = _proprietes_filtres(request)
+    noter(request, "export", "Propriétés", f"{proprietes.count()} lignes")
     reponse = HttpResponse(tableur.classeur(proprietes), content_type=XLSX)
     nom = f"proprietes-urbia-gestion-{timezone.localdate():%Y-%m-%d}.xlsx"
     reponse["Content-Disposition"] = f'attachment; filename="{nom}"'
     return reponse
+
+
+def _dossier_imports():
+    return Path(settings.MEDIA_ROOT) / "imports"
+
+
+def _garder_import(contenu):
+    """Garde le fichier vérifié le temps de la confirmation, sous un nom tiré
+    au hasard ; la session n'en porte que le nom. Les dépôts de plus d'une
+    heure, jamais confirmés, sont effacés au passage."""
+    dossier = _dossier_imports()
+    dossier.mkdir(parents=True, exist_ok=True)
+    limite = time.time() - 3600
+    for ancien in dossier.iterdir():
+        if ancien.is_file() and ancien.stat().st_mtime < limite:
+            ancien.unlink(missing_ok=True)
+    nom = uuid.uuid4().hex
+    (dossier / nom).write_bytes(contenu)
+    return nom
 
 
 def importer(request):
@@ -457,9 +480,7 @@ def importer(request):
         except Exception:  # fichier illisible ou corrompu
             form.add_error("fichier", "Impossible de lire ce fichier. Vérifiez qu'il s'agit bien d'un .xlsx ou d'un .csv.")
         else:
-            request.session[CLE_SESSION_IMPORT] = {
-                "nom": fichier.name, "contenu": base64.b64encode(contenu).decode(),
-            }
+            request.session[CLE_SESSION_IMPORT] = {"nom": fichier.name, "depot": _garder_import(contenu)}
     return render(request, "proprietes/import.html", {"form": form, "rapport": rapport})
 
 
@@ -467,10 +488,15 @@ def importer(request):
 def importer_confirmer(request):
     """Étape 2 : import réel du fichier simulé juste avant."""
     depot = request.session.pop(CLE_SESSION_IMPORT, None)
-    if not depot:
+    chemin = _dossier_imports() / str(depot.get("depot", "")) if depot else None
+    # Le nom du dépôt vient de la session : seul un nom que nous avons créé est accepté.
+    if not depot or not re.fullmatch(r"[0-9a-f]{32}", str(depot.get("depot", ""))) or not chemin.exists():
         messages.error(request, "Aucun fichier en attente : déposez-le à nouveau.")
         return redirect("proprietes:importer")
-    rapport = tableur.importer(depot["nom"], base64.b64decode(depot["contenu"]))
+    contenu = chemin.read_bytes()
+    chemin.unlink(missing_ok=True)
+    rapport = tableur.importer(depot["nom"], contenu)
+    noter(request, "import", depot["nom"], f"{rapport.crees} créées, {rapport.mis_a_jour} mises à jour")
     messages.success(
         request,
         f"Import terminé : {rapport.crees} bien(s) créé(s), {rapport.mis_a_jour} mis à jour, "

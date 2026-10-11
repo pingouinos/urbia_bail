@@ -8,7 +8,9 @@ from django.views.decorators.http import require_POST
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from core.journal import noter
 from proprietes.models import Propriete
+from proprietes.tableur import sans_formule
 from documents import views as documents
 
 from .forms import MandatForm, SignatureForm
@@ -52,12 +54,13 @@ def registre_export(request):
     feuille.append(entetes)
     for cellule in feuille[1]:
         cellule.font = Font(bold=True)
+    noter(request, "export", "Registre des mandats")
     for mandat in _mandats_filtres(request).order_by("numero"):
-        feuille.append([
+        feuille.append([sans_formule(valeur) for valeur in (
             mandat.numero, mandat.date_signature, mandat.mandant,
             f"{mandat.mandant_adresse} {mandat.mandant_code_postal_ville}", mandat.adresse_bien,
             mandat.duree_texte, mandat.date_fin, mandat.propriete.ref_ics,
-        ])
+        )])
     for colonne, largeur in zip("ABCDEFGH", [6, 14, 36, 40, 40, 30, 12, 12]):
         feuille.column_dimensions[colonne].width = largeur
     reponse = HttpResponse(content_type=XLSX)
@@ -129,4 +132,4 @@ def deposer_signe(request, pk):
 
 
 def fichier_signe(request, pk):
-    return documents.fichier_signe(get_object_or_404(Mandat, pk=pk))
+    return documents.fichier_signe(request, get_object_or_404(Mandat, pk=pk))

@@ -32,6 +32,10 @@ jobs:
       - run: python manage.py check
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py test
+      - name: Vulnérabilités connues des dépendances
+        # Signale sans bloquer : une faille publiée ailleurs ne doit pas empêcher de livrer son correctif.
+        continue-on-error: true
+        run: pip install pip-audit && pip-audit -r requirements.txt
 
   image:
     runs-on: ubuntu-latest
