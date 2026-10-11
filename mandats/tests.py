@@ -192,6 +192,29 @@ class VuesTests(Donnees, TestCase):
         self.assertTrue(requete.full_url.endswith("/forms/libreoffice/convert"))
         self.assertIn(b'filename="m.docx"', requete.data)
 
+    def test_conversion_impossible_dit_pourquoi(self):
+        import urllib.error
+
+        refus = urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+        with mock.patch("urllib.request.urlopen", side_effect=refus), self.assertLogs("documents", "WARNING"):
+            with self.assertRaisesMessage(ConversionImpossible, "arrêté ou en cours de redémarrage"):
+                generation.convertir_pdf(b"docx")
+        # LibreOffice pas encore prêt : une seconde tentative suffit.
+        pas_pret = urllib.error.HTTPError("http://gotenberg", 503, "Service Unavailable", {}, io.BytesIO(b""))
+        pret = mock.MagicMock()
+        pret.__enter__.return_value.read.return_value = b"%PDF"
+        with mock.patch("urllib.request.urlopen", side_effect=[pas_pret, pret]), mock.patch("time.sleep"):
+            self.assertEqual(generation.convertir_pdf(b"docx"), b"%PDF")
+        erreur = urllib.error.HTTPError("http://gotenberg", 500, "Internal", {}, io.BytesIO(b"libreoffice a plante"))
+        with mock.patch("urllib.request.urlopen", side_effect=erreur), self.assertLogs("documents", "WARNING") as journal:
+            with self.assertRaisesMessage(ConversionImpossible, "erreur 500"):
+                generation.convertir_pdf(b"docx")
+        self.assertIn("libreoffice a plante", journal.output[0])
+        mandat = self.creer_mandat()
+        with mock.patch("documents.views.convertir_pdf", side_effect=ConversionImpossible("le service ne répond pas")):
+            reponse = self.client.get(reverse("mandats:pdf", args=[mandat.pk]), follow=True)
+        self.assertContains(reponse, "indisponible (le service ne répond pas)")
+
     def test_depot_du_mandat_signe(self):
         mandat = self.creer_mandat()
         fichier = SimpleUploadedFile("scan.pdf", b"%PDF-1.4 signe", content_type="application/pdf")

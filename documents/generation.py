@@ -7,6 +7,8 @@ permet docxtpl. Le PDF est obtenu en confiant le .docx à Gotenberg
 """
 
 import io
+import logging
+import time
 import uuid
 import urllib.error
 import urllib.request
@@ -16,12 +18,14 @@ from pathlib import Path
 from django.conf import settings
 from docxtpl import DocxTemplate
 
+journal = logging.getLogger(__name__)
+
 MODELES_PAR_DEFAUT = Path(__file__).resolve().parent / "modeles"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 class ConversionImpossible(Exception):
-    pass
+    """La conversion en PDF a échoué ; le message dit pourquoi, en clair."""
 
 
 def chemin_modele(nom):
@@ -61,8 +65,23 @@ def convertir_pdf(contenu_docx, nom="document.docx"):
         headers={"Content-Type": f"multipart/form-data; boundary={frontiere}"},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(requete, timeout=60) as reponse:
-            return reponse.read()
-    except (urllib.error.URLError, TimeoutError) as erreur:
-        raise ConversionImpossible(str(erreur)) from erreur
+    # Une seconde tentative si LibreOffice n'était pas encore prêt (erreur 503).
+    for tentative in (1, 2):
+        try:
+            with urllib.request.urlopen(requete, timeout=60) as reponse:
+                return reponse.read()
+        except urllib.error.HTTPError as erreur:
+            if erreur.code == 503 and tentative == 1:
+                time.sleep(2)
+                continue
+            detail = erreur.read(300).decode("utf-8", "replace").strip()
+            journal.warning("Gotenberg a répondu %s pour %s : %s", erreur.code, nom, detail)
+            raise ConversionImpossible(f"le service de conversion a répondu une erreur {erreur.code}") from erreur
+        except (urllib.error.URLError, TimeoutError) as erreur:
+            raison = getattr(erreur, "reason", erreur)
+            journal.warning("Gotenberg injoignable à %s : %r", settings.GOTENBERG_URL, raison)
+            if isinstance(raison, TimeoutError):
+                raise ConversionImpossible("la conversion a dépassé le délai d'une minute") from erreur
+            raise ConversionImpossible(
+                "le service de conversion ne répond pas : il est arrêté ou en cours de redémarrage"
+            ) from erreur

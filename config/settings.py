@@ -223,5 +223,6 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "loggers": {
         "comptes": {"handlers": ["console"], "level": "INFO"},
+        "documents": {"handlers": ["console"], "level": "INFO"},
     },
 }
