@@ -286,6 +286,21 @@ class VuesTests(TestCase):
         })
         propriete = Propriete.objects.get()
         self.assertRedirects(reponse, f"{reverse('mandats:creer')}?propriete={propriete.pk}")
+        # La liste dit d'un coup d'œil si la propriété a un mandat : aucun, à signer, ou son numéro.
+        from mandats.models import Mandat
+
+        self.assertContains(self.client.get(reverse("proprietes:liste")), "Sans mandat</span>")
+        mandat = Mandat.depuis_propriete(propriete)
+        mandat.loyer_cc, mandat.numero = 600, 412
+        mandat.save()
+        liste = self.client.get(reverse("proprietes:liste"))
+        self.assertContains(liste, f'<a href="{mandat.get_absolute_url()}">n° 412</a>')
+        self.assertContains(liste, "À signer</span>")
+        self.assertNotContains(liste, "Sans mandat</span>")
+        mandat.date_signature = dt.date(2026, 9, 1)
+        mandat.save()
+        self.assertNotContains(self.client.get(reverse("proprietes:liste")), "À signer</span>")
+        mandat.delete()
         # Sans le parcours, la fiche reste enregistrable seule, et se retrouve par le filtre.
         self.assertContains(self.client.get(reverse("proprietes:liste"), {"mandat": "sans"}), "3 place du Capitole")
         # Un immeuble : un mandat par lot, depuis sa fiche.

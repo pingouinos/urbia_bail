@@ -81,8 +81,12 @@ def _proprietes_filtres(request):
 
 
 def liste(request):
-    proprietes = _proprietes_filtres(request).prefetch_related("baux__locataires")
+    proprietes = _proprietes_filtres(request).prefetch_related("baux__locataires", "mandats")
     page = Paginator(proprietes, 50).get_page(request.GET.get("page"))
+    for propriete in page:
+        # Mandat en cours, lu dans ce qui est déjà chargé pour la page.
+        en_cours = [mandat for mandat in propriete.mandats.all() if mandat.date_fin is None]
+        propriete.mandat = max(en_cours, key=lambda mandat: mandat.numero, default=None)
     parametres = request.GET.copy()
     parametres.pop("page", None)
     return render(request, "proprietes/liste.html", {
