@@ -196,7 +196,7 @@ class VuesTests(Donnees, TestCase):
         admin = User.objects.create_user("admin")
         attribuer_role(admin, ADMINISTRATEURS)
         self.client.force_login(admin)
-        self.assertContains(self.client.get(signe.get_absolute_url()), "Supprimer ce bail signé")
+        self.assertContains(self.client.get(signe.get_absolute_url()), reverse("contrats:supprimer", args=[signe.pk]))
         self.client.post(reverse("contrats:supprimer", args=[signe.pk]))
         self.assertFalse(Bail.objects.exists())
 

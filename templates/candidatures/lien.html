@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Lien pour le candidat · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{{ candidature.get_absolute_url }}">← Candidature</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span><a href="{{ candidature.propriete.get_absolute_url }}?onglet=candidatures">{{ candidature.propriete.adresse }}</a><span aria-hidden="true">›</span><a href="{{ candidature.get_absolute_url }}">{{ candidature.noms|default:"Candidature" }}</a><span aria-hidden="true">›</span><span class="fil-ici">Lien pour le candidat</span></nav>
 <h1>Lien pour le candidat</h1>
 <p class="discret">Pour {{ candidature.noms }} · {{ candidature.propriete }}<br>Destinataire(s) : {{ destinataires|join:", "|default:"aucune adresse e-mail sur la fiche" }}</p>
 <p class="message">Le candidat y complète son identité, ses coordonnées, son activité, ses revenus et le lien de son dossier DossierFacile, sans compte ni mot de passe. Le lien est valable jusqu'au {{ candidature.lien_expire_le|date:"d/m/Y" }} et ne sert qu'une fois.</p>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Départ du locataire · {{ bail.propriete.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{{ bail.propriete.get_absolute_url }}">← {{ bail.propriete.adresse }}</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><a href="{{ bail.get_absolute_url }}">Bail · {{ bail.propriete.adresse }}</a><span aria-hidden="true">›</span><span class="fil-ici">Départ du locataire</span></nav>
 <h1>Départ du locataire</h1>
 <p class="discret">{{ bail.noms_locataires|default:"Locataire à renseigner" }} · <a href="{{ bail.get_absolute_url }}">bail du {{ bail.date_effet|date:"d/m/Y" }}</a></p>
 <form method="post" class="formulaire">

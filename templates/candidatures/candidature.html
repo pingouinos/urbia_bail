@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block titre %}Candidature · {{ candidature.propriete.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'candidatures:liste' %}?propriete={{ candidature.propriete.pk }}">← Candidatures pour ce logement</a></p>
-<div class="titre-actions">
-  <h1>{{ candidature.noms|default:"Candidature" }}</h1>
-  <div class="actions"><a class="bouton-petit" href="{% url 'candidatures:modifier' candidature.pk %}">Modifier</a></div>
+<div class="barre-fiche">
+  <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span><a href="{{ candidature.propriete.get_absolute_url }}?onglet=candidatures">{{ candidature.propriete.adresse }}</a><span aria-hidden="true">›</span><span class="fil-ici">{{ candidature.noms|default:"Candidature" }}</span></nav>
+  {% url 'candidatures:modifier' candidature.pk as modifier %}{% url 'candidatures:effacer' candidature.pk as supprimer %}{% if candidature.bail %}{% include "_actions_fiche.html" with modifier=modifier supprimer="" %}{% else %}{% include "_actions_fiche.html" with modifier=modifier supprimer=supprimer question="Effacer définitivement cette candidature et les données du candidat ?" %}{% endif %}
 </div>
+<h1>{{ candidature.noms|default:"Candidature" }}</h1>
 <p class="discret">{{ candidature.get_statut_display }}{% if candidature.decide_le %} le {{ candidature.decide_le|date:"d/m/Y" }}{% if candidature.decide_par %} par {{ candidature.decide_par.get_full_name|default:candidature.decide_par.username }}{% endif %}{% endif %} · reçue le {{ candidature.cree_le|date:"d/m/Y" }}</p>
 
 {% for alerte in candidature.alertes %}<p class="message alerte-fond">{{ alerte }}</p>{% endfor %}

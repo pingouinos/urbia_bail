@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Importer des propriétés · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'proprietes:liste' %}">← Propriétés</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span><span class="fil-ici">Importer</span></nav>
 <h1>Importer des propriétés</h1>
 {% if not rapport %}
 <section class="carte">

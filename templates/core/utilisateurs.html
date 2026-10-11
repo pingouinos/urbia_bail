@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Utilisateurs · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'administration' %}">← Administration</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><span class="fil-ici">Utilisateurs</span></nav>
 <div class="titre-actions">
   <h1>Utilisateurs</h1>
   <div class="actions"><a class="bouton-petit bouton-corail" href="{% url 'utilisateur_creer' %}">+ Nouvel utilisateur</a></div>

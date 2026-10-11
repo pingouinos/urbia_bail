@@ -460,7 +460,7 @@ class VuesTests(TestCase):
         })
         self.assertEqual(Immeuble.objects.get().lots.count(), 3)
 
-    def test_modifier_et_supprimer_depuis_la_liste(self):
+    def test_modifier_et_supprimer_depuis_la_fiche(self):
         from mandats.models import Mandat
 
         bailleur = Bailleur.objects.create(nom="Durand")
@@ -469,7 +469,11 @@ class VuesTests(TestCase):
             bailleur=bailleur, adresse="2 rue Gérée", code_postal="31000", ville="Toulouse", dernier_loyer=600,
         )
         Mandat.depuis_propriete(geree).save()
-        page = self.client.get(reverse("proprietes:liste"))
+        # La liste ouvre la fiche ; « Modifier » et « Supprimer » sont en tête de la fiche.
+        liste = self.client.get(reverse("proprietes:liste"))
+        self.assertNotContains(liste, reverse("proprietes:propriete_supprimer", args=[erreur.pk]))
+        page = self.client.get(erreur.get_absolute_url())
+        self.assertContains(page, '<nav class="fil"')
         self.assertContains(page, reverse("proprietes:propriete_modifier", args=[erreur.pk]))
         self.assertContains(page, reverse("proprietes:propriete_supprimer", args=[erreur.pk]))
         # Une propriété sous mandat ne se supprime pas.
@@ -480,6 +484,32 @@ class VuesTests(TestCase):
         self.assertContains(reponse, "Propriété supprimée : 1 rue Erreur")
         self.assertEqual(list(Propriete.objects.all()), [geree])
         self.assertEqual(self.client.get(reverse("proprietes:propriete_supprimer", args=[geree.pk])).status_code, 405)
+
+    def test_supprimer_bailleur_immeuble_et_contact(self):
+        from contacts.models import Contact
+
+        # Un immeuble se supprime sans emporter ses lots.
+        self.client.post(reverse("proprietes:immeuble_creer"), self.immeuble())
+        immeuble = Immeuble.objects.get()
+        self.assertContains(self.client.get(immeuble.get_absolute_url()), reverse("proprietes:immeuble_supprimer", args=[immeuble.pk]))
+        reponse = self.client.post(reverse("proprietes:immeuble_supprimer", args=[immeuble.pk]), follow=True)
+        self.assertContains(reponse, "Ses 2 lots sont conservés")
+        self.assertEqual((Immeuble.objects.count(), Propriete.objects.filter(immeuble__isnull=True).count()), (0, 2))
+        # Un bailleur qui a des propriétés reste ; sans propriété, il se supprime.
+        bailleur = Bailleur.objects.get()
+        reponse = self.client.post(reverse("proprietes:bailleur_supprimer", args=[bailleur.pk]), follow=True)
+        self.assertContains(reponse, "Suppression refusée : ce bailleur a 2 propriétés.")
+        contact = bailleur.contact
+        reponse = self.client.post(reverse("contacts:supprimer", args=[contact.pk]), follow=True)
+        self.assertContains(reponse, "Suppression refusée : ce contact est relié")
+        Propriete.objects.all().delete()
+        self.client.post(reverse("proprietes:bailleur_supprimer", args=[bailleur.pk]))
+        self.assertFalse(Bailleur.objects.exists())
+        # Le contact, que plus rien ne relie, se supprime à son tour.
+        self.assertContains(self.client.get(contact.get_absolute_url()), reverse("contacts:supprimer", args=[contact.pk]))
+        self.client.post(reverse("contacts:supprimer", args=[contact.pk]))
+        self.assertFalse(Contact.objects.filter(pk=contact.pk).exists())
+        self.assertEqual(self.client.get(reverse("contacts:supprimer", args=[contact.pk])).status_code, 405)
 
     def test_depenses_energie_incoherentes(self):
         bailleur = Bailleur.objects.create(nom="Durand")

@@ -402,6 +402,35 @@ def bailleur_editer(request, pk=None):
     return render(request, "proprietes/bailleur_form.html", {"form": form, "bailleur": objet, "associes": associes})
 
 
+@require_POST
+def bailleur_supprimer(request, pk):
+    """Supprime un bailleur sans propriété ; celui qui en a reste, avec elles."""
+    objet = get_object_or_404(Bailleur, pk=pk)
+    nombre = objet.proprietes.count()
+    if nombre:
+        messages.error(request, f"Suppression refusée : ce bailleur a {nombre} propriété{'s' if nombre > 1 else ''}.")
+        return redirect(objet)
+    nom = str(objet)
+    with transaction.atomic():
+        for piece in objet.pieces.all():
+            piece.fichier.delete(save=False)
+        objet.delete()
+        Contact.effacer_orphelins()
+    messages.success(request, f"Bailleur supprimé : {nom}.")
+    return redirect(f"{reverse('contacts:liste')}?categorie=bailleur")
+
+
+@require_POST
+def immeuble_supprimer(request, pk):
+    """Supprime le regroupement ; les lots restent des propriétés à part entière."""
+    objet = get_object_or_404(Immeuble, pk=pk)
+    nom, nombre = str(objet), objet.lots.count()
+    objet.delete()
+    messages.success(request, f"Immeuble supprimé : {nom}." + (
+        f" Ses {nombre} lots sont conservés, sans immeuble." if nombre > 1 else " Son lot est conservé." if nombre else ""))
+    return redirect("proprietes:liste")
+
+
 def modele(request):
     reponse = HttpResponse(tableur.classeur(), content_type=XLSX)
     reponse["Content-Disposition"] = 'attachment; filename="modele-proprietes-urbia-gestion.xlsx"'

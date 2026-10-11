@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Mise en location · {{ propriete.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{{ propriete.get_absolute_url }}">← {{ propriete.adresse }}</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span><a href="{{ propriete.get_absolute_url }}">{{ propriete.adresse }}{% if propriete.complement %}, {{ propriete.complement }}{% endif %}</a><span aria-hidden="true">›</span><span class="fil-ici">Mise en location</span></nav>
 <h1>{% if propriete.a_louer %}Mise en location{% else %}Mettre en location{% endif %}</h1>
 <p class="discret">{{ propriete }} · <span class="pastille pastille-{{ situation.code }}">{{ situation.libelle }}</span></p>
 {% if not mandat %}<p class="message alerte-fond">Aucun mandat de gestion en cours pour ce logement : <a href="{% url 'mandats:creer' %}?propriete={{ propriete.pk }}">créez le mandat</a> avant de le proposer à la location.</p>{% endif %}

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Modifier l'immeuble · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{{ immeuble.get_absolute_url }}">← Retour</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span><a href="{{ immeuble.get_absolute_url }}">{{ immeuble }}</a><span aria-hidden="true">›</span><span class="fil-ici">Modifier</span></nav>
 <h1>Modifier {{ immeuble }}</h1>
 <p class="discret">Une correction de l'adresse est reportée sur tous les lots de l'immeuble. Les baux et mandats déjà rédigés gardent l'adresse qu'ils portent.</p>
 <form method="post" class="formulaire">

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Nouveau contrat · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'contrats:liste' %}">← Contrats</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><span class="fil-ici">Nouveau contrat</span></nav>
 <h1>Nouveau contrat</h1>
 <p class="discret">Le mandat fait entrer une propriété dans le portefeuille ; le bail la loue.</p>
 <nav class="segments" aria-label="Type de contrat">
