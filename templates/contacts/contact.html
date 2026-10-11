@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 {% block titre %}{{ contact.designation }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'contacts:liste' %}">← Contacts</a></p>
+<div class="barre-fiche">
+  <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contacts:liste' %}">Contacts</a><span aria-hidden="true">›</span><span class="fil-ici">{{ contact.designation }}</span></nav>
+  {% url 'contacts:modifier' contact.pk as modifier %}{% url 'contacts:supprimer' contact.pk as supprimer %}{% include "_actions_fiche.html" with modifier=modifier supprimer=supprimer question="Supprimer définitivement ce contact ?" %}
+</div>
 
 <section class="carte fiche-entete fiche-contact">
   <div class="titre-actions">
     <h1>{{ contact.designation }}</h1>
-    <div class="actions"><a class="bouton-petit" href="{% url 'contacts:modifier' contact.pk %}">Modifier</a></div>
   </div>
   <p class="pastilles">
     {% for code, libelle in contact.etiquettes %}<span class="pastille pastille-contact-{{ code }}">{{ libelle }}</span>{% endfor %}

@@ -9,4 +9,5 @@ urlpatterns = [
     path("nouveau/", views.contact_editer, name="nouveau"),
     path("<int:pk>/", views.contact, name="contact"),
     path("<int:pk>/modifier/", views.contact_editer, name="modifier"),
+    path("<int:pk>/supprimer/", views.supprimer, name="supprimer"),
 ]

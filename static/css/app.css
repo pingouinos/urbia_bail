@@ -370,3 +370,16 @@ button.lien.lien-danger { color: var(--erreur); }
 .rubrique-taches { margin: 18px 0 6px; font-size: 0.95rem; }
 .taches td:first-child { width: 46%; }
 .taches td { padding-top: 8px; padding-bottom: 8px; }
+
+/* En tête de page : fil d'Ariane à gauche, actions de la fiche à droite. */
+.barre-fiche { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 14px; }
+.fil { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 14px; font-size: 0.92rem; color: var(--discret); }
+.barre-fiche .fil { margin: 0; }
+.fil a { color: var(--discret); text-decoration: none; }
+.fil a:hover { color: var(--acier); text-decoration: underline; text-decoration-color: var(--corail); }
+.fil-ici { color: var(--texte); font-weight: 600; }
+.actions-fiche { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.actions-fiche form { margin: 0; display: flex; }
+.actions-fiche .bouton-petit, .actions-fiche button.bouton-petit[type=submit] { display: inline-flex; align-items: center; gap: 6px; }
+button.bouton-petit.bouton-supprimer[type=submit] { padding: 6px 14px; background: var(--carte); color: var(--erreur); border-color: var(--erreur); }
+button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erreur); color: #fff; }

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Nouvel immeuble · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'proprietes:liste' %}">← Retour</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span><span class="fil-ici">Nouvel immeuble</span></nav>
 <h1>Nouvelle propriété</h1>
 {% include "proprietes/_type_propriete.html" with type="immeuble" %}
 <p class="discret">L'adresse et les caractéristiques communes se saisissent une fois, puis une ligne par lot. Chaque lot devient une propriété, avec sa fiche, ses candidatures et ses baux. Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}{% if mandat %}Modifier le mandat{% else %}Nouveau mandat{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% if mandat %}{{ mandat.get_absolute_url }}{% else %}{% url 'mandats:registre' %}{% endif %}">← Retour</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span>{% if mandat %}<a href="{{ mandat.get_absolute_url }}">Mandat n° {{ mandat.numero }}</a><span aria-hidden="true">›</span><span class="fil-ici">Modifier</span>{% else %}<a href="{% url 'contrats:choisir' %}">Nouveau contrat</a><span aria-hidden="true">›</span><span class="fil-ici">Mandat de gestion</span>{% endif %}</nav>
 <h1>{% if mandat %}Modifier le mandat n° {{ mandat.numero }}{% else %}Nouveau mandat{% endif %}</h1>
 <p class="discret">{% if mandat %}Corriger le numéro n'est utile que s'il a été mal recopié du registre papier ; la modification est gardée dans l'historique.{% else %}Inscrivez d'abord le mandat au registre papier, puis reportez ici le numéro qu'il y porte.{% endif %} Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
 <form method="post" class="formulaire">

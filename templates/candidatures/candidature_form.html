@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}{% if candidature %}Modifier la candidature{% else %}Nouvelle candidature{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% if candidature %}{{ candidature.get_absolute_url }}{% else %}{% url 'candidatures:liste' %}{% endif %}">← Retour</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span>{% if candidature %}<a href="{{ candidature.propriete.get_absolute_url }}?onglet=candidatures">{{ candidature.propriete.adresse }}</a><span aria-hidden="true">›</span><a href="{{ candidature.get_absolute_url }}">{{ candidature.noms|default:"Candidature" }}</a><span aria-hidden="true">›</span><span class="fil-ici">Modifier</span>{% else %}<a href="{% url 'candidatures:liste' %}">Candidatures</a><span aria-hidden="true">›</span><span class="fil-ici">Nouvelle candidature</span>{% endif %}</nav>
 <h1>{% if candidature %}Modifier la candidature{% else %}Nouvelle candidature{% endif %}</h1>
 <p class="discret">Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
 <form method="post" class="formulaire">

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block titre %}Bail · {{ bail.propriete.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-{% if vient_d_etre_cree %}
-{% include "contrats/_etapes.html" with etape=3 %}
-{% else %}
-<p><a href="{% url 'contrats:liste' %}">← Contrats</a></p>
-{% endif %}
+<div class="barre-fiche">
+  <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><span class="fil-ici">Bail · {{ bail.propriete.adresse }}</span></nav>
+  {% url 'contrats:modifier' bail.pk as modifier %}{% url 'contrats:supprimer' bail.pk as supprimer %}{% if bail.signe and not est_administrateur %}{% include "_actions_fiche.html" with modifier=modifier supprimer="" %}{% elif bail.signe %}{% include "_actions_fiche.html" with modifier=modifier supprimer=supprimer question="Ce bail est signé. Le supprimer définitivement, avec son exemplaire signé ?" %}{% else %}{% include "_actions_fiche.html" with modifier=modifier supprimer=supprimer question="Supprimer définitivement ce bail ?" %}{% endif %}
+</div>
+{% if vient_d_etre_cree %}{% include "contrats/_etapes.html" with etape=3 %}{% endif %}
 
 <section class="carte document">
   <div>
@@ -22,9 +22,7 @@
   <div class="telechargements">
     <a class="bouton bouton-principal" href="{% url 'contrats:pdf' bail.pk %}">Télécharger le PDF</a>
     <a class="bouton secondaire" href="{% url 'contrats:word' bail.pk %}">Version Word, modifiable</a>
-    <a href="{% url 'contrats:modifier' bail.pk %}">Modifier le bail</a>
     {% if bail.en_cours %}<a href="{% url 'contrats:fin' bail.pk %}">{% if bail.conge_recu_le %}Confirmer le départ du locataire{% else %}Départ du locataire{% endif %}</a>{% endif %}
-    {% if not bail.signe or est_administrateur %}<form method="post" action="{% url 'contrats:supprimer' bail.pk %}" onsubmit="return confirm('{% if bail.signe %}Ce bail est signé. Le supprimer définitivement, avec son exemplaire signé ?{% else %}Supprimer définitivement ce bail ?{% endif %}');">{% csrf_token %}<button type="submit" class="lien lien-danger">{% if bail.signe %}Supprimer ce bail signé{% else %}Supprimer ce bail{% endif %}</button></form>{% endif %}
   </div>
 </section>
 

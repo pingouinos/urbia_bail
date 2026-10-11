@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Candidatures · {{ nom_application }}{% endblock %}
 {% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span>{% if propriete %}<a href="{{ propriete.get_absolute_url }}">{{ propriete.adresse }}</a><span aria-hidden="true">›</span>{% endif %}<span class="fil-ici">Candidatures</span></nav>
 <div class="titre-actions">
   <h1>Candidatures</h1>
   <div class="actions"><a class="bouton-petit" href="{% url 'candidatures:creer' %}{% if propriete %}?propriete={{ propriete.pk }}{% endif %}">Nouvelle candidature</a></div>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}{% if bailleur %}Modifier le bailleur{% else %}Nouveau bailleur{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% if bailleur %}{{ bailleur.get_absolute_url }}{% else %}{% url 'contacts:liste' %}?categorie=bailleur{% endif %}">← Retour</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contacts:liste' %}">Contacts</a><span aria-hidden="true">›</span>{% if bailleur %}<a href="{{ bailleur.get_absolute_url }}">{{ bailleur }}</a><span aria-hidden="true">›</span><span class="fil-ici">Modifier</span>{% else %}<span class="fil-ici">Nouveau bailleur</span>{% endif %}</nav>
 <h1>{% if bailleur %}Modifier {{ bailleur }}{% else %}Nouveau bailleur{% endif %}</h1>
 <form method="post" class="formulaire">
   {% csrf_token %}

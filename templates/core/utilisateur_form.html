@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}{% if compte %}Modifier l'utilisateur{% else %}Nouvel utilisateur{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'utilisateurs' %}">← Utilisateurs</a></p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><a href="{% url 'utilisateurs' %}">Utilisateurs</a><span aria-hidden="true">›</span><span class="fil-ici">{% if compte %}{{ compte.get_full_name|default:compte.username }}{% else %}Nouvel utilisateur{% endif %}</span></nav>
 <h1>{% if compte %}{{ compte.get_full_name|default:compte.username }}{% else %}Nouvel utilisateur{% endif %}</h1>
 <p class="discret">{% if compte %}Identifiant : {{ compte.username }} · dernière connexion : {{ compte.last_login|date:"d/m/Y H:i"|default:"jamais" }}.{% else %}L'adresse e-mail sert d'identifiant.{% endif %} Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
 <form method="post" class="formulaire">

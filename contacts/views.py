@@ -3,6 +3,7 @@
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
 from proprietes.models import Bailleur, Propriete
@@ -79,3 +80,18 @@ def contact_editer(request, pk=None):
     return render(request, "contacts/contact_form.html", {
         "form": form, "contact": objet, "doublon": getattr(form, "doublon", None),
     })
+
+
+@require_POST
+def supprimer(request, pk):
+    """Supprime un contact que rien ne relie plus à une propriété, un bail ou
+    une candidature. Les autres disparaissent avec ce qui les relie."""
+    objet = get_object_or_404(Contact.avec_liens(), pk=pk)
+    if objet.liens or objet.bailleurs.all() or objet.locataires.all() or objet.candidats.all() or objet.garants.all():
+        messages.error(request, "Suppression refusée : ce contact est relié à une propriété, un bail, une candidature "
+                                "ou une société. Il disparaîtra avec ce qui le relie.")
+        return redirect(objet)
+    nom = objet.designation
+    objet.delete()
+    messages.success(request, f"Contact supprimé : {nom}.")
+    return redirect("contacts:liste")

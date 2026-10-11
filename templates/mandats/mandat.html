@@ -1,13 +1,15 @@
 {% extends "base.html" %}
 {% block titre %}Mandat n° {{ mandat.numero }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'mandats:registre' %}">← Registre des mandats</a></p>
+<div class="barre-fiche">
+  <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><a href="{% url 'mandats:registre' %}">Registre des mandats</a><span aria-hidden="true">›</span><span class="fil-ici">Mandat n° {{ mandat.numero }}</span></nav>
+  {% url 'mandats:modifier' mandat.pk as modifier %}{% include "_actions_fiche.html" with modifier=modifier supprimer="" %}
+</div>
 <div class="titre-actions">
   <h1>Mandat de gestion n° {{ mandat.numero }}</h1>
   <div class="actions">
     <a href="{% url 'mandats:word' mandat.pk %}">Word</a>
     <a href="{% url 'mandats:pdf' mandat.pk %}">PDF</a>
-    <a class="bouton-petit" href="{% url 'mandats:modifier' mandat.pk %}">Modifier</a>
   </div>
 </div>
 <p class="discret">{{ mandat.mandant }} · {% if mandat.en_cours %}en cours{% else %}terminé le {{ mandat.date_fin|date:"d/m/Y" }}{% endif %}</p>

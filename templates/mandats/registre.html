@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Registre des mandats · {{ nom_application }}{% endblock %}
 {% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><span class="fil-ici">Registre des mandats</span></nav>
 <div class="titre-actions">
   <h1>Registre des mandats</h1>
   <div class="actions">

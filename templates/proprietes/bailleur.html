@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 {% block titre %}{{ bailleur }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% if bailleur.contact %}{{ bailleur.contact.get_absolute_url }}{% else %}{% url 'contacts:liste' %}?categorie=bailleur{% endif %}">← {% if bailleur.contact %}Fiche du contact{% else %}Contacts{% endif %}</a></p>
+<div class="barre-fiche">
+  <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contacts:liste' %}">Contacts</a><span aria-hidden="true">›</span>{% if bailleur.contact %}<a href="{{ bailleur.contact.get_absolute_url }}">{{ bailleur }}</a><span aria-hidden="true">›</span><span class="fil-ici">Fiche de bailleur</span>{% else %}<span class="fil-ici">{{ bailleur }}</span>{% endif %}</nav>
+  {% url 'proprietes:bailleur_modifier' bailleur.pk as modifier %}{% url 'proprietes:bailleur_supprimer' bailleur.pk as supprimer %}{% include "_actions_fiche.html" with modifier=modifier supprimer=supprimer question="Supprimer définitivement ce bailleur ?" %}
+</div>
 <div class="titre-actions">
   <h1>{{ bailleur }}</h1>
   <div class="actions">
     <a href="{% url 'proprietes:propriete_creer' %}?bailleur={{ bailleur.pk }}&amp;suite=mandat">Ajouter un bien</a>
-    <a class="bouton-petit" href="{% url 'proprietes:bailleur_modifier' bailleur.pk %}">Modifier</a>
   </div>
 </div>
 <section class="carte">
