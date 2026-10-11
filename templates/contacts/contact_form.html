@@ -20,7 +20,7 @@
       <div class="choix-radio">{% for radio in form.nature %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
       {% for erreur in form.nature.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
     </div>
-    {% if contact.entreprise %}{% for bailleur in contact.bailleurs.all %}<p class="discret pleine-largeur">Le représentant, les associés et le SIREN de cette société se saisissent sur <a href="{% url 'proprietes:bailleur_modifier' bailleur.pk %}">sa fiche de bailleur</a>.</p>{% endfor %}{% endif %}
+    {% if contact.entreprise %}{% for bailleur in contact.bailleurs.all %}<p class="discret pleine-largeur">Le représentant, les associés et le SIREN de cette société se saisissent sur <a href="{% url 'proprietes:bailleur_modifier' bailleur.pk %}">sa fiche de bailleur</a>. La passer en « Personne » efface son représentant, ses associés et son SIREN.</p>{% endfor %}{% endif %}
     {% if not contact %}<p class="discret pleine-largeur">Un propriétaire reçoit aussi sa fiche de bailleur, à laquelle se rattachent ses propriétés. Un locataire ou un garant saisi ici pourra être relié plus tard à une candidature ou à un bail qui porte le même nom.</p>{% endif %}
   </fieldset>
   {% for titre, champs in form.sections %}
