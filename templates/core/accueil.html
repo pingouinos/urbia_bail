@@ -3,31 +3,34 @@
 <section class="accroche">
   <div>
     <h1>Bonjour {{ user.first_name|default:user.username }}</h1>
-    <p>Suivez chaque mise en location depuis la fiche du logement : mandat, candidatures, bail, signature.</p>
+    <p>{% if nb_taches %}{{ nb_taches }} action{{ nb_taches|pluralize }} en attente{% if nb_urgentes %}, dont {{ nb_urgentes }} en retard{% endif %}.{% else %}Tout est à jour.{% endif %}</p>
   </div>
 </section>
 {% if agence_manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ agence_manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux. <a href="{% url 'agence' %}">Compléter la fiche</a></p>{% endif %}
 
 <section class="carte">
   <div class="titre-actions">
-    <h2>Locations en cours</h2>
-    <a href="{% url 'proprietes:liste' %}?situation=a_louer">Logements à louer</a>
+    <h2>À faire{% if nb_taches %} <span class="compteur">{{ nb_taches }}</span>{% endif %}</h2>
+    {% if nb_urgentes %}<span class="pastille pastille-libre">{{ nb_urgentes }} en retard</span>{% endif %}
   </div>
-  {% if locations %}
-  <table>
-    <thead><tr><th>Logement</th><th>Où en est-on</th><th>À faire</th></tr></thead>
+  {% if taches %}
+  <p class="discret">Les actions en attente, déduites des fiches : une ligne disparaît d'elle-même quand l'action est faite.</p>
+  {% for rubrique, lignes in taches %}
+  <h3 class="rubrique-taches">{{ rubrique }} <span class="discret">({{ lignes|length }})</span></h3>
+  <table class="taches">
     <tbody>
-    {% for location in locations %}
+    {% for tache in lignes %}
       <tr>
-        <td><a href="{{ location.propriete.get_absolute_url }}">{{ location.propriete.adresse }}{% if location.propriete.complement %}, {{ location.propriete.complement }}{% endif %}</a><br><span class="discret">{{ location.propriete.code_postal }} {{ location.propriete.ville }}</span></td>
-        <td>{{ location.etape }}{% if location.detail %}<br><span class="pastille pastille-preavis">{{ location.detail }}</span>{% endif %}</td>
-        <td><a class="bouton-petit" href="{{ location.lien }}">{{ location.action }}</a></td>
+        <td><a href="{{ tache.lien }}">{{ tache.titre }}</a>{% if tache.urgent %} <span class="pastille pastille-libre">En retard</span>{% endif %}{% if tache.detail %}<br><span class="discret">{{ tache.detail }}</span>{% endif %}</td>
+        <td class="discret">{{ tache.sujet }}</td>
+        <td class="actions-ligne"><a class="bouton-petit{% if not tache.urgent %} secondaire{% endif %}" href="{{ tache.lien }}">{{ tache.action }}</a></td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
+  {% endfor %}
   {% else %}
-  <p class="discret">Aucune mise en location en cours. Pour en démarrer une, ouvrez la fiche du logement depuis « Propriétés ».</p>
+  <p class="discret">Rien en attente. Les actions à mener apparaîtront ici : mandat à faire signer, pièces à fournir, candidatures à étudier, bail à rédiger, diagnostic périmé.</p>
   {% endif %}
 </section>
 
