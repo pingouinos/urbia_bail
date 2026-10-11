@@ -1,10 +1,14 @@
+from axes.utils import reset
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.db.models import Q
 from django.http import FileResponse, Http404, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
+from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from contrats.models import Bail
 from proprietes.models import Propriete
@@ -12,7 +16,7 @@ from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from mandats.models import Mandat
 
-from .forms import OrganisationForm, type_image
+from .forms import OrganisationForm, UtilisateurForm, type_image
 from .models import Organisation
 
 
@@ -82,11 +86,67 @@ def accueil(request):
     })
 
 
+def _administrateur(request):
+    if not est_administrateur(request.user):
+        raise PermissionDenied
+
+
+def administration(request):
+    """Accueil de l'administration : l'agence, les utilisateurs, les modèles."""
+    _administrateur(request)
+    Utilisateur = get_user_model()
+    return render(request, "core/administration.html", {
+        "organisation": Organisation.courante(),
+        "nb_utilisateurs": Utilisateur.objects.filter(is_active=True).count(),
+    })
+
+
+def utilisateurs(request):
+    _administrateur(request)
+    comptes = list(get_user_model().objects.order_by("-is_active", "last_name", "first_name", "username"))
+    avec_mfa = set(TOTPDevice.objects.filter(confirmed=True).values_list("user_id", flat=True))
+    for compte in comptes:
+        compte.administrateur = est_administrateur(compte)
+        compte.mfa = compte.pk in avec_mfa
+        compte.google = not compte.has_usable_password()
+    return render(request, "core/utilisateurs.html", {"comptes": comptes})
+
+
+def utilisateur_editer(request, pk=None):
+    _administrateur(request)
+    compte = get_object_or_404(get_user_model(), pk=pk) if pk else None
+    form = UtilisateurForm(request.POST or None, instance=compte, acteur=request.user)
+    if form.is_valid():
+        compte = form.save()
+        messages.success(request, f"Compte de {compte.get_full_name() or compte.username} enregistré.")
+        return redirect("utilisateurs")
+    return render(request, "core/utilisateur_form.html", {
+        "form": form, "compte": compte,
+        "mfa": bool(compte) and TOTPDevice.objects.filter(user=compte, confirmed=True).exists(),
+    })
+
+
+@require_POST
+def utilisateur_action(request, pk, action):
+    """Dépannage d'un compte : nouvelle double authentification, ou
+    déblocage après trop d'essais de mot de passe."""
+    _administrateur(request)
+    compte = get_object_or_404(get_user_model(), pk=pk)
+    nom = compte.get_full_name() or compte.username
+    if action == "mfa":
+        TOTPDevice.objects.filter(user=compte).delete()
+        messages.success(request, f"Double authentification de {nom} réinitialisée : "
+                                  "un nouveau code QR lui sera proposé à sa prochaine connexion.")
+    else:
+        reset(username=compte.username)
+        messages.success(request, f"Compte de {nom} débloqué.")
+    return redirect("utilisateur_modifier", pk=compte.pk)
+
+
 def agence(request):
     """Fiche de l'agence, tenue par les administrateurs : ses mentions figurent
     sur les mandats et les baux."""
-    if not est_administrateur(request.user):
-        raise PermissionDenied
+    _administrateur(request)
     organisation = Organisation.courante()
     form = OrganisationForm(request.POST or None, request.FILES or None, instance=organisation)
     if form.is_valid():

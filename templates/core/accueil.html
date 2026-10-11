@@ -5,7 +5,6 @@
     <h1>Bonjour {{ user.first_name|default:user.username }}</h1>
     <p>Suivez chaque mise en location depuis la fiche du logement : mandat, candidatures, bail, signature.</p>
   </div>
-  <div class="accroche-action"><a class="bouton bouton-corail" href="{% url 'contrats:choisir' %}">+ Nouveau contrat</a></div>
 </section>
 {% if agence_manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ agence_manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux. <a href="{% url 'agence' %}">Compléter la fiche</a></p>{% endif %}
 
@@ -61,8 +60,7 @@
   <a class="carte" href="{% url 'proprietes:liste' %}"><strong>Propriétés</strong><span class="discret">{{ nb_proprietes }} lot(s) actif(s)</span></a>
   <a class="carte" href="{% url 'mandats:registre' %}"><strong>Registre des mandats</strong><span class="discret">{{ nb_mandats }} en cours</span></a>
   <a class="carte" href="{% url 'proprietes:importer' %}"><strong>Importer des propriétés</strong><span class="discret">Depuis un fichier Excel</span></a>
-  {% if est_admin %}<a class="carte" href="{% url 'documents:modeles' %}"><strong>Modèles des documents</strong><span class="discret">Bail et mandat, depuis Google Docs</span></a>
-  <a class="carte" href="{% url 'agence' %}"><strong>Agence</strong><span class="discret">Coordonnées et mentions légales</span></a>{% endif %}
+  {% if est_admin %}<a class="carte" href="{% url 'administration' %}"><strong>Administration</strong><span class="discret">Agence, utilisateurs, modèles des documents</span></a>{% endif %}
 </div>
 <p class="discret">Connecté en tant que {% if est_admin %}administrateur{% else %}gestionnaire{% endif %}.</p>
 {% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titre %}{% if compte %}Modifier l'utilisateur{% else %}Nouvel utilisateur{% endif %} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'utilisateurs' %}">← Utilisateurs</a></p>
+<h1>{% if compte %}{{ compte.get_full_name|default:compte.username }}{% else %}Nouvel utilisateur{% endif %}</h1>
+<p class="discret">{% if compte %}Identifiant : {{ compte.username }} · dernière connexion : {{ compte.last_login|date:"d/m/Y H:i"|default:"jamais" }}.{% else %}L'adresse e-mail sert d'identifiant.{% endif %} Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {% for erreur in form.non_field_errors %}<p class="message alerte-fond">{{ erreur }}</p>{% endfor %}
+  <fieldset>
+    <legend>Identité</legend>
+    {% include "proprietes/_champ.html" with champ=form.first_name %}
+    {% include "proprietes/_champ.html" with champ=form.last_name %}
+    {% include "proprietes/_champ.html" with champ=form.email %}
+  </fieldset>
+  <fieldset>
+    <legend>Rôle et accès</legend>
+    <div class="champ pleine-largeur obligatoire{% if form.role.errors %} en-erreur{% endif %}">
+      <span class="libelle">{{ form.role.label }} :</span>
+      <div class="choix-radio">{% for radio in form.role %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
+      <small class="discret">{{ form.role.help_text }}</small>
+      {% for erreur in form.role.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
+    </div>
+    {% include "proprietes/_champ.html" with champ=form.is_active %}
+    {% include "proprietes/_champ.html" with champ=form.mot_de_passe %}
+  </fieldset>
+  <div class="actions-formulaire"><button type="submit" class="bouton-corail">Enregistrer</button></div>
+</form>
+{% if compte %}
+<section class="carte">
+  <h2>Dépannage</h2>
+  <form method="post" action="{% url 'utilisateur_mfa' compte.pk %}" class="en-ligne" onsubmit="return confirm('Réinitialiser la double authentification de ce compte ?');">
+    {% csrf_token %}
+    <button type="submit" class="secondaire"{% if not mfa %} disabled{% endif %}>Réinitialiser la double authentification</button>
+    <small class="discret">{% if mfa %}Téléphone perdu ou changé : un nouveau code QR sera proposé à la prochaine connexion.{% else %}Aucune application d'authentification n'est configurée sur ce compte.{% endif %}</small>
+  </form>
+  <form method="post" action="{% url 'utilisateur_debloquer' compte.pk %}" class="en-ligne">
+    {% csrf_token %}
+    <button type="submit" class="secondaire">Débloquer le compte</button>
+    <small class="discret">Après trop d'essais de mot de passe, la connexion est bloquée quelque temps.</small>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

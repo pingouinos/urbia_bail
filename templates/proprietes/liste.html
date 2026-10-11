@@ -6,7 +6,7 @@
   <div class="actions">
     <a href="{% url 'proprietes:importer' %}">Importer</a>
     <a href="{% url 'proprietes:exporter' %}?{{ request.GET.urlencode }}">Exporter (Excel)</a>
-    <a class="bouton-petit" href="{% url 'mandats:creer' %}">Nouvelle propriété</a>
+    <a class="bouton-petit bouton-corail" href="{% url 'mandats:creer' %}">+ Nouvelle propriété</a>
   </div>
 </div>
 <form class="filtres" method="get">
