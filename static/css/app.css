@@ -38,6 +38,9 @@ h1 a, h2 a { color: inherit; }
 .marque img { display: block; height: 48px; width: auto; }
 .menu { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; order: 1; }
 .menu a { padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 500; border-bottom: 3px solid transparent; }
+.menu a { display: flex; align-items: center; gap: 10px; }
+.menu .icone { flex: none; color: var(--discret); }
+.menu a[aria-current=page] .icone { color: var(--corail); }
 .menu a:hover { background: var(--melon-clair); }
 .menu a[aria-current=page] { border-bottom-color: var(--corail); border-radius: 8px 8px 0 0; font-weight: 600; }
 .compte { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; color: var(--discret); order: 3; }
@@ -198,6 +201,19 @@ dt { color: var(--discret); }
 dd { margin: 0; }
 .pagination { display: flex; gap: 16px; margin-top: 12px; }
 .historique { margin: 0; padding-left: 18px; }
+
+/* Ordinateur : le menu est un panneau fixe à gauche, le compte en bas. */
+@media (min-width: 761px) {
+  .avec-panneau { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+  .avec-panneau .entete { position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 18px; padding: 20px 14px 16px; border-bottom: 0; border-right: 1px solid var(--bord); }
+  .avec-panneau .marque { padding: 0 10px; }
+  .avec-panneau .menu { flex: 0 0 auto; flex-direction: column; flex-wrap: nowrap; gap: 2px; }
+  .avec-panneau .menu a { padding: 9px 12px; border-bottom: 0; border-left: 3px solid transparent; border-radius: 0 8px 8px 0; }
+  .avec-panneau .menu a[aria-current=page] { border-left-color: var(--corail); border-radius: 0 8px 8px 0; background: var(--melon-clair); }
+  .avec-panneau .bouton-entete { text-align: center; }
+  .avec-panneau .compte { margin-top: auto; flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 6px; padding: 14px 10px 0; border-top: 1px solid var(--bord); }
+  .avec-panneau main { width: 100%; }
+}
 
 @media (max-width: 760px) {
   /* En-tête compact : logo, « Nouveau bail » et un bouton qui déplie le menu. */

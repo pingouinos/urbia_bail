@@ -12,4 +12,4 @@ def rubrique(request):
         return ""
     if page.namespace == "biens" and (page.url_name or "").startswith("bailleur"):
         return "bailleurs"
-    return page.namespace
+    return page.namespace or ("accueil" if page.url_name == "accueil" else "")

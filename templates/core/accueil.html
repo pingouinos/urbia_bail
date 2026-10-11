@@ -36,8 +36,8 @@
 
 <section class="carte">
   <div class="titre-actions">
-    <h2>Derniers baux</h2>
-    <a href="{% url 'baux:liste' %}">Tous les baux</a>
+    <h2>Derniers contrats</h2>
+    <a href="{% url 'baux:liste' %}">Tous les contrats</a>
   </div>
   {% if derniers_baux %}
   <table>
@@ -54,7 +54,7 @@
     </tbody>
   </table>
   {% else %}
-  <p class="discret">Aucun bail pour l'instant. Commencez par « Nouveau bail » ci-dessus.</p>
+  <p class="discret">Aucun contrat pour l'instant.</p>
   {% endif %}
 </section>
 
