@@ -162,6 +162,44 @@ class VuesTests(Donnees, TestCase):
     def setUp(self):
         self.client.force_login(User.objects.create_user("gestion"))
 
+    def test_supprimer_un_bail(self):
+        """Un bail non signé se supprime ; un bail signé, par un administrateur seulement."""
+        from candidatures.models import Candidat, Candidature
+        from comptes.roles import ADMINISTRATEURS, attribuer_role
+
+        propriete = self.creer_propriete()
+        brouillon = self.creer_bail(propriete)
+        page = self.client.get(brouillon.get_absolute_url())
+        self.assertContains(page, reverse("contrats:supprimer", args=[brouillon.pk]))
+        self.assertEqual(self.client.get(reverse("contrats:supprimer", args=[brouillon.pk])).status_code, 405)
+        reponse = self.client.post(reverse("contrats:supprimer", args=[brouillon.pk]), follow=True)
+        self.assertRedirects(reponse, propriete.get_absolute_url())
+        self.assertContains(reponse, "Bail supprimé. Le logement est de nouveau proposé à la location.")
+        propriete.refresh_from_db()
+        self.assertTrue(propriete.a_louer and not Bail.objects.exists())
+        # Né d'une candidature retenue : elle retrouve son étape.
+        candidature = Candidature.objects.create(propriete=propriete, statut="retenue")
+        Candidat.objects.create(candidature=candidature, nom="Roux", prenom="Lina")
+        bail = self.creer_bail(propriete)
+        candidature.bail = bail
+        candidature.save()
+        reponse = self.client.post(reverse("contrats:supprimer", args=[bail.pk]), follow=True)
+        self.assertContains(reponse, "La candidature retenue est conservée")
+        candidature.refresh_from_db()
+        self.assertEqual((candidature.bail, candidature.statut), (None, "retenue"))
+        # Signé : refusé au gestionnaire, qui n'en voit pas le bouton ; permis à l'administrateur.
+        signe = self.creer_bail(propriete, date_signature=dt.date(2026, 10, 1))
+        self.assertNotContains(self.client.get(signe.get_absolute_url()), reverse("contrats:supprimer", args=[signe.pk]))
+        reponse = self.client.post(reverse("contrats:supprimer", args=[signe.pk]), follow=True)
+        self.assertContains(reponse, "seul un administrateur peut le supprimer")
+        self.assertTrue(Bail.objects.filter(pk=signe.pk).exists())
+        admin = User.objects.create_user("admin")
+        attribuer_role(admin, ADMINISTRATEURS)
+        self.client.force_login(admin)
+        self.assertContains(self.client.get(signe.get_absolute_url()), "Supprimer ce bail signé")
+        self.client.post(reverse("contrats:supprimer", args=[signe.pk]))
+        self.assertFalse(Bail.objects.exists())
+
     def test_nouveau_contrat_laisse_le_choix(self):
         page = self.client.get(reverse("contrats:choisir"))
         self.assertContains(page, reverse("mandats:creer"))

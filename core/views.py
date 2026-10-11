@@ -172,6 +172,8 @@ def logo_agence(request):
     fichier.seek(0)
     reponse = FileResponse(fichier, content_type=type_)
     reponse["X-Content-Type-Options"] = "nosniff"
+    # Affiché sur chaque page : le navigateur le garde une heure.
+    reponse["Cache-Control"] = "private, max-age=3600"
     return reponse
 
 

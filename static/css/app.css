@@ -360,3 +360,7 @@ dd { margin: 0; }
 
 /* Rôle sous le nom de la personne connectée. */
 .compte-role { display: block; font-size: 0.8rem; font-weight: 400; color: var(--discret); }
+
+/* Action irréversible présentée comme un lien. */
+button.lien.lien-danger { color: var(--erreur); }
+.telechargements form { margin: 0; }

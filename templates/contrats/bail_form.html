@@ -57,6 +57,13 @@
     <button type="submit">{% if bail %}Enregistrer{% else %}Enregistrer et passer au document{% endif %}</button>
   </div>
 </form>
+{% if bail %}{% if not bail.signe or est_administrateur %}
+<form method="post" action="{% url 'contrats:supprimer' bail.pk %}" class="en-ligne" onsubmit="return confirm('{% if bail.signe %}Ce bail est signé. Le supprimer définitivement, avec son exemplaire signé ?{% else %}Supprimer définitivement ce bail ?{% endif %}');">
+  {% csrf_token %}
+  <button type="submit" class="danger">Supprimer ce bail</button>
+  <small class="discret">{% if bail.signe %}Bail signé : réservé aux administrateurs. Pour y mettre fin normalement, utilisez « Départ du locataire ».{% else %}Bail rédigé par erreur ou resté sans suite. La candidature retenue, s'il y en a une, est conservée.{% endif %}</small>
+</form>
+{% endif %}{% endif %}
 <script>
   // Ajout d'un locataire sans recharger la page : copie du modèle vide du
   // formulaire, numérotée à la suite.
