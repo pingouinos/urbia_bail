@@ -344,7 +344,13 @@ dd { margin: 0; }
 
 /* Actions en bout de ligne d'une liste. */
 .actions-ligne { white-space: nowrap; text-align: right; }
-.actions-ligne > * { display: inline-block; vertical-align: middle; margin-left: 4px; }
+.actions-ligne > a.bouton-icone { display: inline-grid; vertical-align: middle; }
+.actions-ligne > form { display: inline-block; vertical-align: middle; margin-left: 4px; }
 .actions-ligne .bouton-icone, .actions-ligne button.bouton-icone.bouton-icone[type=submit] { width: 30px; height: 30px; }
 .masque { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .fiche-entete .actions form { display: inline; }
+
+/* Pièces du dossier d'un mandat. */
+.dossier form.en-ligne { margin: 0; }
+.dossier input[type=file] { max-width: 260px; }
+.dossier input[type=date] { width: auto; }

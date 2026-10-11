@@ -46,6 +46,35 @@
   </dl>
 </section>
 
+<section class="carte" id="dossier">
+  <div class="titre-actions">
+    <h2>Pièces du dossier</h2>
+    {% if nb_manquantes %}<span class="pastille pastille-libre">{{ nb_manquantes }} pièce{{ nb_manquantes|pluralize }} à fournir</span>{% else %}<span class="pastille pastille-loue">Dossier complet</span>{% endif %}
+  </div>
+  <p class="discret">Pièces remises par le mandant. La pièce d'identité et le RIB sont rattachés au bailleur et valent pour tous ses mandats ; les autres sont rattachées à la propriété. PDF ou image, 20 Mo au maximum.</p>
+  <table class="dossier">
+    <thead><tr><th>Pièce</th><th>État</th><th>Déposer{% if dossier %} ou remplacer{% endif %}</th></tr></thead>
+    <tbody>
+    {% for ligne in dossier %}
+      <tr>
+        <td>{{ ligne.libelle }}{% if ligne.note or not ligne.obligatoire %}<br><span class="discret">{% if not ligne.obligatoire %}Facultatif{% if ligne.note %} : {% endif %}{% endif %}{{ ligne.note }}</span>{% endif %}</td>
+        <td>{% if ligne.piece %}<a href="{% url 'proprietes:piece' ligne.piece.pk %}" target="_blank" rel="noopener">Ouvrir</a> · {% if ligne.piece.perime %}<span class="pastille pastille-libre">Périmé depuis le {{ ligne.piece.expire_le|date:"d/m/Y" }}</span>{% else %}<span class="pastille pastille-loue">Fourni</span>{% endif %}<br><span class="discret">déposé le {{ ligne.piece.cree_le|date:"d/m/Y" }}{% if ligne.piece.expire_le and not ligne.piece.perime %}, valable jusqu'au {{ ligne.piece.expire_le|date:"d/m/Y" }}{% endif %}</span>{% elif ligne.obligatoire %}<span class="pastille pastille-libre">À fournir</span>{% else %}<span class="discret">—</span>{% endif %}</td>
+        <td>
+          <form method="post" enctype="multipart/form-data" class="en-ligne" action="{% if ligne.du_bailleur %}{% url 'proprietes:bailleur_piece_deposer' ligne.cible.pk %}{% else %}{% url 'proprietes:piece_deposer' ligne.cible.pk %}{% endif %}">
+            {% csrf_token %}
+            <input type="hidden" name="type" value="{{ ligne.type }}">
+            <input type="hidden" name="retour" value="{{ mandat.get_absolute_url }}#dossier">
+            <input type="file" name="fichier" accept=".pdf,.jpg,.jpeg,.png" required aria-label="Fichier : {{ ligne.libelle }}">
+            {% if ligne.avec_date %}<label class="discret">établi le <input type="date" name="date_document" aria-label="Date du document"></label>{% endif %}
+            <button type="submit" class="bouton-petit secondaire">Déposer</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
 <section class="carte">
   <div class="titre-actions">
     <h2>Signature</h2>

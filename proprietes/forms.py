@@ -245,6 +245,14 @@ class PieceForm(forms.ModelForm):
             "fichier": forms.FileInput(attrs={"accept": ".pdf,.jpg,.jpeg,.png"}),
         }
 
+    def __init__(self, *args, bailleur=False, **kwargs):
+        """Les types proposés dépendent de ce à quoi la pièce s'attache."""
+        super().__init__(*args, **kwargs)
+        self.fields["type"].choices = [("", "---------")] + [
+            (valeur, libelle) for valeur, libelle in Piece.Type.choices
+            if (valeur in Piece.DU_BAILLEUR) == bailleur or valeur == Piece.Type.AUTRE
+        ]
+
     def clean_fichier(self):
         fichier = self.cleaned_data["fichier"]
         if not fichier.name.lower().endswith((".pdf", ".jpg", ".jpeg", ".png")):

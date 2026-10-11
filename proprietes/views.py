@@ -9,6 +9,7 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from contrats.models import Bail
@@ -131,29 +132,51 @@ def propriete(request, pk):
     })
 
 
-@require_POST
-def piece_deposer(request, pk):
-    objet = get_object_or_404(Propriete, pk=pk)
-    form = PieceForm(request.POST, request.FILES)
+def _retour(request, defaut):
+    """Page d'où vient le dépôt (fiche du mandat, par exemple), si elle est de ce site."""
+    retour = request.POST.get("retour", "")
+    return retour if url_has_allowed_host_and_scheme(retour, allowed_hosts={request.get_host()}) else defaut
+
+
+def _deposer_piece(request, form, retour, **cible):
     if form.is_valid():
         piece = form.save(commit=False)
-        piece.propriete, piece.depose_par = objet, request.user
+        piece.depose_par = request.user
+        for champ, valeur in cible.items():
+            setattr(piece, champ, valeur)
         piece.save()
-        if piece.type == Piece.Type.DPE and piece.date_document and piece.date_document != objet.date_dpe:
+        propriete = piece.propriete
+        if propriete and piece.type == Piece.Type.DPE and piece.date_document:
             # La fiche suit le dernier DPE déposé.
-            if not objet.date_dpe or piece.date_document > objet.date_dpe:
-                objet.date_dpe = piece.date_document
-                objet.save()
-        messages.success(request, f"{piece.get_type_display()} déposé.")
+            if not propriete.date_dpe or piece.date_document > propriete.date_dpe:
+                propriete.date_dpe = piece.date_document
+                propriete.save()
+        messages.success(request, f"{piece.get_type_display()} : document déposé.")
     else:
         for erreurs in form.errors.values():
             for erreur in erreurs:
                 messages.error(request, erreur)
-    return redirect(f"{objet.get_absolute_url()}?onglet=documents")
+    return redirect(_retour(request, retour))
 
 
-def piece(request, pk, piece_pk):
-    objet = get_object_or_404(Piece, pk=piece_pk, propriete=pk)
+@require_POST
+def piece_deposer(request, pk):
+    objet = get_object_or_404(Propriete, pk=pk)
+    return _deposer_piece(
+        request, PieceForm(request.POST, request.FILES), f"{objet.get_absolute_url()}?onglet=documents", propriete=objet,
+    )
+
+
+@require_POST
+def bailleur_piece_deposer(request, pk):
+    objet = get_object_or_404(Bailleur, pk=pk)
+    return _deposer_piece(
+        request, PieceForm(request.POST, request.FILES, bailleur=True), objet.get_absolute_url(), bailleur=objet,
+    )
+
+
+def piece(request, pk):
+    objet = get_object_or_404(Piece, pk=pk)
     try:
         fichier = objet.fichier.open("rb")
     except FileNotFoundError:
@@ -165,12 +188,13 @@ def piece(request, pk, piece_pk):
 
 
 @require_POST
-def piece_supprimer(request, pk, piece_pk):
-    objet = get_object_or_404(Piece, pk=piece_pk, propriete=pk)
+def piece_supprimer(request, pk):
+    objet = get_object_or_404(Piece.objects.select_related("propriete", "bailleur"), pk=pk)
+    defaut = f"{objet.propriete.get_absolute_url()}?onglet=documents" if objet.propriete else objet.bailleur.get_absolute_url()
     objet.fichier.delete(save=False)
     objet.delete()
     messages.success(request, "Document supprimé.")
-    return redirect(f"{reverse('proprietes:propriete', args=[pk])}?onglet=documents")
+    return redirect(_retour(request, defaut))
 
 
 def mettre_en_location(request, pk):
@@ -350,7 +374,10 @@ def bailleurs(request):
 
 def bailleur(request, pk):
     objet = get_object_or_404(Bailleur, pk=pk)
-    return render(request, "proprietes/bailleur.html", {"bailleur": objet, "proprietes": objet.proprietes.all()})
+    return render(request, "proprietes/bailleur.html", {
+        "bailleur": objet, "proprietes": objet.proprietes.all(),
+        "pieces": objet.pieces.select_related("depose_par"), "form_piece": PieceForm(bailleur=True),
+    })
 
 
 def bailleur_editer(request, pk=None):

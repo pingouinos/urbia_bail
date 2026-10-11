@@ -25,4 +25,33 @@
 {% for propriete in proprietes %}<li><a href="{{ propriete.get_absolute_url }}">{{ propriete }}</a>{% if not propriete.actif %} <span class="discret">(plus géré)</span>{% endif %}</li>
 {% empty %}<li class="discret">Aucune propriété.</li>{% endfor %}
 </ul>
+<section class="carte">
+  <h2>Documents</h2>
+  {% if pieces %}
+  <table>
+    <thead><tr><th>Document</th><th>Établi le</th><th>Déposé</th><th></th></tr></thead>
+    <tbody>
+    {% for piece in pieces %}
+      <tr>
+        <td><a href="{% url 'proprietes:piece' piece.pk %}" target="_blank" rel="noopener">{{ piece.get_type_display }}</a>{% if piece.libelle %}<br><span class="discret">{{ piece.libelle }}</span>{% endif %}</td>
+        <td>{{ piece.date_document|date:"d/m/Y"|default:"—" }}</td>
+        <td>{{ piece.cree_le|date:"d/m/Y" }}{% if piece.depose_par %}<br><span class="discret">{{ piece.depose_par.get_full_name|default:piece.depose_par.username }}</span>{% endif %}</td>
+        <td><form method="post" action="{% url 'proprietes:piece_supprimer' piece.pk %}" onsubmit="return confirm('Supprimer ce document ?');">{% csrf_token %}<button type="submit" class="lien">Supprimer</button></form></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="discret">Aucun document. La pièce d'identité et le RIB du bailleur se déposent ici, ou depuis la fiche d'un de ses mandats.</p>
+  {% endif %}
+</section>
+<form method="post" enctype="multipart/form-data" action="{% url 'proprietes:bailleur_piece_deposer' bailleur.pk %}" class="formulaire">
+  {% csrf_token %}
+  <fieldset>
+    <legend>Déposer un document</legend>
+    {% for champ in form_piece %}{% include "proprietes/_champ.html" %}{% endfor %}
+    <p class="discret pleine-largeur">PDF ou image, 20 Mo au maximum.</p>
+  </fieldset>
+  <div class="actions-formulaire"><button type="submit" class="bouton-corail">Déposer</button></div>
+</form>
 {% endblock %}

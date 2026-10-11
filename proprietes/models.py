@@ -445,37 +445,57 @@ class Propriete(Horodatage):
         ]
 
 
+def dossier_piece(piece, nom):
+    """Les pièces d'un bailleur (identité, RIB) sont rangées à part de celles des propriétés."""
+    return f"{'bailleurs' if piece.bailleur_id else 'proprietes'}/{nom}"
+
+
 class Piece(models.Model):
-    """Document attaché à une propriété : diagnostics du dossier technique
-    annexé au bail, règlement de copropriété, etc."""
+    """Document attaché à une propriété (diagnostics, titre, assurance…) ou
+    à un bailleur (pièce d'identité, RIB). Ce sont les pièces que le mandant
+    fournit à la signature du mandat, et celles que l'on annexe au bail."""
 
     class Type(models.TextChoices):
+        IDENTITE = "identite", "Pièce d'identité"
+        RIB = "rib", "Relevé d'identité bancaire"
+        KBIS = "kbis", "Extrait Kbis de moins de trois mois"
+        STATUTS = "statuts", "Statuts de la société"
+        TAXE_FONCIERE = "taxe_fonciere", "Dernière taxe foncière"
+        TITRE = "titre", "Attestation de propriété"
+        CHARGES = "charges", "Relevé annuel des charges de copropriété"
+        ASSURANCE = "assurance", "Attestation d'assurance propriétaire non occupant"
+        BAIL = "bail", "Bail en cours"
+        ETAT_DES_LIEUX = "etat_des_lieux", "État des lieux"
         DPE = "dpe", "Diagnostic de performance énergétique (DPE)"
+        ELECTRICITE = "electricite", "État de l'installation d'électricité"
+        SURFACE = "surface", "Attestation de surface (Carrez ou habitable)"
+        GAZ = "gaz", "État de l'installation de gaz"
         ERP = "erp", "État des risques (ERP)"
         PLOMB = "plomb", "Constat de risque d'exposition au plomb"
         AMIANTE = "amiante", "Diagnostic amiante"
-        ELECTRICITE = "electricite", "État de l'installation d'électricité"
-        GAZ = "gaz", "État de l'installation de gaz"
-        SURFACE = "surface", "Attestation de surface habitable"
         REGLEMENT = "reglement", "Règlement de copropriété"
         AUTRE = "autre", "Autre document"
 
-    # Durée de validité pour une location, quand elle ne dépend que de la date.
+    # Pièces qui concernent la personne du bailleur, et non une propriété.
+    DU_BAILLEUR = (Type.IDENTITE, Type.RIB, Type.KBIS, Type.STATUTS)
+    # Durée de validité quand elle ne dépend que de la date.
     VALIDITE = {
         Type.DPE: dt.timedelta(days=3653),
         Type.ELECTRICITE: dt.timedelta(days=2192),
         Type.GAZ: dt.timedelta(days=2192),
         Type.ERP: dt.timedelta(days=183),
+        Type.ASSURANCE: dt.timedelta(days=366),
     }
     # Les DPE établis avant cette date ne sont plus valables, quel que soit leur âge.
     DPE_ANCIENNE_METHODE = dt.date(2021, 7, 1)
 
-    propriete = models.ForeignKey(Propriete, on_delete=models.CASCADE, related_name="pieces")
+    propriete = models.ForeignKey(Propriete, on_delete=models.CASCADE, null=True, blank=True, related_name="pieces")
+    bailleur = models.ForeignKey(Bailleur, on_delete=models.CASCADE, null=True, blank=True, related_name="pieces")
     type = models.CharField(max_length=20, choices=Type.choices)
     libelle = models.CharField("précision", max_length=120, blank=True)
-    fichier = models.FileField(upload_to="proprietes/")
+    fichier = models.FileField(upload_to=dossier_piece)
     date_document = models.DateField(
-        "établi le", null=True, blank=True, help_text="Date du diagnostic ; elle sert à calculer sa fin de validité.",
+        "établi le", null=True, blank=True, help_text="Date du document ; elle sert à calculer sa fin de validité.",
     )
     cree_le = models.DateTimeField("déposé le", auto_now_add=True)
     depose_par = models.ForeignKey(
@@ -485,6 +505,13 @@ class Piece(models.Model):
     class Meta:
         ordering = ["type", "-date_document", "-cree_le"]
         verbose_name = "document"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(propriete__isnull=False, bailleur__isnull=True)
+                | models.Q(propriete__isnull=True, bailleur__isnull=False),
+                name="piece_propriete_ou_bailleur",
+            ),
+        ]
 
     def __str__(self):
         return self.libelle or self.get_type_display()
@@ -503,3 +530,8 @@ class Piece(models.Model):
     @property
     def perime(self):
         return self.expire_le is not None and self.expire_le < timezone.localdate()
+
+    @property
+    def cible(self):
+        """La propriété ou le bailleur auquel la pièce est attachée."""
+        return self.propriete or self.bailleur

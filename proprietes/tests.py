@@ -326,11 +326,13 @@ class VuesTests(TestCase):
             self.assertEqual((piece.expire_le, piece.perime, piece.depose_par.username), (dt.date(2033, 4, 12), False, "gestion"))
             self.assertContains(self.client.get(onglet), "jusqu'au 12/04/2033")
             self.assertContains(self.client.get(propriete.get_absolute_url() + "?onglet=informations"), "ouvrir le DPE")
-            fichier = self.client.get(reverse("proprietes:piece", args=[propriete.pk, piece.pk]))
+            fichier = self.client.get(reverse("proprietes:piece", args=[piece.pk]))
             self.assertEqual((fichier["Content-Type"], fichier.getvalue()), ("application/pdf", b"%PDF-1.7 essai"))
-            # Le document d'une propriété ne s'ouvre pas par l'adresse d'une autre.
-            self.assertEqual(self.client.get(reverse("proprietes:piece", args=[propriete.pk + 1, piece.pk])).status_code, 404)
-            self.client.post(reverse("proprietes:piece_supprimer", args=[propriete.pk, piece.pk]))
+            # Un document ne s'ouvre que connecté.
+            self.client.logout()
+            self.assertEqual(self.client.get(reverse("proprietes:piece", args=[piece.pk])).status_code, 302)
+            self.client.force_login(User.objects.get(username="gestion"))
+            self.client.post(reverse("proprietes:piece_supprimer", args=[piece.pk]))
             self.assertFalse(Piece.objects.exists())
 
     def test_validite_des_diagnostics(self):

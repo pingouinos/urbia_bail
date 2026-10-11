@@ -263,6 +263,60 @@ class VuesTests(Donnees, TestCase):
         self.assertContains(page, 'name="honoraires_edl_bailleur" value="117.00"')
         self.assertContains(page, 'name="honoraires_bail_locataire" value="390.00"')
 
+    def test_pieces_du_dossier(self):
+        """Les pièces remises par le mandant se déposent depuis la fiche du
+        mandat : identité et RIB sur le bailleur, le reste sur la propriété."""
+        from proprietes.models import Piece
+
+        propriete = self.creer_propriete(regime_juridique="copropriete")
+        mandat = self.creer_mandat(propriete)
+        page = self.client.get(mandat.get_absolute_url())
+        self.assertContains(page, "9 pièces à fournir")
+        self.assertEqual([ligne["libelle"] for ligne in mandat.dossier if not ligne["obligatoire"]], ["Bail en cours", "État des lieux"])
+        retour = mandat.get_absolute_url() + "#dossier"
+
+        def deposer(type_, cible, **autres):
+            nom = "proprietes:bailleur_piece_deposer" if cible is propriete.bailleur else "proprietes:piece_deposer"
+            fichier = SimpleUploadedFile(f"{type_}.pdf", b"%PDF-1.7", content_type="application/pdf")
+            return self.client.post(reverse(nom, args=[cible.pk]), {"type": type_, "fichier": fichier, "retour": retour, **autres})
+
+        self.assertRedirects(deposer("identite", propriete.bailleur), retour, fetch_redirect_response=False)
+        deposer("rib", propriete.bailleur)
+        deposer("dpe", propriete, date_document="2020-01-10")
+        identite = Piece.objects.get(type="identite")
+        self.assertEqual((identite.bailleur, identite.propriete), (propriete.bailleur, None))
+        self.assertTrue(identite.fichier.name.startswith("bailleurs/"))
+        page = self.client.get(mandat.get_absolute_url())
+        # Le DPE déposé est périmé : il reste à fournir.
+        self.assertContains(page, "7 pièces à fournir")
+        self.assertContains(page, "Périmé depuis le 31/12/2024")
+        # Les pièces du bailleur valent pour ses autres mandats.
+        autre = self.creer_mandat(Propriete.objects.create(
+            bailleur=propriete.bailleur, adresse="5 rue du Taur", code_postal="31000", ville="Toulouse",
+            surface=Decimal("30"), dernier_loyer=Decimal("500"), regime_juridique="monopropriete",
+        ))
+        manquantes = autre.pieces_manquantes
+        self.assertNotIn("Pièce d'identité", manquantes)
+        self.assertNotIn("Relevé annuel des charges de copropriété", manquantes)
+        self.assertIn("Dernière taxe foncière", manquantes)
+        self.assertContains(self.client.get(propriete.bailleur.get_absolute_url()), "Relevé d&#x27;identité bancaire")
+        # Une société fournit en plus son Kbis ; ses statuts sont facultatifs.
+        sci = Bailleur.objects.create(type="sci_familiale", nom="SCI ESGT", representant_nom="Garcia", representant_prenom="Elodie")
+        societe = self.creer_mandat(Propriete.objects.create(
+            bailleur=sci, adresse="9 rue Riquet", code_postal="31000", ville="Toulouse", dernier_loyer=Decimal("500"),
+        ))
+        lignes = {ligne["libelle"]: ligne for ligne in societe.dossier}
+        self.assertTrue(lignes["Extrait Kbis de moins de trois mois"]["obligatoire"])
+        self.assertFalse(lignes["Statuts de la société"]["obligatoire"])
+        self.assertEqual(lignes["Pièce d'identité"]["note"], "du représentant, pour une société")
+        self.assertNotIn("Extrait Kbis de moins de trois mois", [ligne["libelle"] for ligne in mandat.dossier])
+        # Une pièce d'identité ne se dépose pas sur une propriété, ni un retour vers un autre site.
+        reponse = self.client.post(reverse("proprietes:piece_deposer", args=[propriete.pk]), {
+            "type": "identite", "fichier": SimpleUploadedFile("id.pdf", b"%PDF-1.7"), "retour": "https://exemple.org/",
+        })
+        self.assertRedirects(reponse, propriete.get_absolute_url() + "?onglet=documents", fetch_redirect_response=False)
+        self.assertEqual(Piece.objects.filter(type="identite").count(), 1)
+
     def test_registre_et_export(self):
         self.creer_mandat()
         self.creer_mandat(date_fin="2026-01-01")
