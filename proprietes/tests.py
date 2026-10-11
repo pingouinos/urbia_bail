@@ -539,6 +539,62 @@ class VuesTests(TestCase):
         with self.assertRaisesMessage(ValueError, "Fichier trop long"):
             tableur.lire_lignes("gros.csv", ("a;b\n" * (tableur.LIGNES_MAX + 2)).encode())
 
+    def test_un_immeuble_une_seule_fois(self):
+        """Le champ « Immeuble » d'une propriété propose chaque immeuble une
+        fois, avec son adresse ; le même immeuble ne s'enregistre pas deux fois."""
+        from django.db import IntegrityError, transaction
+
+        bailleur = Bailleur.objects.create(nom="SCI ESGT", type="sci_familiale")
+        mermoz = Immeuble.objects.create(nom="MERMOZ", adresse="2 Rue Jean Mermoz", code_postal="31120", ville="Portet-sur-Garonne")
+        canal = Immeuble.objects.create(nom="Résidence du Canal", adresse="8 quai de Brienne", code_postal="31000", ville="Toulouse")
+        sans_nom = Immeuble.objects.create(adresse="5 rue du Taur", code_postal="31000", ville="Toulouse")
+        lots = [
+            Propriete.objects.create(bailleur=bailleur, immeuble=mermoz, adresse=mermoz.adresse, code_postal="31120",
+                                     ville=mermoz.ville, complement=f"Apt{numero}")
+            for numero in (1, 2, 3)
+        ]
+        page = self.client.get(reverse("proprietes:propriete_modifier", args=[lots[0].pk]))
+        libelles = [str(libelle) for valeur, libelle in page.context["form"].fields["immeuble"].choices if valeur]
+        # Trois lots, un seul choix « MERMOZ » ; les autres immeubles sont là, chacun une fois.
+        self.assertEqual(libelles, [
+            "5 rue du Taur, 31000 Toulouse",
+            "MERMOZ — 2 Rue Jean Mermoz, 31120 Portet-sur-Garonne",
+            "Résidence du Canal — 8 quai de Brienne, 31000 Toulouse",
+        ])
+        self.assertContains(page, f'<option value="{mermoz.pk}" selected>MERMOZ — 2 Rue Jean Mermoz, 31120 Portet-sur-Garonne</option>', html=True)
+        # Enregistrer la fiche garde le rattachement et ne crée ni immeuble ni propriété.
+        donnees = {"bailleur": bailleur.pk, "immeuble": mermoz.pk, "usage": "habitation", "actif": "on",
+                   "adresse": mermoz.adresse, "code_postal": "31120", "ville": mermoz.ville, "complement": "Apt1", "surface": "42"}
+        reponse = self.client.post(reverse("proprietes:propriete_modifier", args=[lots[0].pk]), donnees)
+        self.assertRedirects(reponse, lots[0].get_absolute_url())
+        lots[0].refresh_from_db()
+        self.assertEqual((lots[0].immeuble, lots[0].surface), (mermoz, Decimal("42")))
+        self.assertEqual((Immeuble.objects.count(), Propriete.objects.count(), mermoz.lots.count()), (3, 3, 3))
+        # Le même immeuble, écrit autrement, est refusé à la création…
+        memes = self.immeuble(**{"immeuble-nom": "Mermoz", "immeuble-adresse": "2, rue Jean MERMOZ",
+                                 "immeuble-code_postal": "31120", "immeuble-ville": "Portet sur Garonne", "immeuble-confirmer_adresse": "on"})
+        reponse = self.client.post(reverse("proprietes:immeuble_creer"), memes)
+        self.assertContains(reponse, "Cet immeuble est déjà enregistré")
+        self.assertContains(reponse, mermoz.get_absolute_url())
+        self.assertEqual((Immeuble.objects.count(), Propriete.objects.count()), (3, 3))
+        # … en renommant un autre immeuble…
+        reponse = self.client.post(reverse("proprietes:immeuble_modifier", args=[canal.pk]), {
+            "nom": "MERMOZ", "adresse": "2 rue Jean Mermoz", "code_postal": "31120", "ville": "Portet-sur-Garonne",
+        })
+        self.assertContains(reponse, "Cet immeuble est déjà enregistré")
+        # … et par la base elle-même.
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Immeuble.objects.create(nom="mermoz", adresse="2 RUE JEAN MERMOZ", code_postal="31120", ville="Portet-sur-Garonne")
+        # Un autre bâtiment à la même adresse reste possible sous un autre nom, après confirmation.
+        autre = {**memes, "immeuble-nom": "MERMOZ bâtiment B"}
+        self.client.post(reverse("proprietes:immeuble_creer"), autre)
+        self.assertEqual(Immeuble.objects.count(), 4)
+        # Modifier un immeuble sans changer son identité ne le prend pas pour son propre doublon.
+        reponse = self.client.post(reverse("proprietes:immeuble_modifier", args=[sans_nom.pk]), {
+            "nom": "", "adresse": "5 rue du Taur", "code_postal": "31000", "ville": "Toulouse",
+        })
+        self.assertRedirects(reponse, sans_nom.get_absolute_url())
+
     def test_depenses_energie_incoherentes(self):
         bailleur = Bailleur.objects.create(nom="Durand")
         reponse = self.client.post(reverse("proprietes:propriete_creer"), {

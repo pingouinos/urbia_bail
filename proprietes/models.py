@@ -218,14 +218,38 @@ class Immeuble(Horodatage):
     code_postal = models.CharField("code postal", max_length=10, validators=[code_postal_francais])
     ville = models.CharField(max_length=100)
 
+    # Ce qui fait qu'un immeuble est le même : adresse, code postal, ville et
+    # nom, sans tenir compte de l'écriture. Unique, pour qu'un immeuble ne
+    # soit pas enregistré deux fois.
+    cle = models.CharField(max_length=600, editable=False, default="")
+
     history = HistoricalRecords()
 
     class Meta:
-        ordering = ["ville", "adresse"]
+        ordering = ["ville", "adresse", "nom"]
         verbose_name = "immeuble"
+        constraints = [models.UniqueConstraint(fields=["cle"], name="immeuble_unique")]
 
     def __str__(self):
         return self.nom or f"{self.adresse}, {self.code_postal} {self.ville}"
+
+    def save(self, *args, **kwargs):
+        self.cle = self.identite(self.nom, self.adresse, self.code_postal, self.ville)
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def identite(nom, adresse, code_postal, ville):
+        """« 2 Rue Jean Mermoz » et « 2 rue jean mermoz, » à Portet-sur-Garonne
+        désignent le même immeuble ; deux bâtiments d'une même adresse se
+        distinguent par leur nom."""
+        return "|".join([cle_adresse(adresse), (code_postal or "").strip(), cle_adresse(ville), cle_adresse(nom)])[:600]
+
+    @property
+    def designation(self):
+        """Libellé sans ambiguïté pour une liste de choix : « MERMOZ — 2 Rue
+        Jean Mermoz, 31120 Portet-sur-Garonne »."""
+        adresse = f"{self.adresse}, {self.code_postal} {self.ville}"
+        return f"{self.nom} — {adresse}" if self.nom else adresse
 
     def get_absolute_url(self):
         return reverse("proprietes:immeuble", args=[self.pk])

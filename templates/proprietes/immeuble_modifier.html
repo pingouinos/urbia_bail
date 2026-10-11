@@ -7,6 +7,7 @@
 <form method="post" class="formulaire">
   {% csrf_token %}
   {{ form.non_field_errors }}
+  {% if form.doublon %}<p class="message alerte-fond"><strong>Cet immeuble est déjà enregistré :</strong> <a href="{{ form.doublon.get_absolute_url }}">{{ form.doublon.designation }}</a> ({{ form.doublon.lots.count }} lot{{ form.doublon.lots.count|pluralize }}). Ajoutez vos lots depuis sa fiche, ou donnez un autre nom s'il s'agit d'un autre bâtiment à la même adresse.</p>{% endif %}
   <fieldset>
     <legend>Immeuble</legend>
     {% for champ in form.champs %}{% include "proprietes/_champ.html" %}{% endfor %}

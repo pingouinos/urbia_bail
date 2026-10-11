@@ -8,7 +8,8 @@
 {% if request.GET.suite == "mandat" %}<p class="message">Étape 1 sur 2 : l'immeuble et ses lots. Vous rédigerez ensuite un mandat par lot, depuis la fiche de l'immeuble.</p>{% endif %}
 <form method="post" class="formulaire">
   {% csrf_token %}
-  {{ form.non_field_errors }}{{ communs.non_field_errors }}
+  {{ form.non_field_errors }}
+  {% if form.doublon %}<p class="message alerte-fond"><strong>Cet immeuble est déjà enregistré :</strong> <a href="{{ form.doublon.get_absolute_url }}">{{ form.doublon.designation }}</a> ({{ form.doublon.lots.count }} lot{{ form.doublon.lots.count|pluralize }}). Ajoutez vos lots depuis sa fiche, ou donnez un autre nom s'il s'agit d'un autre bâtiment à la même adresse.</p>{% endif %}{{ communs.non_field_errors }}
   {% include "proprietes/_adresse_connue.html" %}
   <fieldset>
     <legend>Immeuble</legend>
