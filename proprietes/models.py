@@ -116,6 +116,28 @@ class Bailleur(Horodatage):
     def societe(self):
         return self.type != self.Type.PERSONNE_PHYSIQUE
 
+    @classmethod
+    def deja_enregistre(cls, type_, nom, prenom="", siren="", code_postal="", sauf=None):
+        """Bailleur qui est manifestement le même, ou None. Une société se
+        reconnaît à sa raison sociale, sauf SIREN différents ; une personne à
+        son nom et son prénom, sauf codes postaux différents (deux homonymes)."""
+        societe = type_ != cls.Type.PERSONNE_PHYSIQUE
+        candidats = cls.objects.exclude(pk=sauf)
+        candidats = candidats.exclude(type=cls.Type.PERSONNE_PHYSIQUE) if societe else candidats.filter(type=cls.Type.PERSONNE_PHYSIQUE)
+        cle = cle_adresse(nom), "" if societe else cle_adresse(prenom)
+
+        def distincts(a, b):
+            a, b = re.sub(r"\s", "", a or ""), re.sub(r"\s", "", b or "")
+            return bool(a and b and a != b)
+
+        for autre in candidats.order_by("pk"):
+            if (cle_adresse(autre.nom), "" if societe else cle_adresse(autre.prenom)) != cle:
+                continue
+            if distincts(siren, autre.siren) if societe else distincts(code_postal, autre.code_postal):
+                continue
+            return autre
+        return None
+
     def save(self, *args, **kwargs):
         from contacts.models import Contact, cle_identite
 

@@ -18,6 +18,7 @@ class SocieteOuPersonneMixin:
     civilité, un prénom et éventuellement un conjoint. Les champs qui ne
     concernent pas le type choisi sont vidés."""
 
+    doublon = None
     PERSONNE = ("civilite", "prenom", "conjoint_civilite", "conjoint_nom", "conjoint_prenom")
     SOCIETE = ("representant_civilite", "representant_nom", "representant_prenom", "representant_qualite", "siren")
 
@@ -28,6 +29,13 @@ class SocieteOuPersonneMixin:
             for champ in self.PERSONNE if societe else self.SOCIETE:
                 if champ in self.fields and champ not in self.errors:
                     donnees[champ] = ""
+            # Le même bailleur ne s'enregistre pas deux fois : on reprend sa fiche.
+            self.doublon = donnees.get("nom") and Bailleur.deja_enregistre(
+                donnees["type"], donnees["nom"], donnees.get("prenom", ""), donnees.get("siren", ""),
+                donnees.get("code_postal", ""), sauf=self.instance.pk,
+            )
+            if self.doublon:
+                self.add_error("nom", f"« {self.doublon} » est déjà enregistré : reprenez sa fiche au lieu d'en créer une autre.")
         return donnees
 
 

@@ -6,6 +6,7 @@
 <form method="post" class="formulaire">
   {% csrf_token %}
   {{ form.non_field_errors }}
+  {% if form.doublon %}<p class="message alerte-fond"><strong>Ce bailleur est déjà enregistré :</strong> <a href="{{ form.doublon.get_absolute_url }}">{{ form.doublon.designation }}</a>, avec {{ form.doublon.proprietes.count }} propriété{{ form.doublon.proprietes.count|pluralize }}. S'il s'agit bien d'un autre bailleur du même nom, indiquez {% if form.doublon.societe %}son SIREN{% else %}son code postal{% endif %} pour les distinguer.</p>{% endif %}
   <fieldset>
     <legend>Bailleur</legend>
     {% for champ in form %}{% include "proprietes/_champ.html" %}{% endfor %}

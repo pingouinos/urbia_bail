@@ -22,6 +22,7 @@
   </fieldset>
   <fieldset id="nouveau-bailleur">
     <legend>Nouveau bailleur</legend>
+    {% if nouveau_bailleur.doublon %}<p class="message alerte-fond pleine-largeur"><strong>Ce bailleur est déjà enregistré.</strong> Choisissez « {{ nouveau_bailleur.doublon }} » dans la liste « Bailleur » ci-dessus au lieu de le saisir à nouveau.</p>{% endif %}
     <p class="discret pleine-largeur">À remplir si le bailleur n'est pas dans la liste ci-dessus.</p>
     {% for champ in nouveau_bailleur %}{% include "proprietes/_champ.html" %}{% endfor %}
   </fieldset>
