@@ -5,17 +5,23 @@
 
 <section class="carte fiche-entete">
   <div class="titre-actions">
-    <h1>{{ bien.adresse }}{% if bien.complement %}, {{ bien.complement }}{% endif %}</h1>
-    <div class="actions"><a class="bouton-petit" href="{% url 'biens:bien_modifier' bien.pk %}">Modifier</a></div>
+    <h1 class="fiche-titre"><svg class="icone" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></svg>{{ bien.adresse }}{% if bien.complement %}, {{ bien.complement }}{% endif %}</h1>
+    <div class="actions">
+      {% if not bien.a_louer and situation.code != "loue" and not situation.a_venir %}<a class="bouton-icone" href="{% url 'biens:mettre_en_location' bien.pk %}" title="Mettre en location" aria-label="Mettre en location"><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8"/><path d="M16 7l2.5 2.5"/><path d="M19 4l1.5 1.5"/></svg></a>{% endif %}
+      <a class="bouton-icone" href="{% url 'biens:bien_modifier' bien.pk %}" title="Modifier la fiche" aria-label="Modifier la fiche"><svg class="icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/><path d="M14.5 6.5l3 3"/></svg></a>
+    </div>
   </div>
   <p class="pastilles">
     <span class="pastille">{{ bien.get_usage_display }}{% if bien.meuble %} meublé{% endif %}</span>
     <span class="pastille pastille-{{ situation.code }}">{{ situation.libelle }}</span>
     {% if bien.a_louer %}<span class="pastille pastille-a_louer">À louer</span>{% endif %}
+    {% if not mandat %}<span class="pastille pastille-libre">Sans mandat</span>{% endif %}
+    {% if bien.classe_dpe %}<span class="pastille{% if bien.classe_dpe == "F" or bien.classe_dpe == "G" %} pastille-libre{% endif %}">DPE {{ bien.classe_dpe }}</span>{% endif %}
+    {% if bien.zone_tendue %}<span class="pastille">Zone tendue</span>{% endif %}
     {% if not bien.actif %}<span class="pastille pastille-libre">Plus géré par l'agence</span>{% endif %}
   </p>
-  <p>Appartient à <a href="{{ bien.bailleur.get_absolute_url }}"><strong>{{ bien.bailleur }}</strong></a>{% if mandat %} · <a href="{{ mandat.get_absolute_url }}">mandat n° {{ mandat.numero }}</a>{% else %} · <span class="alerte">aucun mandat en cours</span>{% endif %}</p>
-  <p class="discret">{{ bien.code_postal }} {{ bien.ville }}{% if bien.surface %} · {{ bien.surface }} m²{% endif %}{% if bien.nb_pieces %} · {{ bien.nb_pieces }} pièce{{ bien.nb_pieces|pluralize }}{% endif %}{% if bien.ref_ics %} · réf. ICS {{ bien.ref_ics }}{% endif %}</p>
+  <p>Appartient à <a href="{{ bien.bailleur.get_absolute_url }}"><strong>{{ bien.bailleur }}</strong></a>{% if mandat %} · <a href="{{ mandat.get_absolute_url }}">mandat n° {{ mandat.numero }}</a>{% endif %}{% if bien.surface %} · {{ bien.surface }} m²{% endif %}{% if bien.nb_pieces %} · {{ bien.nb_pieces }} pièce{{ bien.nb_pieces|pluralize }}{% endif %}</p>
+  <p class="discret adresse"><svg class="icone" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg>{{ bien.adresse }}, {{ bien.code_postal }} {{ bien.ville }}{% if bien.ref_ics %} · réf. ICS {{ bien.ref_ics }}{% endif %}</p>
   <nav class="onglets" aria-label="Rubriques de la fiche">
     <a href="?onglet=location"{% if onglet == "location" %} aria-current="page"{% endif %}>Location</a>
     <a href="?onglet=informations"{% if onglet == "informations" %} aria-current="page"{% endif %}>Informations générales</a>
@@ -33,8 +39,35 @@
 {% if onglet == "location" %}
 {% if bien.location_interdite %}<p class="message alerte-fond">Logement classé G au DPE : il ne peut plus faire l'objet d'un nouveau bail d'habitation depuis le 1er janvier 2025.</p>{% endif %}
 <section class="carte">
-  <h2>Location</h2>
-  {% if etape %}
+  <div class="titre-actions">
+    <h2>Contrat en cours</h2>
+    {% if situation.bail %}{% if situation.bail.conge_recu_le %}<span class="pastille pastille-preavis">Préavis</span>{% elif not situation.bail.date_signature %}<span class="pastille pastille-libre">À signer</span>{% else %}<span class="pastille pastille-loue">En cours</span>{% endif %}{% endif %}
+  </div>
+  {% if situation.bail %}{% with bail=situation.bail %}
+  <dl class="resume">
+    <div><dt>Locataires</dt><dd>{{ bail.noms_locataires|default:"Locataire à renseigner" }}</dd></div>
+    <div><dt>Bail</dt><dd><a href="{{ bail.get_absolute_url }}">bail du {{ bail.date_effet|date:"d/m/Y" }}</a>{% if not bail.date_signature %} · <span class="alerte">à faire signer</span>{% endif %}</dd></div>
+    <div><dt>{% if bail.conge_recu_le %}Départ prévu{% else %}Terme{% endif %}</dt><dd>{% if bail.conge_recu_le %}{{ bail.date_depart_prevue|date:"d/m/Y" }}{% else %}{{ bail.date_fin|date:"d/m/Y" }}{% endif %}</dd></div>
+    <div><dt>Loyer</dt><dd>{{ bail.loyer }} € + {{ bail.charges }} € de charges</dd></div>
+    {% if bail.conge_recu_le %}<div><dt>Congé</dt><dd>congé {% if bail.conge_origine == "bailleur" %}du bailleur{% else %}du locataire{% endif %} le {{ bail.conge_recu_le|date:"d/m/Y" }}</dd></div>{% endif %}
+  </dl>
+  <div class="actions-location">
+    {% if not bail.date_signature %}<a class="bouton" href="{{ bail.get_absolute_url }}">Faire signer le bail</a>{% endif %}
+    {% if bail.conge_recu_le %}<a class="bouton secondaire" href="{% url 'baux:fin' bail.pk %}">Confirmer le départ du locataire</a>
+    {% else %}<a class="bouton{% if not bail.date_signature %} secondaire{% endif %}" href="{% url 'baux:fin' bail.pk %}">Départ du locataire</a>{% endif %}
+    <a href="{% url 'baux:pdf' bail.pk %}">Bail en PDF</a>
+  </div>
+  {% endwith %}{% else %}
+  <div class="vide">
+    <p class="discret">Aucun contrat en cours pour cette propriété.{% if situation.code == "sans_bail" %} Si elle est déjà louée, ajoutez son bail : l'application saura qu'elle est occupée.{% endif %}</p>
+    {% if not situation.a_venir and not retenue %}<a class="bouton secondaire" href="{% url 'baux:creer' %}?bien={{ bien.pk }}">Ajouter un contrat</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+
+{% if etape and situation.code != "loue" %}
+<section class="carte">
+  <h2>Mise en location</h2>
   <ol class="etapes" aria-label="Étapes de la mise en location">
     <li{% if etape == 1 %} aria-current="step"{% else %} class="faite"{% endif %}><span>1</span> Mandat</li>
     <li{% if etape == 2 %} aria-current="step"{% elif etape > 2 %} class="faite"{% endif %}><span>2</span> Mise en location</li>
@@ -43,17 +76,12 @@
     <li{% if etape == 5 %} aria-current="step"{% elif etape > 5 %} class="faite"{% endif %}><span>5</span> Signature</li>
     <li{% if etape == 6 %} aria-current="step"{% endif %}><span>6</span> Entrée dans les lieux</li>
   </ol>
-  {% endif %}
-  {% if situation.bail %}
-  <p><strong>{{ situation.bail.noms_locataires|default:"Locataire à renseigner" }}</strong> · <a href="{{ situation.bail.get_absolute_url }}">bail du {{ situation.bail.date_effet|date:"d/m/Y" }}</a>{% if not situation.bail.date_signature %} · <span class="alerte">à faire signer</span>{% endif %}{% if situation.bail.conge_recu_le %} · congé {% if situation.bail.conge_origine == "bailleur" %}du bailleur{% else %}du locataire{% endif %} le {{ situation.bail.conge_recu_le|date:"d/m/Y" }}{% endif %}</p>
-  {% endif %}
   {% if situation.a_venir %}
   <p>Prochain locataire : <strong>{{ situation.a_venir.noms_locataires|default:"à renseigner" }}</strong>, entrée le {{ situation.a_venir.date_effet|date:"d/m/Y" }} · <a href="{{ situation.a_venir.get_absolute_url }}">bail</a>{% if not situation.a_venir.date_signature %} · <span class="alerte">à faire signer</span>{% endif %}</p>
   {% endif %}
   {% if bien.a_louer %}
   <p>À louer depuis le {{ bien.mise_en_location_le|date:"d/m/Y" }} · disponible le {{ bien.disponible_le|date:"d/m/Y" }}{% if bien.dernier_loyer %} · {{ bien.dernier_loyer }} € hors charges{% if bien.charges %} + {{ bien.charges }} € de charges{% endif %}{% endif %} · <a href="{% url 'biens:mettre_en_location' bien.pk %}">modifier</a></p>
   {% endif %}
-  {% if situation.code == "sans_bail" and not bien.a_louer %}<p class="discret">Si ce logement est déjà loué, saisissez son bail en cours : l'application saura qu'il est occupé.</p>{% endif %}
   {% if candidatures %}
   <ul class="choix">
     {% for candidature in candidatures %}
@@ -62,10 +90,7 @@
   </ul>
   {% endif %}
   <div class="actions-location">
-    {% if situation.code == "loue" %}
-      {% if not situation.bail.date_signature %}<a class="bouton" href="{{ situation.bail.get_absolute_url }}">Faire signer le bail</a>{% endif %}
-      <a class="bouton{% if not situation.bail.date_signature %} secondaire{% endif %}" href="{% url 'baux:fin' situation.bail.pk %}">Départ du locataire</a>
-    {% elif situation.a_venir %}
+    {% if situation.a_venir %}
       <a class="bouton" href="{{ situation.a_venir.get_absolute_url }}">{% if situation.a_venir.date_signature %}Ouvrir le bail{% else %}Faire signer le bail{% endif %}</a>
     {% elif retenue %}
       <a class="bouton" href="{% url 'baux:creer' %}?candidature={{ retenue.pk }}">Rédiger le bail de {{ retenue.noms|default:"la candidature retenue" }}</a>
@@ -78,10 +103,9 @@
     {% elif bien.est_habitation %}
       <a class="bouton" href="{% url 'candidatures:creer' %}?bien={{ bien.pk }}">Enregistrer une candidature</a>
     {% endif %}
-    {% if situation.code != "loue" and not situation.a_venir and not retenue %}<a href="{% url 'baux:creer' %}?bien={{ bien.pk }}">Rédiger un bail sans candidature</a>{% endif %}
-    {% if situation.code == "preavis" %}<a href="{% url 'baux:fin' situation.bail.pk %}">Confirmer le départ du locataire</a>{% endif %}
   </div>
 </section>
+{% endif %}
 
 {% elif onglet == "informations" %}
 <div class="grille">
