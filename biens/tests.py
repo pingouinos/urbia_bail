@@ -175,7 +175,7 @@ class VuesTests(TestCase):
     def test_liste_recherche_et_export(self):
         tableur.importer("biens.xlsx", xlsx(ligne("L001"), ligne("L002", Ville="Blagnac", **{"Code postal": "31700"})))
         reponse = self.client.get(reverse("biens:liste"), {"q": "blagnac"})
-        self.assertContains(reponse, "1 bien(s)")
+        self.assertContains(reponse, "1 propriété(s)")
         reponse = self.client.get(reverse("biens:exporter"), {"q": "blagnac"})
         self.assertEqual(load_workbook(io.BytesIO(reponse.content)).active.max_row, 2)
 

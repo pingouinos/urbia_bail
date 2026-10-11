@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block titre %}{% if bail %}Modifier le bail{% else %}Nouveau bail{% endif %} · {{ nom_application }}{% endblock %}
+{% block titre %}{% if bail %}Modifier le bail{% else %}Nouveau contrat{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 {% if bail %}<p><a href="{{ bail.get_absolute_url }}">← Retour au bail</a></p>{% endif %}
-<h1>{% if bail %}Modifier le bail{% else %}Nouveau bail{% endif %}</h1>
+<h1>{% if bail %}Modifier le bail{% else %}Nouveau contrat{% endif %}</h1>
 {% if not bail %}{% include "baux/_etapes.html" with etape=2 %}{% endif %}
 
 {% if logement %}

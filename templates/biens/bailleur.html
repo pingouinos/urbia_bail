@@ -19,7 +19,7 @@
     {% if bailleur.siren %}<dt>SIREN</dt><dd>{{ bailleur.siren }}</dd>{% endif %}
   </dl>
 </section>
-<h2>Biens ({{ biens|length }})</h2>
+<h2>Propriétés ({{ biens|length }})</h2>
 <ul>
 {% for bien in biens %}<li><a href="{{ bien.get_absolute_url }}">{{ bien }}</a>{% if not bien.actif %} <span class="discret">(plus géré)</span>{% endif %}</li>
 {% empty %}<li class="discret">Aucun bien.</li>{% endfor %}

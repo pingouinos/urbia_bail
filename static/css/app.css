@@ -51,6 +51,17 @@ h1 a, h2 a { color: inherit; }
 .ouvert .bouton-menu { background: var(--melon-clair); }
 .icone-menu { width: 18px; height: 2px; margin: 6px 0; border-radius: 1px; background: currentColor; box-shadow: 0 -6px 0 currentColor, 0 6px 0 currentColor; }
 .bouton-entete:hover { background: #ffad8f; }
+/* Menu « Ajouter » : point d'entrée unique des créations. */
+.ajouter { position: relative; order: 2; }
+.ajouter summary { display: block; cursor: pointer; list-style: none; text-align: center; }
+.ajouter summary::-webkit-details-marker { display: none; }
+.ajouter summary::after { content: " +"; }
+.ajouter[open] summary { background: #ffad8f; }
+.ajouter-liste { position: absolute; z-index: 10; top: calc(100% + 6px); left: 0; min-width: 100%; width: max-content; max-width: 280px; display: grid; background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); box-shadow: 0 8px 20px -12px rgb(60 66 94 / 0.5); overflow: hidden; }
+.ajouter-liste a { display: grid; gap: 2px; padding: 10px 14px; text-decoration: none; font-weight: 600; }
+.ajouter-liste a + a { border-top: 1px solid var(--bord); }
+.ajouter-liste a:hover { background: var(--melon-clair); }
+.ajouter-liste span { font-weight: 400; font-size: 0.85rem; }
 
 main { max-width: 1080px; margin: 0 auto; padding: 28px 16px 48px; }
 
@@ -211,6 +222,7 @@ dd { margin: 0; }
   .avec-panneau .menu a { padding: 9px 12px; border-bottom: 0; border-left: 3px solid transparent; border-radius: 0 8px 8px 0; }
   .avec-panneau .menu a[aria-current=page] { border-left-color: var(--corail); border-radius: 0 8px 8px 0; background: var(--melon-clair); }
   .avec-panneau .bouton-entete { text-align: center; }
+  .avec-panneau .ajouter-liste { position: static; width: auto; max-width: none; margin-top: 6px; box-shadow: none; }
   .avec-panneau .compte { margin-top: auto; flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 6px; padding: 14px 10px 0; border-top: 1px solid var(--bord); }
   .avec-panneau main { width: 100%; }
 }
@@ -221,6 +233,7 @@ dd { margin: 0; }
   .entete-seule { display: flex; }
   .marque img { height: 40px; }
   .bouton-menu { display: flex; order: 3; }
+  .ajouter-liste { left: auto; right: 0; }
   .menu, .compte { grid-column: 1 / -1; flex-direction: column; align-items: stretch; gap: 0; }
   .menu { order: 4; padding-top: 6px; border-top: 1px solid var(--bord); }
   .compte { order: 5; padding: 6px 0 4px; border-top: 1px solid var(--bord); }

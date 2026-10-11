@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block titre %}Biens · {{ nom_application }}{% endblock %}
+{% block titre %}Propriétés · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <div class="titre-actions">
-  <h1>Biens</h1>
+  <h1>Propriétés</h1>
   <div class="actions">
     <a href="{% url 'biens:importer' %}">Importer</a>
     <a href="{% url 'biens:exporter' %}?{{ request.GET.urlencode }}">Exporter (Excel)</a>
-    <a class="bouton-petit" href="{% url 'biens:bien_creer' %}">Nouveau bien</a>
+    <a class="bouton-petit" href="{% url 'biens:bien_creer' %}">Nouvelle propriété</a>
   </div>
 </div>
 <form class="filtres" method="get">
@@ -19,10 +19,10 @@
     <option value="">Toutes les situations</option>
     {% for valeur, libelle in situations %}<option value="{{ valeur }}"{% if request.GET.situation == valeur %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
   </select>
-  <label><input type="checkbox" name="inactifs" value="1"{% if request.GET.inactifs == "1" %} checked{% endif %}> Inclure les biens qui ne sont plus gérés</label>
+  <label><input type="checkbox" name="inactifs" value="1"{% if request.GET.inactifs == "1" %} checked{% endif %}> Inclure les propriétés qui ne sont plus gérées</label>
   <button type="submit">Filtrer</button>
 </form>
-<p class="discret">{{ page.paginator.count }} bien(s)</p>
+<p class="discret">{{ page.paginator.count }} propriété(s)</p>
 <table>
   <thead><tr><th>Adresse</th><th>Ville</th><th>Location</th><th>Usage</th><th>Bailleur</th><th>DPE</th><th>Réf. ICS</th></tr></thead>
   <tbody>
