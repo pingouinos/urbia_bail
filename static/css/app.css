@@ -403,3 +403,10 @@ button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erre
 .bouton-entete:hover { color: var(--acier); background: var(--corail); }
 .lien-admin:hover { color: var(--acier); }
 .pastille a, a.pastille { color: inherit; }
+
+/* Liens entre contacts (société, représentant, associés) dans la liste. */
+.contacts .relations { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 0.92rem; }
+.contacts .relations a { color: var(--lien); font-weight: 600; }
+.contacts .relations a:hover { color: var(--lien-survol); }
+.contacts .liens-contact summary { cursor: pointer; width: fit-content; padding: 2px 8px 2px 0; }
+.contacts .liens-contact summary:hover { color: var(--lien); }

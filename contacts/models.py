@@ -221,17 +221,43 @@ class Contact(Horodatage):
         return list(self.garants.all())
 
     @property
-    def liens(self):
-        liens = [
-            Lien("societe", f"Représente {societe.nom}", societe.get_absolute_url(), None, societe.representant_qualite)
+    def relations(self):
+        """Liens entre contacts : une personne et la société qu'elle représente
+        ou dont elle est associée, et, vu de la société, son représentant et
+        ses associés. Chaque lien mène à la fiche de l'autre contact."""
+        def fiche(bailleur):
+            return bailleur.contact.get_absolute_url() if bailleur.contact_id else bailleur.get_absolute_url()
+
+        def parts(associe):
+            return f"{associe.parts.normalize():f} % des parts".replace(".", ",") if associe.parts is not None else ""
+
+        relations = [
+            Lien("represente", f"Représente {societe.nom}", fiche(societe), None, societe.representant_qualite)
             for societe in self.societes.all()
         ]
-        liens += [
-            Lien("societe", f"Associé de {associe.bailleur.nom}", associe.bailleur.get_absolute_url(), None,
-                 f"{associe.parts.normalize():f} % des parts".replace(".", ",") if associe.parts is not None else "")
+        relations += [
+            Lien("associe", f"Associé de {associe.bailleur.nom}", fiche(associe.bailleur), None, parts(associe))
             for associe in self.associes.all()
         ]
-        liens += [Lien("propriete", str(p), p.get_absolute_url(), p.pk) for p in self.proprietes]
+        for bailleur in self.bailleurs.all():
+            if not bailleur.societe:
+                continue
+            if bailleur.representant_id:
+                relations.append(Lien(
+                    "representant", f"Représentée par {bailleur.representant.designation}",
+                    bailleur.representant.get_absolute_url(), None, bailleur.representant_qualite,
+                ))
+            relations += [
+                Lien("associe", f"Associé : {associe}", associe.contact.get_absolute_url() if associe.contact_id else "",
+                     None, parts(associe))
+                for associe in bailleur.associes.all()
+                if associe.contact_id != bailleur.representant_id
+            ]
+        return relations
+
+    @property
+    def liens(self):
+        liens = [Lien("propriete", str(p), p.get_absolute_url(), p.pk) for p in self.proprietes]
         liens += [
             Lien("bail", f"Bail · {bail.propriete}", bail.get_absolute_url(), bail.propriete_id,
                  "" if bail.en_cours else "terminé")
@@ -251,9 +277,18 @@ class Contact(Horodatage):
                 ))
         return liens
 
+    @property
+    def liens_propres(self):
+        """Liens à afficher sur la ligne du contact : les siens. Les propriétés
+        d'une société qu'il représente se lisent sur la ligne de la société,
+        vers laquelle renvoie sa relation."""
+        siennes = {p.pk for bailleur in self.bailleurs.all() for p in bailleur.proprietes.all()}
+        return [lien for lien in self.liens if lien.type != "propriete" or lien.propriete_id in siennes]
+
     def correspond(self, mots):
         texte = normaliser(" ".join(
-            [self.nom, self.prenom, self.email, self.telephone, *(lien.libelle for lien in self.liens)]
+            [self.nom, self.prenom, self.email, self.telephone,
+             *(lien.libelle for lien in [*self.liens, *self.relations])]
         ))
         return all(mot in texte for mot in mots)
 
@@ -261,7 +296,7 @@ class Contact(Horodatage):
     def avec_liens(cls):
         """Contacts avec tout ce qu'il faut pour afficher catégories et liens."""
         return cls.objects.prefetch_related(
-            "bailleurs__proprietes", "bailleurs__representant", "bailleurs__associes__contact", "societes__proprietes",
-            "associes__bailleur__proprietes", "locataires__bail__propriete", "candidats__candidature__propriete",
+            "bailleurs__proprietes", "bailleurs__representant", "bailleurs__associes__contact", "societes__proprietes", "societes__contact",
+            "associes__bailleur__proprietes", "associes__bailleur__contact", "locataires__bail__propriete", "candidats__candidature__propriete",
             "garants__candidat__candidature__bail",
         )

@@ -388,7 +388,18 @@ class VuesTests(TestCase):
         self.assertEqual(dict(personne.etiquettes), {"representant": "Représentant", "associe": "Associé"})
         tom = Contact.objects.get(prenom="Tom")
         self.assertEqual(dict(tom.etiquettes), {"associe": "Associé"})
-        self.assertIn("Associé de SCI ESGT", [lien.libelle for lien in tom.liens])
+        self.assertIn("Associé de SCI ESGT", [lien.libelle for lien in tom.relations])
+        # Chaque contact renvoie à l'autre : la gérante vers la société, la société vers sa gérante et son associé.
+        self.assertEqual([(r.libelle, r.url) for r in personne.relations if r.type == "represente"],
+                         [("Représente SCI ESGT", societe.get_absolute_url())])
+        self.assertEqual([r.libelle for r in societe.relations], ["Représentée par GARCIA Elodie", "Associé : GARCIA Tom"])
+        liste = self.client.get(reverse("contacts:liste"))
+        self.assertContains(liste, f'<a href="{personne.get_absolute_url()}">Représentée par GARCIA Elodie</a>')
+        self.assertContains(liste, f'<a href="{societe.get_absolute_url()}">Représente SCI ESGT</a>')
+        # Le bloc dépliable des liens garde son clic : la ligne ne l'intercepte pas.
+        self.assertContains(liste, 'closest("a, button, form, label, summary, details, input, select")')
+        # La recherche par le nom de la société trouve aussi sa gérante.
+        self.assertContains(self.client.get(reverse("contacts:liste"), {"q": "esgt"}), "GARCIA Elodie")
         self.assertContains(self.client.get(bailleur.get_absolute_url()), "GARCIA Tom</a> (40 %)")
         self.assertContains(self.client.get(societe.get_absolute_url()), "GARCIA Tom")
         self.assertContains(self.client.get(reverse("contacts:liste"), {"categorie": "associe"}), "GARCIA Tom")
