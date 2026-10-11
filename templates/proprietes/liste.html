@@ -25,20 +25,21 @@
 </form>
 <p class="discret">{{ page.paginator.count }} propriété(s)</p>
 <table>
-  <thead><tr><th>Adresse</th><th>Ville</th><th>Location</th><th>Usage</th><th>Bailleur</th><th>DPE</th><th>Réf. ICS</th></tr></thead>
+  <thead><tr><th>Adresse</th><th>Ville</th><th>Location</th><th>Mandat</th><th>Usage</th><th>Bailleur</th><th>DPE</th><th>Réf. ICS</th></tr></thead>
   <tbody>
   {% for propriete in page %}
     <tr{% if not propriete.actif %} class="inactif"{% endif %}>
       <td><a href="{{ propriete.get_absolute_url }}">{{ propriete.adresse }}{% if propriete.complement %}, {{ propriete.complement }}{% endif %}</a>{% if propriete.immeuble %}<br><a class="discret" href="{{ propriete.immeuble.get_absolute_url }}">Immeuble{% if propriete.immeuble.nom %} {{ propriete.immeuble.nom }}{% endif %}</a>{% endif %}</td>
       <td>{{ propriete.code_postal }} {{ propriete.ville }}</td>
       <td>{% with situation=propriete.situation %}<span class="pastille pastille-{{ situation.code }}">{{ situation.libelle }}</span>{% if propriete.a_louer %} <span class="pastille pastille-a_louer">À louer</span>{% endif %}{% if situation.bail %}<br><span class="discret">{{ situation.bail.noms_locataires }}</span>{% endif %}{% if situation.a_venir %}<br><span class="discret">Entrée de {{ situation.a_venir.noms_locataires|default:"locataire à renseigner" }} le {{ situation.a_venir.date_effet|date:"d/m/Y" }}</span>{% endif %}{% endwith %}</td>
+      <td>{% if propriete.mandat %}<a href="{{ propriete.mandat.get_absolute_url }}">n° {{ propriete.mandat.numero }}</a>{% if not propriete.mandat.date_signature %}<br><span class="pastille pastille-preavis">À signer</span>{% endif %}{% else %}<span class="pastille pastille-libre">Sans mandat</span>{% endif %}</td>
       <td>{{ propriete.get_usage_display }}{% if propriete.meuble %} meublé{% endif %}</td>
       <td>{{ propriete.bailleur }}</td>
       <td>{% if propriete.location_interdite %}<span class="alerte">G</span>{% else %}{{ propriete.classe_dpe|default:"—" }}{% endif %}</td>
       <td>{{ propriete.ref_ics|default:"—" }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="7" class="discret">Aucune propriété. Commencez par <a href="{% url 'proprietes:importer' %}">importer un fichier</a>.</td></tr>
+    <tr><td colspan="8" class="discret">Aucune propriété. Commencez par <a href="{% url 'proprietes:importer' %}">importer un fichier</a>.</td></tr>
   {% endfor %}
   </tbody>
 </table>
