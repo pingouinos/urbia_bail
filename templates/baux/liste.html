@@ -3,7 +3,7 @@
 {% block contenu %}
 <div class="titre-actions">
   <h1>Contrats</h1>
-  <div class="actions"><a class="bouton-petit" href="{% url 'baux:creer' %}">Nouveau bail</a></div>
+  <div class="actions"><a class="bouton-petit" href="{% url 'baux:creer' %}">Nouveau contrat</a></div>
 </div>
 <form class="filtres" method="get">
   <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Adresse, locataire, référence…" aria-label="Rechercher">

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block titre %}{% if bien %}Modifier le bien{% else %}Nouveau bien{% endif %} · {{ nom_application }}{% endblock %}
+{% block titre %}{% if bien %}Modifier le bien{% else %}Nouvelle propriété{% endif %} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <p><a href="{% if bien %}{{ bien.get_absolute_url }}{% else %}{% url 'biens:liste' %}{% endif %}">← Retour</a></p>
-<h1>{% if bien %}Modifier {{ bien.adresse }}{% else %}Nouveau bien{% endif %}</h1>
+<h1>{% if bien %}Modifier {{ bien.adresse }}{% else %}Nouvelle propriété{% endif %}</h1>
 <form method="post" class="formulaire">
   {% csrf_token %}
   {{ form.non_field_errors }}

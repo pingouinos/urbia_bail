@@ -7,7 +7,7 @@
   </div>
   <form method="get" action="{% url 'baux:creer' %}" class="recherche">
     <input type="search" name="q" placeholder="Adresse ou référence" aria-label="Logement à louer">
-    <button type="submit">Nouveau bail</button>
+    <button type="submit">Nouveau contrat</button>
   </form>
 </section>
 
@@ -30,7 +30,7 @@
     </tbody>
   </table>
   {% else %}
-  <p class="discret">Aucune mise en location en cours. Pour en démarrer une, ouvrez la fiche du logement depuis « Biens ».</p>
+  <p class="discret">Aucune mise en location en cours. Pour en démarrer une, ouvrez la fiche du logement depuis « Propriétés ».</p>
   {% endif %}
 </section>
 
@@ -60,8 +60,8 @@
 
 <div class="grille raccourcis">
   <a class="carte" href="{% url 'candidatures:liste' %}"><strong>Candidatures</strong><span class="discret">{{ nb_candidatures }} à étudier</span></a>
-  <a class="carte" href="{% url 'biens:liste' %}"><strong>Biens</strong><span class="discret">{{ nb_biens }} lot(s) actif(s)</span></a>
-  <a class="carte" href="{% url 'mandats:registre' %}"><strong>Mandats</strong><span class="discret">{{ nb_mandats }} en cours</span></a>
+  <a class="carte" href="{% url 'biens:liste' %}"><strong>Propriétés</strong><span class="discret">{{ nb_biens }} lot(s) actif(s)</span></a>
+  <a class="carte" href="{% url 'mandats:registre' %}"><strong>Registre des mandats</strong><span class="discret">{{ nb_mandats }} en cours</span></a>
   <a class="carte" href="{% url 'biens:importer' %}"><strong>Importer des biens</strong><span class="discret">Depuis un fichier Excel</span></a>
   {% if est_admin %}<a class="carte" href="{% url 'documents:modeles' %}"><strong>Modèles des documents</strong><span class="discret">Bail et mandat, depuis Google Docs</span></a>{% endif %}
 </div>
