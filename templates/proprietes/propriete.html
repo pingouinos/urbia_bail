@@ -128,7 +128,7 @@
   <section class="carte">
     <h2>Énergie et loyer</h2>
     <dl>
-      <dt>Classe DPE</dt><dd>{{ propriete.get_classe_dpe_display|default:"—" }}{% if propriete.date_dpe %} ({{ propriete.date_dpe }}){% endif %}{% if piece_dpe %} · <a href="{% url 'proprietes:piece' propriete.pk piece_dpe.pk %}" target="_blank" rel="noopener">ouvrir le DPE</a>{% if piece_dpe.perime %} <span class="pastille pastille-libre">Périmé</span>{% endif %}{% else %} · <a href="?onglet=documents">déposer le DPE</a>{% endif %}</dd>
+      <dt>Classe DPE</dt><dd>{{ propriete.get_classe_dpe_display|default:"—" }}{% if propriete.date_dpe %} ({{ propriete.date_dpe }}){% endif %}{% if piece_dpe %} · <a href="{% url 'proprietes:piece' piece_dpe.pk %}" target="_blank" rel="noopener">ouvrir le DPE</a>{% if piece_dpe.perime %} <span class="pastille pastille-libre">Périmé</span>{% endif %}{% else %} · <a href="?onglet=documents">déposer le DPE</a>{% endif %}</dd>
       <dt>Dépenses d'énergie</dt><dd>{% if propriete.depenses_energie_min %}{{ propriete.depenses_energie_min }} à {{ propriete.depenses_energie_max }} € par an{% else %}—{% endif %}</dd>
       <dt>Zone tendue</dt><dd>{{ propriete.zone_tendue|yesno:"oui,non" }}</dd>
       <dt>Dernier loyer HC</dt><dd>{% if propriete.dernier_loyer %}{{ propriete.dernier_loyer }} €{% else %}—{% endif %}</dd>
@@ -218,11 +218,11 @@
     <tbody>
     {% for piece in pieces %}
       <tr>
-        <td><a href="{% url 'proprietes:piece' propriete.pk piece.pk %}" target="_blank" rel="noopener">{{ piece.get_type_display }}</a>{% if piece.libelle %}<br><span class="discret">{{ piece.libelle }}</span>{% endif %}</td>
+        <td><a href="{% url 'proprietes:piece' piece.pk %}" target="_blank" rel="noopener">{{ piece.get_type_display }}</a>{% if piece.libelle %}<br><span class="discret">{{ piece.libelle }}</span>{% endif %}</td>
         <td>{{ piece.date_document|date:"d/m/Y"|default:"—" }}</td>
         <td>{% if piece.expire_le %}{% if piece.perime %}<span class="pastille pastille-libre">Périmé depuis le {{ piece.expire_le|date:"d/m/Y" }}</span>{% else %}jusqu'au {{ piece.expire_le|date:"d/m/Y" }}{% endif %}{% else %}—{% endif %}</td>
         <td>{{ piece.cree_le|date:"d/m/Y" }}{% if piece.depose_par %}<br><span class="discret">{{ piece.depose_par.get_full_name|default:piece.depose_par.username }}</span>{% endif %}</td>
-        <td><form method="post" action="{% url 'proprietes:piece_supprimer' propriete.pk piece.pk %}" onsubmit="return confirm('Supprimer ce document ?');">{% csrf_token %}<button type="submit" class="lien">Supprimer</button></form></td>
+        <td><form method="post" action="{% url 'proprietes:piece_supprimer' piece.pk %}" onsubmit="return confirm('Supprimer ce document ?');">{% csrf_token %}<button type="submit" class="lien">Supprimer</button></form></td>
       </tr>
     {% endfor %}
     </tbody>

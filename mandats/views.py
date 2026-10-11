@@ -69,8 +69,11 @@ def registre_export(request):
 
 def mandat(request, pk):
     objet = get_object_or_404(Mandat.objects.select_related("propriete__bailleur"), pk=pk)
+    dossier = objet.dossier
     return render(request, "mandats/mandat.html", {
-        "mandat": objet,
+        "mandat": objet, "dossier": dossier,
+        "nb_fournies": sum(1 for ligne in dossier if ligne["piece"] and not ligne["piece"].perime),
+        "nb_manquantes": sum(1 for ligne in dossier if ligne["obligatoire"] and (not ligne["piece"] or ligne["piece"].perime)),
         "historique": objet.history.select_related("history_user")[:10],
         "form_signe": SignatureForm(instance=objet),
     })
@@ -101,7 +104,8 @@ def mandat_editer(request, pk=None):
                     messages.success(request, f"Mandat n° {objet.numero} enregistré. Il reste {restants} "
                                               f"lot{'s' if restants > 1 else ''} sans mandat dans cet immeuble.")
                     return redirect(immeuble)
-            messages.success(request, f"Mandat n° {objet.numero} enregistré.")
+            messages.success(request, f"Mandat n° {objet.numero} enregistré."
+                                      + (" Déposez les pièces du dossier ci-dessous." if creation else ""))
             return redirect(objet)
     return render(request, "mandats/mandat_form.html", {"form": form, "mandat": objet})
 

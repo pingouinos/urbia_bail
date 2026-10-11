@@ -216,6 +216,49 @@ class Mandat(Contrat):
         return "loue", "En cours"
 
     @property
+    def dossier(self):
+        """Pièces que le mandant fournit avec le mandat, et où elles en sont.
+        Celles du bailleur (identité, RIB) valent pour tous ses mandats."""
+        from proprietes.models import Piece
+
+        propriete, bailleur, T = self.propriete, self.propriete.bailleur, Piece.Type
+        attendues = [
+            (T.IDENTITE, bailleur, True, "du représentant, pour une société" if bailleur.societe else ""),
+            (T.RIB, bailleur, True, ""),
+            # Une société : son existence et le pouvoir de celui qui signe pour elle.
+            *([(T.KBIS, bailleur, True, "il nomme le gérant habilité à signer"),
+               (T.STATUTS, bailleur, False, "pour vérifier les pouvoirs du gérant")] if bailleur.societe else []),
+            (T.TAXE_FONCIERE, propriete, True, ""),
+            (T.TITRE, propriete, True, ""),
+            (T.CHARGES, propriete, propriete.regime_juridique != propriete.Regime.MONOPROPRIETE, "si le logement est en copropriété"),
+            (T.ASSURANCE, propriete, True, ""),
+            (T.BAIL, propriete, False, "si le logement est déjà loué"),
+            (T.ETAT_DES_LIEUX, propriete, False, "si le logement est déjà loué"),
+            (T.DPE, propriete, True, ""),
+            (T.ELECTRICITE, propriete, True, ""),
+            (T.SURFACE, propriete, True, ""),
+        ]
+        deposees = {}
+        for piece in [*bailleur.pieces.all(), *propriete.pieces.all()]:
+            # La plus récente de chaque type, selon l'ordre du modèle.
+            deposees.setdefault((piece.type, piece.bailleur_id is not None), piece)
+        return [
+            {
+                "type": type_, "libelle": type_.label, "du_bailleur": cible is bailleur, "cible": cible,
+                "obligatoire": obligatoire, "note": note, "piece": deposees.get((type_, cible is bailleur)),
+                "avec_date": type_ in Piece.VALIDITE or type_ == T.KBIS,
+            }
+            for type_, cible, obligatoire, note in attendues
+        ]
+
+    @property
+    def pieces_manquantes(self):
+        return [
+            ligne["libelle"] for ligne in self.dossier
+            if ligne["obligatoire"] and (ligne["piece"] is None or ligne["piece"].perime)
+        ]
+
+    @property
     def duree_texte(self):
         """« une durée de trois ans » ou « une durée d'un an, le contrat se
         renouvellera par tacite reconduction à trois reprises »."""
