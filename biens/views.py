@@ -2,15 +2,25 @@ import base64
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from baux.models import Bail
+from candidatures.models import Candidature
+
 from . import tableur
-from .forms import BailleurForm, BienForm, ImportForm
+from .forms import BailleurForm, BienForm, ImportForm, MiseEnLocationForm
 from .models import Bailleur, Bien
+
+# Filtre « Location » de la liste des biens.
+SITUATIONS = [
+    ("a_louer", "À louer"), ("libre", "Libres ou sans bail"), ("preavis", "En préavis"), ("loue", "Loués"),
+]
+# Onglets de la fiche d'un bien.
+ONGLETS = ("location", "informations", "candidatures", "baux", "mandats", "historique")
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 CLE_SESSION_IMPORT = "import_biens"
@@ -30,22 +40,99 @@ def _biens_filtres(request):
         biens = biens.filter(usage=usage)
     if request.GET.get("inactifs") != "1":
         biens = biens.filter(actif=True)
+    situation = request.GET.get("situation")
+    if situation in dict(SITUATIONS):
+        aujourd_hui = timezone.localdate()
+        en_place = Bail.objects.filter(bien=OuterRef("pk"), date_effet__lte=aujourd_hui).filter(
+            Q(date_fin_effective__isnull=True) | Q(date_fin_effective__gt=aujourd_hui)
+        )
+        if situation == "a_louer":
+            biens = biens.filter(mise_en_location_le__isnull=False)
+        elif situation == "libre":
+            biens = biens.filter(~Exists(en_place))
+        else:
+            biens = biens.filter(Exists(en_place.filter(conge_recu_le__isnull=situation == "loue")))
     return biens
 
 
 def liste(request):
-    page = Paginator(_biens_filtres(request), 50).get_page(request.GET.get("page"))
+    biens = _biens_filtres(request).prefetch_related("baux__locataires")
+    page = Paginator(biens, 50).get_page(request.GET.get("page"))
     parametres = request.GET.copy()
     parametres.pop("page", None)
     return render(request, "biens/liste.html", {
-        "page": page, "usages": Bien.Usage.choices, "parametres": parametres.urlencode(),
+        "page": page, "usages": Bien.Usage.choices, "situations": SITUATIONS,
+        "parametres": parametres.urlencode(),
     })
 
 
 def bien(request, pk):
-    objet = get_object_or_404(Bien.objects.select_related("bailleur"), pk=pk)
-    historique = objet.history.select_related("history_user")[:10]
-    return render(request, "biens/bien.html", {"bien": objet, "historique": historique})
+    """Fiche d'un bien, en onglets. Le premier, « Location », suit la mise en
+    location : situation, étape atteinte et prochaine action."""
+    objet = get_object_or_404(Bien.objects.select_related("bailleur").prefetch_related("baux__locataires"), pk=pk)
+    onglet = request.GET.get("onglet")
+    if onglet not in ONGLETS:
+        onglet = "location"
+    situation = objet.situation
+    toutes = list(objet.candidatures.select_related("bail").prefetch_related("candidats"))
+    candidatures = [
+        c for c in toutes
+        if not c.bail_id and c.statut in (Candidature.Statut.A_ETUDIER, Candidature.Statut.RETENUE)
+    ]
+    retenue = next((c for c in candidatures if c.statut == Candidature.Statut.RETENUE), None)
+    mandats = list(objet.mandats.order_by("-numero"))
+    mandat = next((m for m in mandats if m.date_fin is None), None)
+    # Étape de la mise en location : mandat, mise en location, candidatures,
+    # bail, signature, entrée. Rien à suivre quand le logement est loué sans
+    # départ annoncé.
+    nouveau_bail = situation.a_venir or (situation.bail if situation.code == "loue" else None)
+    if situation.code == "loue" and situation.bail.date_signature:
+        etape = None
+    elif nouveau_bail:
+        etape = 6 if nouveau_bail.date_signature else 5
+    elif retenue:
+        etape = 4
+    elif objet.a_louer or candidatures:
+        etape = 3
+    elif mandat:
+        etape = 2
+    else:
+        etape = 1
+    return render(request, "biens/bien.html", {
+        "bien": objet, "onglet": onglet, "situation": situation, "candidatures": candidatures,
+        "toutes_candidatures": toutes, "retenue": retenue, "mandat": mandat, "mandats": mandats,
+        "baux": sorted(objet.baux.all(), key=lambda bail: bail.date_effet, reverse=True),
+        "etape": etape, "nouveau_bail": nouveau_bail,
+        "historique": objet.history.select_related("history_user")[:20] if onglet == "historique" else [],
+    })
+
+
+def mettre_en_location(request, pk):
+    """Ouvre (ou met à jour) la mise en location : date de disponibilité et
+    loyer proposé. Elle se referme à la rédaction du bail."""
+    objet = get_object_or_404(Bien.objects.select_related("bailleur").prefetch_related("baux__locataires"), pk=pk)
+    situation = objet.situation
+    if request.method == "POST" and request.POST.get("action") == "retirer":
+        objet.mise_en_location_le = objet.disponible_le = None
+        objet.save(update_fields=["mise_en_location_le", "disponible_le", "modifie_le"])
+        messages.success(request, "Le logement n'est plus proposé à la location.")
+        return redirect(objet)
+    initial = {}
+    if not objet.disponible_le:
+        depart = situation.bail and (situation.bail.date_fin_effective or situation.bail.date_depart_prevue)
+        initial["disponible_le"] = max(
+            depart + timezone.timedelta(days=1) if depart else timezone.localdate(), timezone.localdate()
+        )
+    form = MiseEnLocationForm(request.POST or None, instance=objet, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        objet = form.save(commit=False)
+        objet.mise_en_location_le = objet.mise_en_location_le or timezone.localdate()
+        objet.save()
+        messages.success(request, "Logement mis en location : enregistrez les candidatures au fur et à mesure.")
+        return redirect(objet)
+    return render(request, "biens/mise_en_location.html", {
+        "bien": objet, "form": form, "situation": situation, "mandat": objet.mandat_en_cours,
+    })
 
 
 def bien_editer(request, pk=None):

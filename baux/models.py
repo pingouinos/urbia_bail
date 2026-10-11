@@ -101,6 +101,13 @@ class Bail(Horodatage):
     # Fin du bail : le congé reçu ouvre le préavis, au terme duquel le
     # locataire part. Tant qu'aucun congé n'est enregistré, le logement ne
     # peut pas faire l'objet d'un nouveau bail.
+    class Origine(models.TextChoices):
+        LOCATAIRE = "locataire", "Le locataire (préavis)"
+        BAILLEUR = "bailleur", "Le bailleur (vente, reprise, motif légitime)"
+
+    conge_origine = models.CharField(
+        "congé donné par", max_length=10, choices=Origine.choices, blank=True,
+    )
     conge_recu_le = models.DateField(
         "congé reçu le", null=True, blank=True,
         help_text="Préavis donné par le locataire, ou congé donné par le bailleur.",
@@ -168,6 +175,12 @@ class Bail(Horodatage):
     @property
     def en_cours(self):
         return self.date_fin_effective is None
+
+    @property
+    def mois_preavis(self):
+        """Préavis du locataire : un mois en meublé ou en zone tendue, trois
+        mois sinon (art. 15 et 25-8 de la loi du 6 juillet 1989)."""
+        return 1 if self.meuble or self.bien.zone_tendue else 3
 
     @property
     def noms_locataires(self):

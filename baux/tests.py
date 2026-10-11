@@ -6,6 +6,7 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from docx import Document
 
 from biens.models import Bailleur, Bien
@@ -308,6 +309,145 @@ class VuesTests(Donnees, TestCase):
         # Le bail en place reste modifiable malgré le suivant.
         self.assertRedirects(self.client.post(reverse("baux:modifier", args=[en_place.pk]), donnees),
                              en_place.get_absolute_url())
+
+    def test_parcours_depart_du_locataire(self):
+        """De « loué » à « libre » depuis la fiche du logement, sans rouvrir
+        le bail : congé proposé d'avance, puis départ effectif."""
+        aujourd_hui = timezone.localdate()
+        bien = self.creer_bien(zone_tendue=False)
+        bail = self.creer_bail(bien=bien, date_effet=dt.date(2024, 9, 1), date_signature=dt.date(2024, 8, 20))
+        self.assertEqual(bien.situation.code, "loue")
+        page = self.client.get(bien.get_absolute_url())
+        self.assertContains(page, '<span class="pastille pastille-loue">Loué</span>')
+        self.assertContains(page, f'href="{reverse("baux:fin", args=[bail.pk])}">Départ du locataire</a>')
+        self.assertNotContains(page, "Enregistrer une candidature")
+        # Logement nu hors zone tendue : trois mois de préavis proposés.
+        page = self.client.get(reverse("baux:fin", args=[bail.pk]))
+        initial = page.context["form"].initial
+        self.assertEqual((initial["conge_recu_le"], initial["date_depart_prevue"]),
+                         (aujourd_hui, ajouter_mois(aujourd_hui, 3)))
+        depart = aujourd_hui + dt.timedelta(days=30)
+        self.assertEqual(initial["conge_origine"], "locataire")
+        donnees = {"conge_recu_le": aujourd_hui.isoformat(), "date_depart_prevue": depart.isoformat()}
+        reponse = self.client.post(reverse("baux:fin", args=[bail.pk]), donnees)
+        self.assertIn("conge_origine", reponse.context["form"].errors)
+        # Le congé enregistré ouvre la mise en location du logement.
+        reponse = self.client.post(reverse("baux:fin", args=[bail.pk]), {**donnees, "conge_origine": "bailleur"})
+        self.assertRedirects(reponse, reverse("biens:mettre_en_location", args=[bien.pk]))
+        bien = Bien.objects.get(pk=bien.pk)
+        self.assertEqual((bien.situation.code, bien.situation.libelle),
+                         ("preavis", f"Préavis, libre le {depart:%d/%m/%Y}"))
+        page = self.client.get(bien.get_absolute_url())
+        self.assertContains(page, "congé du bailleur")
+        self.assertContains(page, "Confirmer le départ du locataire")
+        self.assertNotContains(page, "Enregistrer une candidature")
+        page = self.client.get(reverse("biens:mettre_en_location", args=[bien.pk]))
+        self.assertEqual(page.context["form"].initial["disponible_le"], depart + dt.timedelta(days=1))
+        self.assertContains(page, "Aucun mandat de gestion en cours")
+        Mandat.depuis_bien(bien).save()
+        reponse = self.client.post(reverse("biens:mettre_en_location", args=[bien.pk]), {
+            "disponible_le": (depart + dt.timedelta(days=1)).isoformat(), "dernier_loyer": "720", "charges": "50"})
+        self.assertRedirects(reponse, bien.get_absolute_url())
+        bien = Bien.objects.get(pk=bien.pk)
+        self.assertEqual((bien.a_louer, bien.mise_en_location_le, bien.dernier_loyer),
+                         (True, aujourd_hui, Decimal("720")))
+        page = self.client.get(bien.get_absolute_url())
+        self.assertEqual(page.context["etape"], 3)
+        self.assertContains(page, "pastille-a_louer")
+        self.assertContains(page, "Enregistrer une candidature")
+        self.assertEqual([b.pk for b in self.client.get(reverse("biens:liste"), {"situation": "a_louer"}).context["page"]],
+                         [bien.pk])
+        # Le bail du nouveau locataire referme la mise en location.
+        nouveau = self.donnees_bail(bien, ["Roux"])
+        nouveau["date_effet"] = (depart + dt.timedelta(days=1)).isoformat()
+        self.client.post(reverse("baux:creer"), nouveau)
+        self.assertEqual(bien.baux.count(), 2)
+        self.assertFalse(Bien.objects.get(pk=bien.pk).a_louer)
+        bien.baux.exclude(pk=bail.pk).delete()
+        # Départ effectif : le logement redevient libre.
+        hier = aujourd_hui - dt.timedelta(days=1)
+        reponse = self.client.post(reverse("baux:fin", args=[bail.pk]), {
+            "conge_origine": "bailleur", "conge_recu_le": (hier - dt.timedelta(days=30)).isoformat(),
+            "date_depart_prevue": hier.isoformat(), "date_fin_effective": hier.isoformat()}, follow=True)
+        self.assertContains(reponse, "logement libre depuis le")
+        self.assertEqual(Bien.objects.get(pk=bien.pk).situation.code, "libre")
+        # Dates incohérentes refusées.
+        reponse = self.client.post(reverse("baux:fin", args=[bail.pk]), {"conge_recu_le": aujourd_hui.isoformat()})
+        self.assertIn("date_depart_prevue", reponse.context["form"].errors)
+        reponse = self.client.post(reverse("baux:fin", args=[bail.pk]), {"date_fin_effective": "2020-01-01"})
+        self.assertIn("date_fin_effective", reponse.context["form"].errors)
+
+    def test_preavis_d_un_mois_en_meuble_ou_zone_tendue(self):
+        self.assertEqual(self.creer_bail(bien=self.creer_bien(zone_tendue=False)).mois_preavis, 3)
+        self.assertEqual(self.creer_bail(bien=self.creer_bien(zone_tendue=True)).mois_preavis, 1)
+        self.assertEqual(self.creer_bail(bien=self.creer_bien(zone_tendue=False), type=Bail.Type.MEUBLE).mois_preavis, 1)
+
+    def test_fiche_du_logement_selon_l_etape(self):
+        bien = self.creer_bien()
+        self.assertEqual(bien.situation.code, "sans_bail")
+        page = self.client.get(bien.get_absolute_url())
+        self.assertContains(page, "Aucun bail enregistré")
+        self.assertContains(page, "Créer le mandat")
+        self.assertEqual(page.context["etape"], 1)
+        Mandat.depuis_bien(bien).save()
+        page = self.client.get(bien.get_absolute_url())
+        self.assertEqual(page.context["etape"], 2)
+        self.assertContains(page, f'href="{reverse("biens:mettre_en_location", args=[bien.pk])}">Mettre en location</a>')
+        # Les autres rubriques de la fiche sont dans leurs onglets.
+        self.assertNotContains(page, "<h2>Description</h2>")
+        self.assertContains(self.client.get(bien.get_absolute_url(), {"onglet": "informations"}), "<h2>Description</h2>")
+        self.assertContains(self.client.get(bien.get_absolute_url(), {"onglet": "mandats"}), "Mandat n° ")
+        self.assertContains(self.client.get(bien.get_absolute_url(), {"onglet": "baux"}), "Aucun bail enregistré pour ce logement")
+        # Bail rédigé pour une entrée à venir : il reste à le faire signer.
+        bail = self.creer_bail(bien=bien, date_effet=timezone.localdate() + dt.timedelta(days=20))
+        page = self.client.get(bien.get_absolute_url())
+        self.assertEqual(page.context["etape"], 5)
+        self.assertContains(page, "Faire signer le bail")
+        self.assertContains(page, "Prochain locataire")
+        bail.date_signature = timezone.localdate()
+        bail.save()
+        self.assertEqual(self.client.get(bien.get_absolute_url()).context["etape"], 6)
+        self.assertContains(self.client.get(bien.get_absolute_url(), {"onglet": "baux"}), "Paul MARTIN")
+
+    def test_liste_des_biens_par_situation(self):
+        aujourd_hui = timezone.localdate()
+        loue = self.creer_bien(adresse="1 rue Louee")
+        self.creer_bail(bien=loue, date_effet=dt.date(2024, 9, 1))
+        preavis = self.creer_bien(adresse="2 rue Preavis")
+        self.creer_bail(bien=preavis, date_effet=dt.date(2024, 9, 1), conge_recu_le=aujourd_hui,
+                        date_depart_prevue=aujourd_hui + dt.timedelta(days=30))
+        libre = self.creer_bien(adresse="3 rue Libre")
+        self.creer_bail(bien=libre, date_effet=dt.date(2022, 1, 1), date_fin_effective=dt.date(2025, 1, 1))
+        sans = self.creer_bien(adresse="4 rue Sans Bail")
+        for situation, attendus in (("loue", [loue]), ("preavis", [preavis]), ("libre", [libre, sans])):
+            with self.subTest(situation=situation):
+                page = self.client.get(reverse("biens:liste"), {"situation": situation})
+                self.assertEqual(sorted(b.pk for b in page.context["page"]), sorted(b.pk for b in attendus))
+        page = self.client.get(reverse("biens:liste"))
+        self.assertContains(page, "pastille-loue")
+        self.assertContains(page, "pastille-preavis")
+        self.assertContains(page, "Aucun bail enregistré")
+
+    def test_accueil_locations_en_cours(self):
+        aujourd_hui = timezone.localdate()
+        tranquille = self.creer_bien(adresse="1 rue Tranquille")
+        self.creer_bail(bien=tranquille, date_effet=dt.date(2024, 9, 1), date_signature=dt.date(2024, 8, 20))
+        a_signer = self.creer_bien(adresse="2 rue A Signer")
+        bail = self.creer_bail(bien=a_signer, date_effet=aujourd_hui + dt.timedelta(days=10))
+        a_relouer = self.creer_bien(adresse="3 rue A Relouer")
+        self.creer_bail(bien=a_relouer, date_effet=dt.date(2023, 1, 1), date_signature=dt.date(2022, 12, 20),
+                        conge_recu_le=aujourd_hui, date_depart_prevue=aujourd_hui + dt.timedelta(days=30))
+        page = self.client.get(reverse("accueil"))
+        lignes = {l["bien"].pk: l for l in page.context["locations"]}
+        self.assertEqual(set(lignes), {a_signer.pk, a_relouer.pk})
+        self.assertEqual((lignes[a_signer.pk]["action"], lignes[a_signer.pk]["lien"]),
+                         ("Ouvrir le bail", bail.get_absolute_url()))
+        self.assertEqual((lignes[a_relouer.pk]["etape"], lignes[a_relouer.pk]["action"]),
+                         ("Départ annoncé", "Mettre en location"))
+        Bien.objects.filter(pk=a_relouer.pk).update(mise_en_location_le=aujourd_hui, disponible_le=aujourd_hui)
+        page = self.client.get(reverse("accueil"))
+        ligne = next(l for l in page.context["locations"] if l["bien"].pk == a_relouer.pk)
+        self.assertEqual((ligne["etape"], ligne["action"]), ("À louer, aucune candidature", "Enregistrer une candidature"))
 
     def test_logement_libere(self):
         bien = self.creer_bien()

@@ -9,6 +9,7 @@ urlpatterns = [
     path("nouveau/", views.bien_editer, name="bien_creer"),
     path("<int:pk>/", views.bien, name="bien"),
     path("<int:pk>/modifier/", views.bien_editer, name="bien_modifier"),
+    path("<int:pk>/mise-en-location/", views.mettre_en_location, name="mettre_en_location"),
     path("bailleurs/", views.bailleurs, name="bailleurs"),
     path("bailleurs/nouveau/", views.bailleur_editer, name="bailleur_creer"),
     path("bailleurs/<int:pk>/", views.bailleur, name="bailleur"),

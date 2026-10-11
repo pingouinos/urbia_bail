@@ -24,6 +24,10 @@ Par défaut (`GOOGLE_CREATION_AUTO=false`), un administrateur crée d'abord le c
 
 Les comptes locaux (identifiant et mot de passe) servent d'accès de secours aux administrateurs. Ils passent par une double authentification TOTP : à la première connexion, scanner le QR code avec une application d'authentification, puis saisir le code à chaque connexion.
 
+## Parcours de mise en location
+
+La fiche d'un logement est le point d'entrée. Son en-tête donne la situation (loué, en préavis, libre, à louer), le bailleur et le mandat ; ses onglets regroupent la location, les informations générales, les candidatures, les baux, les mandats et l'historique. L'onglet « Location » indique l'étape atteinte (mandat, mise en location, candidatures, bail, signature, entrée dans les lieux) et la prochaine action. « Départ du locataire » enregistre en une page le congé, donné par le locataire ou par le bailleur, avec la fin du préavis proposée d'avance (un mois en meublé ou en zone tendue, trois mois sinon), puis le départ effectif. Le congé ouvre la mise en location : date de disponibilité et loyer proposé ; elle se referme à la rédaction du bail suivant. L'accueil liste les locations en cours avec ce qu'il reste à faire, et la liste des biens se filtre par situation. Un logement dont aucun bail n'est dans l'application apparaît « sans bail enregistré » : il peut être loué par un bail antérieur.
+
 ## Mandats de gestion
 
 Chaque mandat reçoit à l'enregistrement un numéro d'ordre définitif : la page « Mandats » tient le registre exigé par la loi Hoguet, exportable en Excel, et aucun mandat ne peut être supprimé. Un mandat se crée depuis la fiche d'un bien, prérempli avec le bailleur et le bien, puis se télécharge en Word ou en PDF. L'exemplaire signé et scanné se dépose sur la fiche du mandat.

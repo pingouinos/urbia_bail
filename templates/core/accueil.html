@@ -3,7 +3,7 @@
 <section class="accroche">
   <div>
     <h1>Bonjour {{ user.first_name|default:user.username }}</h1>
-    <p>Rédigez un bail en trois étapes : le logement, les locataires et les conditions, puis le document à faire signer.</p>
+    <p>Suivez chaque mise en location depuis la fiche du logement : mandat, candidatures, bail, signature.</p>
   </div>
   <form method="get" action="{% url 'baux:creer' %}" class="recherche">
     <input type="search" name="q" placeholder="Adresse ou référence" aria-label="Logement à louer">
@@ -11,16 +11,28 @@
   </form>
 </section>
 
-{% if a_rediger %}
 <section class="carte">
-  <h2>Candidatures retenues sans bail</h2>
-  <ul class="choix">
-    {% for candidature in a_rediger %}
-    <li><a href="{% url 'baux:creer' %}?candidature={{ candidature.pk }}"><strong>Rédiger le bail de {{ candidature.noms|default:"la candidature" }}</strong><span class="discret">{{ candidature.bien }}{% if candidature.date_entree_souhaitee %} · entrée le {{ candidature.date_entree_souhaitee|date:"d/m/Y" }}{% endif %}{% if candidature.rempli_le %} · informations reçues du locataire{% elif candidature.lien_cree_le %} · lien envoyé, en attente du locataire{% endif %}</span></a></li>
+  <div class="titre-actions">
+    <h2>Locations en cours</h2>
+    <a href="{% url 'biens:liste' %}?situation=a_louer">Logements à louer</a>
+  </div>
+  {% if locations %}
+  <table>
+    <thead><tr><th>Logement</th><th>Où en est-on</th><th>À faire</th></tr></thead>
+    <tbody>
+    {% for location in locations %}
+      <tr>
+        <td><a href="{{ location.bien.get_absolute_url }}">{{ location.bien.adresse }}{% if location.bien.complement %}, {{ location.bien.complement }}{% endif %}</a><br><span class="discret">{{ location.bien.code_postal }} {{ location.bien.ville }}</span></td>
+        <td>{{ location.etape }}{% if location.detail %}<br><span class="pastille pastille-preavis">{{ location.detail }}</span>{% endif %}</td>
+        <td><a class="bouton-petit" href="{{ location.lien }}">{{ location.action }}</a></td>
+      </tr>
     {% endfor %}
-  </ul>
+    </tbody>
+  </table>
+  {% else %}
+  <p class="discret">Aucune mise en location en cours. Pour en démarrer une, ouvrez la fiche du logement depuis « Biens ».</p>
+  {% endif %}
 </section>
-{% endif %}
 
 <section class="carte">
   <div class="titre-actions">

@@ -5,11 +5,23 @@ décrire. La référence ICS du lot sert de clé pour les imports successifs et
 pour la future migration du logiciel de gestion.
 """
 
+from dataclasses import dataclass
 from decimal import Decimal
 
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
+
+
+@dataclass(frozen=True)
+class Situation:
+    """Situation locative d'un bien, d'après les baux enregistrés."""
+
+    code: str  # loue, preavis, libre ou sans_bail
+    libelle: str
+    bail: object = None  # bail du locataire en place
+    a_venir: object = None  # bail rédigé dont la prise d'effet est à venir
 
 
 class Horodatage(models.Model):
@@ -215,6 +227,13 @@ class Bien(Horodatage):
 
     observations = models.TextField(blank=True)
 
+    # Mise en location : ouverte quand le logement se libère, refermée à la
+    # rédaction du bail suivant.
+    mise_en_location_le = models.DateField("mis en location le", null=True, blank=True, editable=False)
+    disponible_le = models.DateField(
+        "disponible le", null=True, blank=True, help_text="Date à laquelle le nouveau locataire peut entrer.",
+    )
+
     history = HistoricalRecords()
 
     class Meta:
@@ -231,6 +250,29 @@ class Bien(Horodatage):
     @property
     def mandat_en_cours(self):
         return self.mandats.filter(date_fin__isnull=True).order_by("-numero").first()
+
+    @property
+    def a_louer(self):
+        return self.mise_en_location_le is not None
+
+    @property
+    def situation(self):
+        """Loué, en préavis ou libre. Un bien dont aucun bail n'est dans
+        l'application est « sans bail enregistré » : il peut être loué par un
+        bail signé avant sa mise en service."""
+        aujourd_hui = timezone.localdate()
+        baux = sorted(self.baux.all(), key=lambda bail: bail.date_effet)
+        actifs = [b for b in baux if b.date_fin_effective is None or b.date_fin_effective > aujourd_hui]
+        en_place = [b for b in actifs if b.date_effet <= aujourd_hui]
+        a_venir = next((b for b in actifs if b.date_effet > aujourd_hui), None)
+        if not en_place:
+            if baux:
+                return Situation("libre", "Libre", a_venir=a_venir)
+            return Situation("sans_bail", "Aucun bail enregistré")
+        bail = en_place[-1]
+        if bail.conge_recu_le:
+            return Situation("preavis", f"Préavis, libre le {bail.date_depart_prevue:%d/%m/%Y}", bail, a_venir)
+        return Situation("loue", "Loué", bail, a_venir)
 
     @property
     def designation(self):
