@@ -116,6 +116,13 @@ class Bailleur(Horodatage):
     def societe(self):
         return self.type != self.Type.PERSONNE_PHYSIQUE
 
+    @property
+    def lien_annuaire(self):
+        """Fiche de la société sur l'Annuaire des Entreprises de l'État, où
+        son extrait d'immatriculation au RNE se télécharge gratuitement."""
+        siren = re.sub(r"\D", "", self.siren or "")[:9]
+        return f"https://annuaire-entreprises.data.gouv.fr/entreprise/{siren}" if len(siren) == 9 else ""
+
     @classmethod
     def deja_enregistre(cls, type_, nom, prenom="", siren="", code_postal="", sauf=None):
         """Bailleur qui est manifestement le même, ou None. Une société se
@@ -539,7 +546,8 @@ class Piece(models.Model):
     class Type(models.TextChoices):
         IDENTITE = "identite", "Pièce d'identité"
         RIB = "rib", "Relevé d'identité bancaire"
-        KBIS = "kbis", "Extrait Kbis de moins de trois mois"
+        # Extrait d'immatriculation au RNE (gratuit) ou extrait Kbis. Le code est gardé pour les pièces déjà déposées.
+        KBIS = "kbis", "Justificatif d'immatriculation de la société"
         STATUTS = "statuts", "Statuts de la société"
         TAXE_FONCIERE = "taxe_fonciere", "Dernière taxe foncière"
         TITRE = "titre", "Attestation de propriété"

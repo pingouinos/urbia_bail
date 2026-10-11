@@ -309,16 +309,17 @@ class VuesTests(Donnees, TestCase):
         self.assertNotIn("Relevé annuel des charges de copropriété", manquantes)
         self.assertIn("Dernière taxe foncière", manquantes)
         self.assertContains(self.client.get(propriete.bailleur.get_absolute_url()), "Relevé d&#x27;identité bancaire")
-        # Une société fournit en plus son Kbis ; ses statuts sont facultatifs.
+        # Une société fournit en plus son justificatif d'immatriculation (extrait RNE ou Kbis) ; ses statuts sont facultatifs.
         sci = Bailleur.objects.create(type="sci_familiale", nom="SCI ESGT", representant_nom="Garcia", representant_prenom="Elodie")
         societe = self.creer_mandat(Propriete.objects.create(
             bailleur=sci, adresse="9 rue Riquet", code_postal="31000", ville="Toulouse", dernier_loyer=Decimal("500"),
         ))
         lignes = {ligne["libelle"]: ligne for ligne in societe.dossier}
-        self.assertTrue(lignes["Extrait Kbis de moins de trois mois"]["obligatoire"])
+        self.assertTrue(lignes["Justificatif d'immatriculation de la société"]["obligatoire"])
         self.assertFalse(lignes["Statuts de la société"]["obligatoire"])
+        self.assertIn("extrait RNE", lignes["Justificatif d'immatriculation de la société"]["note"])
         self.assertEqual(lignes["Pièce d'identité"]["note"], "du représentant, pour une société")
-        self.assertNotIn("Extrait Kbis de moins de trois mois", [ligne["libelle"] for ligne in mandat.dossier])
+        self.assertNotIn("Justificatif d'immatriculation de la société", [ligne["libelle"] for ligne in mandat.dossier])
         # Une pièce d'identité ne se dépose pas sur une propriété, ni un retour vers un autre site.
         reponse = self.client.post(reverse("proprietes:piece_deposer", args=[propriete.pk]), {
             "type": "identite", "fichier": SimpleUploadedFile("id.pdf", b"%PDF-1.7"), "retour": "https://exemple.org/",
