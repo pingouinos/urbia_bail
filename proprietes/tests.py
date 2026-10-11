@@ -289,7 +289,9 @@ class VuesTests(TestCase):
         # Sans le parcours, la fiche reste enregistrable seule, et se retrouve par le filtre.
         self.assertContains(self.client.get(reverse("proprietes:liste"), {"mandat": "sans"}), "3 place du Capitole")
         # Un immeuble : un mandat par lot, depuis sa fiche.
-        reponse = self.client.post(reverse("proprietes:immeuble_creer") + "?suite=mandat", self.immeuble(), follow=True)
+        # La bailleresse, déjà enregistrée avec le logement, se choisit dans la liste.
+        immeuble = self.immeuble(**{"communs-bailleur": propriete.bailleur_id})
+        reponse = self.client.post(reverse("proprietes:immeuble_creer") + "?suite=mandat", immeuble, follow=True)
         self.assertContains(reponse, "Rédigez maintenant le mandat de chaque lot.")
         self.assertContains(reponse, "2 sans mandat")
         lot = Immeuble.objects.get().lots.first()
@@ -594,6 +596,37 @@ class VuesTests(TestCase):
             "nom": "", "adresse": "5 rue du Taur", "code_postal": "31000", "ville": "Toulouse",
         })
         self.assertRedirects(reponse, sans_nom.get_absolute_url())
+
+    def test_un_bailleur_une_seule_fiche(self):
+        """Saisir à nouveau un bailleur déjà connu est refusé : on reprend sa fiche."""
+        vide = {"associes-TOTAL_FORMS": "0", "associes-INITIAL_FORMS": "0"}
+        sci = {"type": "sci_familiale", "nom": "SCI ESGT", "representant_nom": "Couet", "representant_prenom": "Elodie", **vide}
+        self.client.post(reverse("proprietes:bailleur_creer"), sci)
+        reponse = self.client.post(reverse("proprietes:bailleur_creer"), {**sci, "nom": "sci  esgt", "representant_qualite": "gérante"})
+        self.assertContains(reponse, "Ce bailleur est déjà enregistré")
+        self.assertEqual(Bailleur.objects.count(), 1)
+        # Depuis la création d'une propriété aussi : le bailleur se choisit dans la liste.
+        reponse = self.client.post(reverse("proprietes:propriete_creer"), {
+            "usage": "habitation", "actif": "on", "adresse": "2 rue Jean Mermoz", "code_postal": "31120",
+            "ville": "Portet-sur-Garonne", "bailleur-type": "sci_familiale", "bailleur-nom": "SCI ESGT",
+        })
+        self.assertContains(reponse, "dans la liste « Bailleur » ci-dessus")
+        self.assertEqual((Bailleur.objects.count(), Propriete.objects.count()), (1, 0))
+        # Deux sociétés de même nom mais de SIREN différents sont bien deux bailleurs ; deux homonymes
+        # se distinguent par leur code postal.
+        existant = Bailleur.objects.get()
+        existant.siren = "732 829 320"
+        existant.save()
+        self.client.post(reverse("proprietes:bailleur_creer"), {**sci, "siren": "552 100 554"})
+        self.assertEqual(Bailleur.objects.count(), 2)
+        personne = {"type": "physique", "nom": "Durand", "prenom": "Paul", "code_postal": "31000", **vide}
+        self.client.post(reverse("proprietes:bailleur_creer"), personne)
+        self.assertContains(self.client.post(reverse("proprietes:bailleur_creer"), {**personne, "nom": "DURAND"}), "déjà enregistré")
+        self.client.post(reverse("proprietes:bailleur_creer"), {**personne, "code_postal": "75011"})
+        self.assertEqual(Bailleur.objects.filter(nom="Durand").count(), 2)
+        # Modifier une fiche ne la prend pas pour son propre doublon.
+        reponse = self.client.post(reverse("proprietes:bailleur_modifier", args=[existant.pk]), {**sci, "siren": "732 829 320", "email": "a@b.fr"})
+        self.assertRedirects(reponse, existant.get_absolute_url())
 
     def test_depenses_energie_incoherentes(self):
         bailleur = Bailleur.objects.create(nom="Durand")
