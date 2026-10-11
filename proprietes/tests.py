@@ -196,6 +196,36 @@ class VuesTests(TestCase):
         self.assertContains(reponse, "À compléter avant de rédiger un bail")
         self.assertContains(reponse, "gestion")  # auteur dans l'historique
 
+    def test_nouvelle_propriete_avec_nouveau_bailleur(self):
+        """Un bailleur absent de la liste se crée sur la page de la propriété."""
+        page = self.client.get(reverse("proprietes:propriete_creer"))
+        self.assertContains(page, "Nouveau bailleur (ci-dessous)")
+        self.assertContains(page, 'name="bailleur-nom"')
+        propriete = {"usage": "habitation", "actif": "on", "adresse": "3 place du Capitole",
+                     "code_postal": "31000", "ville": "Toulouse"}
+        # Ni bailleur choisi ni bailleur saisi : rien n'est créé.
+        reponse = self.client.post(reverse("proprietes:propriete_creer"), {**propriete, "bailleur-type": "physique"})
+        self.assertEqual(reponse.status_code, 200)
+        self.assertIn("nom", reponse.context["nouveau_bailleur"].errors)
+        self.assertFalse(Propriete.objects.exists() or Bailleur.objects.exists())
+        reponse = self.client.post(reverse("proprietes:propriete_creer"), {
+            **propriete, "bailleur-type": "physique", "bailleur-civilite": "Mme", "bailleur-nom": "Garcia",
+            "bailleur-prenom": "Ines", "bailleur-ville": "Toulouse",
+        })
+        nouvelle = Propriete.objects.get()
+        self.assertRedirects(reponse, nouvelle.get_absolute_url())
+        self.assertEqual((nouvelle.bailleur.nom, nouvelle.bailleur.prenom, nouvelle.bailleur.ville), ("Garcia", "Ines", "Toulouse"))
+        # Bailleur existant choisi : les champs du nouveau sont ignorés.
+        self.client.post(reverse("proprietes:propriete_creer"), {
+            **propriete, "adresse": "5 rue du Taur", "bailleur": nouvelle.bailleur.pk, "bailleur-nom": "Ignoré",
+        })
+        self.assertEqual((Bailleur.objects.count(), nouvelle.bailleur.proprietes.count()), (1, 2))
+        # À la modification, le bailleur reste obligatoire et rien d'autre n'est proposé.
+        page = self.client.get(reverse("proprietes:propriete_modifier", args=[nouvelle.pk]))
+        self.assertNotContains(page, 'name="bailleur-nom"')
+        reponse = self.client.post(reverse("proprietes:propriete_modifier", args=[nouvelle.pk]), propriete)
+        self.assertIn("bailleur", reponse.context["form"].errors)
+
     def test_depenses_energie_incoherentes(self):
         bailleur = Bailleur.objects.create(nom="Durand")
         reponse = self.client.post(reverse("proprietes:propriete_creer"), {

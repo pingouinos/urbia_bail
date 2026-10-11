@@ -21,6 +21,15 @@ class BailleurForm(RefIcsVideEnNullMixin, forms.ModelForm):
         ]
 
 
+class NouveauBailleurForm(forms.ModelForm):
+    """Création rapide d'un bailleur pendant celle d'une propriété ou d'un
+    bail : l'essentiel, le reste se complète sur sa fiche."""
+
+    class Meta:
+        model = Bailleur
+        fields = ["type", "civilite", "nom", "prenom", "adresse", "code_postal", "ville", "email", "telephone"]
+
+
 class MiseEnLocationForm(forms.ModelForm):
     """Ce qu'il faut pour proposer le logement : la date de disponibilité et
     le loyer demandé."""
@@ -63,6 +72,13 @@ class ProprieteForm(RefIcsVideEnNullMixin, forms.ModelForm):
         ("Loyer", ["zone_tendue", "loyer_reference_majore", "dernier_loyer", "charges", "dispositif_fiscal"]),
         ("Notes", ["observations"]),
     ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            # À la création, le bailleur peut être saisi dans la foulée.
+            self.fields["bailleur"].required = False
+            self.fields["bailleur"].empty_label = "Nouveau bailleur (ci-dessous)"
 
     def sections(self):
         return [(titre, [self[nom] for nom in noms]) for titre, noms in self.SECTIONS]

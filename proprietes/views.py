@@ -2,6 +2,7 @@ import base64
 
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -12,7 +13,7 @@ from contrats.models import Bail
 from candidatures.models import Candidature
 
 from . import tableur
-from .forms import BailleurForm, ProprieteForm, ImportForm, MiseEnLocationForm
+from .forms import BailleurForm, ImportForm, MiseEnLocationForm, NouveauBailleurForm, ProprieteForm
 from .models import Bailleur, Propriete
 
 # Filtre « Location » de la liste des biens.
@@ -146,11 +147,27 @@ def propriete_editer(request, pk=None):
     if objet is None and request.GET.get("bailleur"):
         initial["bailleur"] = request.GET["bailleur"]
     form = ProprieteForm(request.POST or None, instance=objet, initial=initial)
-    if form.is_valid():
-        objet = form.save()
-        messages.success(request, "Fiche enregistrée.")
-        return redirect(objet)
-    return render(request, "proprietes/propriete_form.html", {"form": form, "propriete": objet})
+    # À la création, un bailleur absent de la liste se saisit sur la même page.
+    nouveau_bailleur = NouveauBailleurForm(request.POST or None, prefix="bailleur") if objet is None else None
+    if request.method == "POST":
+        valide = form.is_valid()
+        creer_bailleur = nouveau_bailleur is not None and not form.cleaned_data.get("bailleur")
+        if creer_bailleur:
+            valide = nouveau_bailleur.is_valid() and valide
+        elif nouveau_bailleur is not None:
+            # Bailleur existant choisi : les champs du nouveau sont ignorés.
+            nouveau_bailleur = NouveauBailleurForm(prefix="bailleur")
+        if valide:
+            with transaction.atomic():
+                objet = form.save(commit=False)
+                if creer_bailleur:
+                    objet.bailleur = nouveau_bailleur.save()
+                objet.save()
+            messages.success(request, "Fiche enregistrée.")
+            return redirect(objet)
+    return render(request, "proprietes/propriete_form.html", {
+        "form": form, "propriete": objet, "nouveau_bailleur": nouveau_bailleur,
+    })
 
 
 def bailleurs(request):
