@@ -41,7 +41,7 @@
     </tbody>
   </table>
   {% else %}
-  <p class="discret">Aucune propriété pour l'instant. <a href="{% url 'proprietes:propriete_creer' %}?bailleur={{ contact.bailleurs.all.0.pk }}">Ajouter une propriété</a></p>
+  <p class="discret">Aucune propriété pour l'instant. <a href="{% url 'proprietes:propriete_creer' %}?bailleur={{ contact.bailleurs.all.0.pk }}&amp;suite=mandat">Ajouter une propriété</a></p>
   {% endif %}
 </section>
 {% endif %}

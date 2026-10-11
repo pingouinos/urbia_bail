@@ -162,6 +162,13 @@ class VuesTests(Donnees, TestCase):
     def setUp(self):
         self.client.force_login(User.objects.create_user("gestion"))
 
+    def test_nouveau_contrat_laisse_le_choix(self):
+        page = self.client.get(reverse("contrats:choisir"))
+        self.assertContains(page, reverse("mandats:creer"))
+        self.assertContains(page, reverse("contrats:creer"))
+        for url in (reverse("accueil"), reverse("contrats:liste")):
+            self.assertContains(self.client.get(url), f'href="{reverse("contrats:choisir")}">+ Nouveau contrat')
+
     def test_creation_avec_locataires(self):
         propriete = self.creer_propriete()
         self.assertContains(self.client.get(reverse("contrats:creer")), str(propriete))

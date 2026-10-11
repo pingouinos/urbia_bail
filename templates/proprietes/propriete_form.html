@@ -4,6 +4,7 @@
 <p><a href="{% if propriete %}{{ propriete.get_absolute_url }}{% else %}{% url 'proprietes:liste' %}{% endif %}">← Retour</a></p>
 <h1>{% if propriete %}Modifier {{ propriete.adresse }}{% else %}Nouvelle propriété{% endif %}</h1>
 {% if not propriete and not request.GET.immeuble %}{% include "proprietes/_type_propriete.html" with type="unite" %}{% endif %}
+{% if not propriete and request.GET.suite == "mandat" %}<p class="message">Étape 1 sur 2 : la fiche de la propriété. Le mandat suit, prérempli avec ce que vous saisissez ici.</p>{% endif %}
 <form method="post" class="formulaire">
   {% csrf_token %}
   {{ form.non_field_errors }}
@@ -20,7 +21,7 @@
   </fieldset>
   {% endif %}
   {% endfor %}
-  <button type="submit">Enregistrer</button>
+  <button type="submit">{% if not propriete and request.GET.suite == "mandat" %}Enregistrer et rédiger le mandat{% else %}Enregistrer{% endif %}</button>
 </form>
 {% if nouveau_bailleur %}
 <script>

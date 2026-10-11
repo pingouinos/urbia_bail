@@ -273,6 +273,28 @@ class VuesTests(TestCase):
         })
         self.assertEqual(set(immeuble.lots.values_list("adresse", flat=True)), {"8 bis quai de Brienne"})
 
+    def test_mandat_d_abord(self):
+        """« Nouveau mandat » est la porte d'entrée : la propriété se crée en
+        chemin, puis son mandat s'ouvre prérempli."""
+        page = self.client.get(reverse("mandats:creer"))
+        self.assertContains(page, reverse("proprietes:propriete_creer") + "?suite=mandat")
+        self.assertContains(page, reverse("proprietes:immeuble_creer") + "?suite=mandat")
+        self.assertContains(self.client.get(reverse("proprietes:liste")), f'href="{reverse("mandats:creer")}">Nouvelle propriété')
+        reponse = self.client.post(reverse("proprietes:propriete_creer") + "?suite=mandat", {
+            "usage": "habitation", "actif": "on", "adresse": "3 place du Capitole", "code_postal": "31000",
+            "ville": "Toulouse", "bailleur-type": "physique", "bailleur-nom": "Garcia", "bailleur-prenom": "Ines",
+        })
+        propriete = Propriete.objects.get()
+        self.assertRedirects(reponse, f"{reverse('mandats:creer')}?propriete={propriete.pk}")
+        # Sans le parcours, la fiche reste enregistrable seule, et se retrouve par le filtre.
+        self.assertContains(self.client.get(reverse("proprietes:liste"), {"mandat": "sans"}), "3 place du Capitole")
+        # Un immeuble : un mandat par lot, depuis sa fiche.
+        reponse = self.client.post(reverse("proprietes:immeuble_creer") + "?suite=mandat", self.immeuble(), follow=True)
+        self.assertContains(reponse, "Rédigez maintenant le mandat de chaque lot.")
+        self.assertContains(reponse, "2 sans mandat")
+        lot = Immeuble.objects.get().lots.first()
+        self.assertContains(reponse, f"{reverse('mandats:creer')}?propriete={lot.pk}")
+
     def test_immeuble_incomplet(self):
         """Sans lot, ou avec un lot que rien ne distingue, rien n'est créé."""
         sans_lot = {cle: valeur for cle, valeur in self.immeuble().items() if not cle.startswith("lots-") or cle.endswith("FORMS")}

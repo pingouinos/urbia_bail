@@ -91,7 +91,16 @@ def mandat_editer(request, pk=None):
     else:
         form = MandatForm(request.POST or None, instance=objet)
         if form.is_valid():
+            creation = objet is None
             objet = form.save()
+            immeuble = objet.propriete.immeuble if creation else None
+            if immeuble:
+                # Un mandat par lot : on revient à l'immeuble tant qu'il en reste à rédiger.
+                restants = immeuble.lots.exclude(mandats__date_fin__isnull=True).count()
+                if restants:
+                    messages.success(request, f"Mandat n° {objet.numero} enregistré. Il reste {restants} "
+                                              f"lot{'s' if restants > 1 else ''} sans mandat dans cet immeuble.")
+                    return redirect(immeuble)
             messages.success(request, f"Mandat n° {objet.numero} enregistré.")
             return redirect(objet)
     return render(request, "mandats/mandat_form.html", {"form": form, "mandat": objet})

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block titre %}Nouveau contrat · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'contrats:liste' %}">← Contrats</a></p>
+<h1>Nouveau contrat</h1>
+<p class="discret">Le mandat fait entrer une propriété dans le portefeuille ; le bail la loue.</p>
+<nav class="segments" aria-label="Type de contrat">
+  <a href="{% url 'mandats:creer' %}"><span><span class="pastille pastille-type-mandat">Mandat</span></span><strong>Mandat de gestion</strong><span class="discret">Avec le bailleur, pour une propriété nouvelle ou déjà enregistrée. Inscrit au registre des mandats.</span></a>
+  <a href="{% url 'contrats:creer' %}"><span><span class="pastille pastille-type-bail">Bail</span></span><strong>Bail d'habitation</strong><span class="discret">Avec le locataire, nu ou meublé, pour une propriété du portefeuille.</span></a>
+</nav>
+{% endblock %}

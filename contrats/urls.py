@@ -6,6 +6,7 @@ app_name = "contrats"
 
 urlpatterns = [
     path("", views.liste, name="liste"),
+    path("ajouter/", views.choisir, name="choisir"),
     path("nouveau/", views.bail_editer, name="creer"),
     path("nouveau/logement/", views.nouveau_logement, name="nouveau_logement"),
     path("<int:pk>/", views.bail, name="bail"),

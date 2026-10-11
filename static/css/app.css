@@ -156,7 +156,7 @@ button.bouton-corail[type=submit]:hover { background: #cf463d; border-color: #cf
 .actions-location { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin: 16px 0 8px; }
 
 /* Accueil */
-.accroche { display: grid; grid-template-columns: 1fr minmax(280px, 420px); gap: 16px 32px; align-items: center; padding: 28px 32px; border-radius: var(--rayon); background: var(--melon-clair); border: 1px solid #fbd9cb; }
+.accroche { display: grid; grid-template-columns: 1fr auto; gap: 16px 32px; align-items: center; padding: 28px 32px; border-radius: var(--rayon); background: var(--melon-clair); border: 1px solid #fbd9cb; }
 .accroche h1 { margin-bottom: 4px; }
 .accroche p { margin: 0; }
 .raccourcis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 16px; }
@@ -323,3 +323,5 @@ dd { margin: 0; }
 /* Ligne de liste cliquable en entier. */
 .ligne-lien { cursor: pointer; }
 .ligne-lien:hover { background: var(--melon-clair); }
+.accroche-action { text-align: right; }
+.segments a > span:first-child:has(.pastille) { margin-bottom: 4px; }

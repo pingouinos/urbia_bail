@@ -5,6 +5,7 @@
 <h1>Nouvelle propriété</h1>
 {% include "proprietes/_type_propriete.html" with type="immeuble" %}
 <p class="discret">L'adresse et les caractéristiques communes se saisissent une fois, puis une ligne par lot. Chaque lot devient une propriété, avec sa fiche, ses candidatures et ses baux. Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
+{% if request.GET.suite == "mandat" %}<p class="message">Étape 1 sur 2 : l'immeuble et ses lots. Vous rédigerez ensuite un mandat par lot, depuis la fiche de l'immeuble.</p>{% endif %}
 <form method="post" class="formulaire">
   {% csrf_token %}
   {{ form.non_field_errors }}{{ communs.non_field_errors }}

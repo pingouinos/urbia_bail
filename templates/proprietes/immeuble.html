@@ -15,6 +15,7 @@
     <span class="pastille">{{ lots|length }} lot{{ lots|length|pluralize }}</span>
     {% if nb_loues %}<span class="pastille pastille-loue">{{ nb_loues }} loué{{ nb_loues|pluralize }}</span>{% endif %}
     {% if nb_a_louer %}<span class="pastille pastille-a_louer">{{ nb_a_louer }} à louer</span>{% endif %}
+    {% if nb_sans_mandat %}<span class="pastille pastille-libre">{{ nb_sans_mandat }} sans mandat</span>{% endif %}
   </p>
   {% if bailleurs %}<p>Appartient à {% for bailleur in bailleurs %}<a href="{{ bailleur.get_absolute_url }}"><strong>{{ bailleur }}</strong></a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
   <p class="discret adresse"><svg class="icone" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg>{{ immeuble.adresse }}, {{ immeuble.code_postal }} {{ immeuble.ville }}</p>
@@ -23,11 +24,11 @@
 <section class="carte">
   <div class="titre-actions">
     <h2>Lots</h2>
-    <div class="actions"><a class="bouton-petit" href="{% url 'proprietes:propriete_creer' %}?immeuble={{ immeuble.pk }}">+ Ajouter un lot</a></div>
+    <div class="actions"><a class="bouton-petit" href="{% url 'proprietes:propriete_creer' %}?immeuble={{ immeuble.pk }}&amp;suite=mandat">+ Ajouter un lot</a></div>
   </div>
   {% if lots %}
   <table>
-    <thead><tr><th>Lot</th><th>Location</th><th>Description</th><th>Loyer HC</th><th>Bailleur</th></tr></thead>
+    <thead><tr><th>Lot</th><th>Location</th><th>Description</th><th>Loyer HC</th><th>Bailleur</th><th>Mandat</th></tr></thead>
     <tbody>
     {% for lot in lots %}
       <tr{% if not lot.actif %} class="inactif"{% endif %}>
@@ -36,6 +37,7 @@
         <td>{{ lot.get_usage_display }}{% if lot.meuble %} meublé{% endif %}{% if lot.nb_pieces %} · T{{ lot.nb_pieces }}{% endif %}{% if lot.surface %} · {{ lot.surface }} m²{% endif %}</td>
         <td>{% if lot.dernier_loyer %}{{ lot.dernier_loyer }} €{% else %}—{% endif %}</td>
         <td>{{ lot.bailleur }}</td>
+        <td>{% if lot.mandat %}<a href="{{ lot.mandat.get_absolute_url }}">n° {{ lot.mandat.numero }}</a>{% if not lot.mandat.date_signature %}<br><span class="discret">à signer</span>{% endif %}{% else %}<a class="bouton-petit" href="{% url 'mandats:creer' %}?propriete={{ lot.pk }}">Rédiger le mandat</a>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>

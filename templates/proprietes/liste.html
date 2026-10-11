@@ -6,7 +6,7 @@
   <div class="actions">
     <a href="{% url 'proprietes:importer' %}">Importer</a>
     <a href="{% url 'proprietes:exporter' %}?{{ request.GET.urlencode }}">Exporter (Excel)</a>
-    <a class="bouton-petit" href="{% url 'proprietes:propriete_creer' %}">Nouvelle propriété</a>
+    <a class="bouton-petit" href="{% url 'mandats:creer' %}">Nouvelle propriété</a>
   </div>
 </div>
 <form class="filtres" method="get">
@@ -19,6 +19,7 @@
     <option value="">Toutes les situations</option>
     {% for valeur, libelle in situations %}<option value="{{ valeur }}"{% if request.GET.situation == valeur %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
   </select>
+  <label><input type="checkbox" name="mandat" value="sans"{% if request.GET.mandat == "sans" %} checked{% endif %}> Sans mandat en cours</label>
   <label><input type="checkbox" name="inactifs" value="1"{% if request.GET.inactifs == "1" %} checked{% endif %}> Inclure les propriétés qui ne sont plus gérées</label>
   <button type="submit">Filtrer</button>
 </form>

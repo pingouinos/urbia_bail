@@ -1,20 +1,32 @@
 {% extends "base.html" %}
 {% block titre %}Nouveau mandat · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<p><a href="{% url 'mandats:registre' %}">← Registre des mandats</a></p>
+<p><a href="{% url 'contrats:liste' %}">← Contrats</a></p>
 <h1>Nouveau mandat</h1>
+<p class="discret">Le mandat fait entrer une propriété dans le portefeuille : commencez par dire sur quoi il porte. Un mandat porte sur un seul lot.</p>
+<h2>Une nouvelle propriété</h2>
+<nav class="segments" aria-label="Nouvelle propriété">
+  <a href="{% url 'proprietes:propriete_creer' %}?suite=mandat"><strong>Un logement</strong><span class="discret">Maison, appartement, local ou parking isolé : sa fiche, puis son mandat</span></a>
+  <a href="{% url 'proprietes:immeuble_creer' %}?suite=mandat"><strong>Un immeuble</strong><span class="discret">Plusieurs lots à la même adresse : ses lots, puis un mandat par lot</span></a>
+</nav>
+<h2>Une propriété déjà enregistrée</h2>
+{% if proprietes %}
 <form method="get" class="formulaire">
   <fieldset>
-    <legend>Bien confié à l'agence</legend>
-    <div class="champ">
-      <label for="bien">Bien</label>
-      <select name="propriete" id="bien" required>
-        <option value="">Choisir un bien sans mandat en cours</option>
+    <legend>Propriété sans mandat en cours</legend>
+    <div class="champ pleine-largeur obligatoire">
+      <label for="propriete">Propriété</label>
+      <select name="propriete" id="propriete" required>
+        <option value="">Choisir une propriété</option>
         {% for propriete in proprietes %}<option value="{{ propriete.pk }}">{{ propriete }} · {{ propriete.bailleur }}</option>{% endfor %}
       </select>
-      <small class="discret">Le mandat est prérempli avec les fiches du bien et du bailleur. Un bien absent de la liste doit d'abord être <a href="{% url 'proprietes:propriete_creer' %}">ajouté au référentiel</a>.</small>
+      <small class="discret">Le mandat est prérempli avec les fiches de la propriété et du bailleur.</small>
     </div>
   </fieldset>
-  <button type="submit">Continuer</button>
+  <div class="actions-formulaire"><button type="submit" class="bouton-corail">Continuer</button></div>
 </form>
+{% else %}
+<p class="discret">Toutes les propriétés enregistrées ont un mandat en cours.</p>
+{% endif %}
+<p class="discret">Pour reprendre une propriété déjà gérée dont le mandat n'est pas à rédiger maintenant, vous pouvez <a href="{% url 'proprietes:propriete_creer' %}">l'enregistrer sans mandat</a> ; elle restera signalée « Sans mandat ».</p>
 {% endblock %}
