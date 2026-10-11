@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Bailleur, Immeuble, Propriete
+from .models import Bailleur, Immeuble, Piece, Propriete
 
 
 class RefIcsVideEnNullMixin:
@@ -139,6 +139,34 @@ class LotForm(forms.ModelForm):
 
 
 LotFormSet = forms.formset_factory(LotForm, extra=3, min_num=1, validate_min=True, max_num=60)
+
+
+class PieceForm(forms.ModelForm):
+    """Dépôt d'un document sur la fiche d'une propriété."""
+
+    TAILLE_MAX = 20 * 1024 * 1024
+    # Premiers octets des formats acceptés.
+    SIGNATURES = (b"%PDF", b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n")
+
+    class Meta:
+        model = Piece
+        fields = ["type", "date_document", "libelle", "fichier"]
+        widgets = {
+            "date_document": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "fichier": forms.FileInput(attrs={"accept": ".pdf,.jpg,.jpeg,.png"}),
+        }
+
+    def clean_fichier(self):
+        fichier = self.cleaned_data["fichier"]
+        if not fichier.name.lower().endswith((".pdf", ".jpg", ".jpeg", ".png")):
+            raise forms.ValidationError("Fournir un PDF ou une image (JPEG, PNG).")
+        if fichier.size > self.TAILLE_MAX:
+            raise forms.ValidationError("Fichier trop volumineux (20 Mo au maximum).")
+        debut = fichier.read(8)
+        fichier.seek(0)
+        if not debut.startswith(self.SIGNATURES):
+            raise forms.ValidationError("Ce fichier n'est ni un PDF ni une image.")
+        return fichier
 
 
 class ImportForm(forms.Form):

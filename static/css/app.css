@@ -319,3 +319,7 @@ dd { margin: 0; }
 .tableau-lots th, .tableau-lots td { padding: 6px; }
 .tableau-lots input:not([type=checkbox]) { width: 100%; min-width: 0; }
 .tableau-lots td:first-child { min-width: 180px; }
+
+/* Ligne de liste cliquable en entier. */
+.ligne-lien { cursor: pointer; }
+.ligne-lien:hover { background: var(--melon-clair); }

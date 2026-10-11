@@ -27,6 +27,7 @@
     <a href="?onglet=informations"{% if onglet == "informations" %} aria-current="page"{% endif %}>Informations générales</a>
     <a href="?onglet=candidatures"{% if onglet == "candidatures" %} aria-current="page"{% endif %}>Candidatures{% if toutes_candidatures %} ({{ toutes_candidatures|length }}){% endif %}</a>
     <a href="?onglet=contrats"{% if onglet == "contrats" %} aria-current="page"{% endif %}>Contrats{% if contrats %} ({{ contrats|length }}){% endif %}</a>
+    <a href="?onglet=documents"{% if onglet == "documents" %} aria-current="page"{% endif %}>Documents{% if pieces %} ({{ pieces|length }}){% endif %}</a>
     <a href="?onglet=historique"{% if onglet == "historique" %} aria-current="page"{% endif %}>Historique</a>
   </nav>
 </section>
@@ -126,7 +127,7 @@
   <section class="carte">
     <h2>Énergie et loyer</h2>
     <dl>
-      <dt>Classe DPE</dt><dd>{{ propriete.get_classe_dpe_display|default:"—" }}{% if propriete.date_dpe %} ({{ propriete.date_dpe }}){% endif %}</dd>
+      <dt>Classe DPE</dt><dd>{{ propriete.get_classe_dpe_display|default:"—" }}{% if propriete.date_dpe %} ({{ propriete.date_dpe }}){% endif %}{% if piece_dpe %} · <a href="{% url 'proprietes:piece' propriete.pk piece_dpe.pk %}" target="_blank" rel="noopener">ouvrir le DPE</a>{% if piece_dpe.perime %} <span class="pastille pastille-libre">Périmé</span>{% endif %}{% else %} · <a href="?onglet=documents">déposer le DPE</a>{% endif %}</dd>
       <dt>Dépenses d'énergie</dt><dd>{% if propriete.depenses_energie_min %}{{ propriete.depenses_energie_min }} à {{ propriete.depenses_energie_max }} € par an{% else %}—{% endif %}</dd>
       <dt>Zone tendue</dt><dd>{{ propriete.zone_tendue|yesno:"oui,non" }}</dd>
       <dt>Dernier loyer HC</dt><dd>{% if propriete.dernier_loyer %}{{ propriete.dernier_loyer }} €{% else %}—{% endif %}</dd>
@@ -206,6 +207,38 @@
   <p class="discret">Aucun contrat pour cette propriété : ni mandat de gestion, ni bail.</p>
   {% endif %}
 </section>
+
+{% elif onglet == "documents" %}
+<section class="carte">
+  <h2>Documents</h2>
+  {% if pieces %}
+  <table>
+    <thead><tr><th>Document</th><th>Établi le</th><th>Validité</th><th>Déposé</th><th></th></tr></thead>
+    <tbody>
+    {% for piece in pieces %}
+      <tr>
+        <td><a href="{% url 'proprietes:piece' propriete.pk piece.pk %}" target="_blank" rel="noopener">{{ piece.get_type_display }}</a>{% if piece.libelle %}<br><span class="discret">{{ piece.libelle }}</span>{% endif %}</td>
+        <td>{{ piece.date_document|date:"d/m/Y"|default:"—" }}</td>
+        <td>{% if piece.expire_le %}{% if piece.perime %}<span class="pastille pastille-libre">Périmé depuis le {{ piece.expire_le|date:"d/m/Y" }}</span>{% else %}jusqu'au {{ piece.expire_le|date:"d/m/Y" }}{% endif %}{% else %}—{% endif %}</td>
+        <td>{{ piece.cree_le|date:"d/m/Y" }}{% if piece.depose_par %}<br><span class="discret">{{ piece.depose_par.get_full_name|default:piece.depose_par.username }}</span>{% endif %}</td>
+        <td><form method="post" action="{% url 'proprietes:piece_supprimer' propriete.pk piece.pk %}" onsubmit="return confirm('Supprimer ce document ?');">{% csrf_token %}<button type="submit" class="lien">Supprimer</button></form></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="discret">Aucun document pour l'instant. Déposez ici le DPE et les autres diagnostics à annexer au bail.</p>
+  {% endif %}
+</section>
+<form method="post" enctype="multipart/form-data" action="{% url 'proprietes:piece_deposer' propriete.pk %}" class="formulaire">
+  {% csrf_token %}
+  <fieldset>
+    <legend>Déposer un document</legend>
+    {% for champ in form_piece %}{% include "proprietes/_champ.html" %}{% endfor %}
+    <p class="discret pleine-largeur">PDF ou image, 20 Mo au maximum. Pour un DPE, la date indiquée met à jour celle de la fiche.</p>
+  </fieldset>
+  <div class="actions-formulaire"><button type="submit" class="bouton-corail">Déposer</button></div>
+</form>
 
 {% else %}
 <section class="carte">

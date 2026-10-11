@@ -5,9 +5,11 @@ décrire. La référence ICS du lot sert de clé pour les imports successifs et
 pour la future migration du logiciel de gestion.
 """
 
+import datetime as dt
 from dataclasses import dataclass
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -363,3 +365,62 @@ class Propriete(Horodatage):
             if getattr(self, nom) in (None, "")
         ]
 
+
+class Piece(models.Model):
+    """Document attaché à une propriété : diagnostics du dossier technique
+    annexé au bail, règlement de copropriété, etc."""
+
+    class Type(models.TextChoices):
+        DPE = "dpe", "Diagnostic de performance énergétique (DPE)"
+        ERP = "erp", "État des risques (ERP)"
+        PLOMB = "plomb", "Constat de risque d'exposition au plomb"
+        AMIANTE = "amiante", "Diagnostic amiante"
+        ELECTRICITE = "electricite", "État de l'installation d'électricité"
+        GAZ = "gaz", "État de l'installation de gaz"
+        SURFACE = "surface", "Attestation de surface habitable"
+        REGLEMENT = "reglement", "Règlement de copropriété"
+        AUTRE = "autre", "Autre document"
+
+    # Durée de validité pour une location, quand elle ne dépend que de la date.
+    VALIDITE = {
+        Type.DPE: dt.timedelta(days=3653),
+        Type.ELECTRICITE: dt.timedelta(days=2192),
+        Type.GAZ: dt.timedelta(days=2192),
+        Type.ERP: dt.timedelta(days=183),
+    }
+    # Les DPE établis avant cette date ne sont plus valables, quel que soit leur âge.
+    DPE_ANCIENNE_METHODE = dt.date(2021, 7, 1)
+
+    propriete = models.ForeignKey(Propriete, on_delete=models.CASCADE, related_name="pieces")
+    type = models.CharField(max_length=20, choices=Type.choices)
+    libelle = models.CharField("précision", max_length=120, blank=True)
+    fichier = models.FileField(upload_to="proprietes/")
+    date_document = models.DateField(
+        "établi le", null=True, blank=True, help_text="Date du diagnostic ; elle sert à calculer sa fin de validité.",
+    )
+    cree_le = models.DateTimeField("déposé le", auto_now_add=True)
+    depose_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["type", "-date_document", "-cree_le"]
+        verbose_name = "document"
+
+    def __str__(self):
+        return self.libelle or self.get_type_display()
+
+    @property
+    def expire_le(self):
+        """Fin de validité pour une location, ou None si elle n'est pas
+        connue ou si le document n'en a pas."""
+        duree = self.VALIDITE.get(self.type)
+        if not duree or not self.date_document:
+            return None
+        if self.type == self.Type.DPE and self.date_document < self.DPE_ANCIENNE_METHODE:
+            return dt.date(2024, 12, 31)
+        return self.date_document + duree
+
+    @property
+    def perime(self):
+        return self.expire_le is not None and self.expire_le < timezone.localdate()
