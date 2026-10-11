@@ -1,0 +1,4 @@
+<nav class="segments" aria-label="Type de propriété">
+  <a href="{% url 'proprietes:propriete_creer' %}{% if request.GET.bailleur %}?bailleur={{ request.GET.bailleur }}{% endif %}"{% if type == "unite" %} aria-current="page"{% endif %}><strong>Un logement</strong><span class="discret">Maison, appartement, local ou parking isolé</span></a>
+  <a href="{% url 'proprietes:immeuble_creer' %}{% if request.GET.bailleur %}?bailleur={{ request.GET.bailleur }}{% endif %}"{% if type == "immeuble" %} aria-current="page"{% endif %}><strong>Un immeuble</strong><span class="discret">Plusieurs lots à la même adresse</span></a>
+</nav>

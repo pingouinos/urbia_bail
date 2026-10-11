@@ -14,8 +14,17 @@ from contrats.models import Bail
 from candidatures.models import Candidature
 
 from . import tableur
-from .forms import BailleurForm, ImportForm, MiseEnLocationForm, NouveauBailleurForm, ProprieteForm
-from .models import Bailleur, Propriete
+from .forms import (
+    BailleurForm, ImmeubleForm, ImportForm, LotFormSet, LotsCommunsForm, MiseEnLocationForm, NouveauBailleurForm,
+    ProprieteForm,
+)
+from .models import Bailleur, Immeuble, Propriete
+
+# Ce qu'un nouveau lot reprend d'un lot déjà saisi dans le même immeuble.
+COMMUNS_IMMEUBLE = (
+    "bailleur", "usage", "type_habitat", "regime_juridique", "periode_construction", "chauffage", "eau_chaude",
+    "syndic", "zone_tendue", "parties_communes",
+)
 
 # Filtre « Location » de la liste des biens.
 SITUATIONS = [
@@ -31,11 +40,12 @@ CLE_SESSION_IMPORT = "import_proprietes"
 
 
 def _proprietes_filtres(request):
-    proprietes = Propriete.objects.select_related("bailleur")
+    proprietes = Propriete.objects.select_related("bailleur", "immeuble")
     q = request.GET.get("q", "").strip()
     if q:
         proprietes = proprietes.filter(
             Q(ref_ics__icontains=q) | Q(adresse__icontains=q) | Q(complement__icontains=q)
+            | Q(immeuble__nom__icontains=q)
             | Q(ville__icontains=q) | Q(code_postal__startswith=q)
             | Q(bailleur__nom__icontains=q) | Q(bailleur__prenom__icontains=q)
         )
@@ -147,6 +157,15 @@ def propriete_editer(request, pk=None):
     initial = {}
     if objet is None and request.GET.get("bailleur"):
         initial["bailleur"] = request.GET["bailleur"]
+    if objet is None and request.GET.get("immeuble"):
+        # Nouveau lot d'un immeuble : son adresse, et ce que ses lots ont en commun.
+        immeuble = get_object_or_404(Immeuble, pk=request.GET["immeuble"])
+        initial.update(immeuble=immeuble.pk, adresse=immeuble.adresse, code_postal=immeuble.code_postal,
+                       ville=immeuble.ville, type_habitat=Propriete.TypeHabitat.COLLECTIF)
+        voisin = immeuble.lots.order_by("-pk").first()
+        if voisin:
+            initial.update({champ: getattr(voisin, champ) for champ in COMMUNS_IMMEUBLE})
+            initial["bailleur"] = voisin.bailleur_id
     form = ProprieteForm(request.POST or None, instance=objet, initial=initial)
     # À la création, un bailleur absent de la liste se saisit sur la même page.
     nouveau_bailleur = NouveauBailleurForm(request.POST or None, prefix="bailleur") if objet is None else None
@@ -169,6 +188,68 @@ def propriete_editer(request, pk=None):
     return render(request, "proprietes/propriete_form.html", {
         "form": form, "propriete": objet, "nouveau_bailleur": nouveau_bailleur,
     })
+
+
+def immeuble_creer(request):
+    """Un immeuble et ses lots en une fois : l'adresse et les caractéristiques
+    communes se saisissent une seule fois, puis une ligne par lot."""
+    donnees = request.POST or None
+    form = ImmeubleForm(donnees, prefix="immeuble")
+    communs = LotsCommunsForm(donnees, prefix="communs", initial={"bailleur": request.GET.get("bailleur")})
+    nouveau_bailleur = NouveauBailleurForm(donnees, prefix="bailleur")
+    lots = LotFormSet(donnees, prefix="lots")
+    if request.method == "POST":
+        valide = all([form.is_valid(), communs.is_valid(), lots.is_valid()])
+        creer_bailleur = communs.is_valid() and not communs.cleaned_data.get("bailleur")
+        if creer_bailleur:
+            valide = nouveau_bailleur.is_valid() and valide
+        else:
+            nouveau_bailleur = NouveauBailleurForm(prefix="bailleur")
+        if valide:
+            with transaction.atomic():
+                objet = form.save()
+                valeurs = dict(communs.cleaned_data)
+                if creer_bailleur:
+                    valeurs["bailleur"] = nouveau_bailleur.save()
+                nombre = 0
+                for ligne in lots:
+                    if not ligne.has_changed():
+                        continue
+                    lot = ligne.save(commit=False)
+                    for champ, valeur in valeurs.items():
+                        setattr(lot, champ, valeur)
+                    lot.immeuble, lot.type_habitat = objet, Propriete.TypeHabitat.COLLECTIF
+                    lot.adresse, lot.code_postal, lot.ville = objet.adresse, objet.code_postal, objet.ville
+                    lot.save()
+                    nombre += 1
+            messages.success(request, f"Immeuble créé avec {nombre} lot{'s' if nombre > 1 else ''}. "
+                                      "Chaque lot a sa fiche, à compléter avant de rédiger un bail.")
+            return redirect(objet)
+    return render(request, "proprietes/immeuble_form.html", {
+        "form": form, "communs": communs, "nouveau_bailleur": nouveau_bailleur, "lots": lots,
+    })
+
+
+def immeuble(request, pk):
+    objet = get_object_or_404(Immeuble, pk=pk)
+    lots = list(objet.lots.select_related("bailleur").prefetch_related("baux__locataires").order_by("complement", "pk"))
+    codes = [lot.situation.code for lot in lots]
+    return render(request, "proprietes/immeuble.html", {
+        "immeuble": objet, "lots": lots, "nb_loues": sum(code in ("loue", "preavis") for code in codes),
+        "nb_a_louer": sum(lot.a_louer for lot in lots),
+        "bailleurs": list(dict.fromkeys(lot.bailleur for lot in lots)),
+    })
+
+
+def immeuble_editer(request, pk):
+    objet = get_object_or_404(Immeuble, pk=pk)
+    form = ImmeubleForm(request.POST or None, instance=objet)
+    if form.is_valid():
+        with transaction.atomic():
+            form.save().aligner_les_lots()
+        messages.success(request, "Immeuble enregistré ; l'adresse de ses lots est à jour.")
+        return redirect(objet)
+    return render(request, "proprietes/immeuble_modifier.html", {"form": form, "immeuble": objet})
 
 
 def bailleurs(request):

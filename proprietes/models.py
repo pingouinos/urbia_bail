@@ -108,6 +108,38 @@ class Bailleur(Horodatage):
         return 6 if self.type == self.Type.PERSONNE_MORALE else 3
 
 
+class Immeuble(Horodatage):
+    """Bâtiment dont l'agence gère plusieurs lots. Il regroupe des propriétés
+    à la même adresse ; chaque lot garde son bailleur, car une copropriété
+    réunit plusieurs propriétaires."""
+
+    nom = models.CharField(
+        "nom de l'immeuble", max_length=120, blank=True, help_text="Résidence, bâtiment… Facultatif.",
+    )
+    adresse = models.CharField(max_length=255)
+    code_postal = models.CharField("code postal", max_length=10)
+    ville = models.CharField(max_length=100)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["ville", "adresse"]
+        verbose_name = "immeuble"
+
+    def __str__(self):
+        return self.nom or f"{self.adresse}, {self.code_postal} {self.ville}"
+
+    def get_absolute_url(self):
+        return reverse("proprietes:immeuble", args=[self.pk])
+
+    def aligner_les_lots(self):
+        """Reporte l'adresse de l'immeuble sur ses lots, après une correction."""
+        for lot in self.lots.all():
+            if (lot.adresse, lot.code_postal, lot.ville) != (self.adresse, self.code_postal, self.ville):
+                lot.adresse, lot.code_postal, lot.ville = self.adresse, self.code_postal, self.ville
+                lot.save()
+
+
 class Propriete(Horodatage):
     class Usage(models.TextChoices):
         HABITATION = "habitation", "Habitation"
@@ -149,6 +181,10 @@ class Propriete(Horodatage):
         "référence ICS du lot", max_length=50, unique=True, null=True, blank=True
     )
     bailleur = models.ForeignKey(Bailleur, on_delete=models.PROTECT, related_name="proprietes")
+    immeuble = models.ForeignKey(
+        Immeuble, on_delete=models.SET_NULL, null=True, blank=True, related_name="lots",
+        help_text="À choisir si ce lot fait partie d'un immeuble dont l'agence gère plusieurs lots.",
+    )
     usage = models.CharField(max_length=20, choices=Usage.choices, default=Usage.HABITATION)
     meuble = models.BooleanField("meublé", default=False)
     actif = models.BooleanField(
