@@ -162,6 +162,7 @@ button.bouton-corail[type=submit]:hover { background: #cf463d; border-color: #cf
 .accroche { display: grid; grid-template-columns: 1fr; gap: 16px 32px; align-items: center; padding: 28px 32px; border-radius: var(--rayon); background: var(--melon-clair); border: 1px solid #fbd9cb; }
 .accroche h1 { margin-bottom: 4px; }
 .accroche p { margin: 0; }
+.accroche-salut { font-size: 1.1rem; font-weight: 600; margin-bottom: 2px; }
 .raccourcis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 16px; }
 .raccourcis .carte { display: grid; gap: 2px; padding: 14px 18px; text-decoration: none; }
 .raccourcis .carte:hover { border-color: var(--melon); background: var(--melon-clair); }
