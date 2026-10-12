@@ -19,7 +19,7 @@ from documents import views as documents
 
 from django.utils import timezone
 
-from .forms import BailForm, FichierSigneForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm
+from .forms import BailForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm, SignatureForm
 from .models import Bail, Echeance, ajouter_mois
 
 MODELE = "bail_habitation.docx"
@@ -72,7 +72,7 @@ def bail(request, pk):
         # Bannière de fin de parcours, une seule fois après la création.
         "vient_d_etre_cree": request.session.pop("bail_cree", None) == objet.pk,
         "historique": objet.history.select_related("history_user")[:10],
-        "form_signe": FichierSigneForm(instance=objet),
+        "form_signe": SignatureForm(instance=objet),
         "echeances": _echeances(objet),
         "mois_propose": max(objet.date_effet, timezone.localdate()).strftime("%Y-%m"),
         "aujourd_hui": timezone.localdate().isoformat(),
@@ -354,14 +354,15 @@ def telecharger(request, pk, format_):
 @require_POST
 def deposer_signe(request, pk):
     objet = get_object_or_404(Bail, pk=pk)
-    form = FichierSigneForm(request.POST, request.FILES, instance=objet)
+    form = SignatureForm(request.POST, request.FILES, instance=objet)
     if form.is_valid():
         form.save()
-        messages.success(request, "Bail signé enregistré.")
+        messages.success(request, f"Signature du bail enregistrée au {objet.date_signature:%d/%m/%Y}.")
     else:
-        for erreur in form.errors.get("fichier_signe", []):
-            messages.error(request, erreur)
-    return redirect(objet)
+        for erreurs in form.errors.values():
+            for erreur in erreurs:
+                messages.error(request, erreur)
+    return redirect(f"{objet.get_absolute_url()}#signature")
 
 
 def fichier_signe(request, pk):

@@ -2,7 +2,7 @@ from django import forms
 
 from proprietes.forms import NouveauBailleurForm, RefIcsVideEnNullMixin
 from proprietes.models import Bailleur, Propriete
-from documents.forms import FichierSigneMixin
+from documents.forms import SignatureMixin
 
 from .models import Bail, Locataire
 
@@ -23,11 +23,11 @@ def verifier_fin(form, donnees):
 class BailForm(forms.ModelForm):
     class Meta:
         model = Bail
-        exclude = ["cree_le", "modifie_le", "fichier_signe"]
+        exclude = ["cree_le", "modifie_le", "fichier_signe", "date_signature"]
         widgets = {
             **{nom: DATE for nom in (
                 "date_effet", "precedent_date_versement", "precedent_date_revision",
-                "date_signature", "conge_recu_le", "date_depart_prevue", "date_fin_effective",
+                "conge_recu_le", "date_depart_prevue", "date_fin_effective",
             )},
             "garants": forms.Textarea(attrs={"rows": 2}),
             "travaux": forms.Textarea(attrs={"rows": 2}),
@@ -38,7 +38,7 @@ class BailForm(forms.ModelForm):
     # sont facultatives ou déjà préremplies ; elles s'ouvrent en cas d'erreur.
     SECTIONS = [
         ("Bail", ["propriete", "type", "usage_mixte", "garants"], False),
-        ("Dates", ["date_effet", "lieu_signature", "date_signature"], False),
+        ("Dates", ["date_effet", "lieu_signature"], False),
         ("Loyer et charges", [
             "loyer", "mode_charges", "charges", "jour_paiement", "a_echoir", "depot_garantie",
             "irl_trimestre", "irl_valeur",
@@ -190,8 +190,9 @@ class FinBailForm(forms.ModelForm):
         return donnees
 
 
-class FichierSigneForm(FichierSigneMixin, forms.ModelForm):
+class SignatureForm(SignatureMixin, forms.ModelForm):
     class Meta:
         model = Bail
-        fields = ["fichier_signe"]
-        widgets = {"fichier_signe": FichierSigneMixin.WIDGET}
+        fields = SignatureMixin.CHAMPS
+        widgets = SignatureMixin.WIDGETS
+        labels = SignatureMixin.LIBELLES

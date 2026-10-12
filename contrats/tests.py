@@ -232,6 +232,44 @@ class VuesTests(Donnees, TestCase):
         self.assertEqual((fevrier.fin, fevrier.loyer), (dt.date(2026, 2, 10), (bail.loyer * 10 / 28).quantize(Decimal("0.01"))))
         self.assertEqual((janvier.exigible_le, fevrier.exigible_le), (dt.date(2026, 2, 1), dt.date(2026, 3, 1)))
 
+    def test_signature_du_bail(self):
+        """Déposer l'exemplaire signé enregistre aussi la date : le bail quitte
+        l'étape « Signature ». Modifier le bail ensuite ne l'efface pas."""
+        import tempfile
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        bail = self.creer_bail()
+        page = self.client.get(bail.get_absolute_url())
+        self.assertContains(page, "À signer")
+        self.assertNotIn("date_signature", self.client.get(reverse("contrats:modifier", args=[bail.pk])).context["form"].fields)
+        deposer = reverse("contrats:deposer_signe", args=[bail.pk])
+        with tempfile.TemporaryDirectory() as dossier, self.settings(MEDIA_ROOT=dossier):
+            scan = SimpleUploadedFile("bail.pdf", b"%PDF-1.7 signe", content_type="application/pdf")
+            reponse = self.client.post(deposer, {"date_signature": "2026-10-10", "fichier_signe": scan}, follow=True)
+            self.assertContains(reponse, "Signé le 10/10/2026")
+            bail.refresh_from_db()
+            self.assertEqual((bail.signe, str(bail.date_signature)), (True, "2026-10-10"))
+            self.assertRegex(bail.fichier_signe.name, r"^baux/[0-9a-f]{32}\.pdf$")
+            # Le scan sans date est refusé : c'est la date qui dit que le bail est signé.
+            autre = self.creer_bail(self.creer_propriete(adresse="5 rue du Taur"))
+            scan = SimpleUploadedFile("bail.pdf", b"%PDF-1.7", content_type="application/pdf")
+            reponse = self.client.post(reverse("contrats:deposer_signe", args=[autre.pk]), {"date_signature": "", "fichier_signe": scan}, follow=True)
+            autre.refresh_from_db()
+            self.assertFalse(autre.signe or autre.fichier_signe)
+        # Enregistrer le formulaire du bail ne touche pas à la date de signature.
+        from django.forms.models import model_to_dict
+
+        from .forms import BailForm
+
+        donnees = {nom: valeur for nom, valeur in model_to_dict(bail, fields=BailForm(instance=bail).fields).items()
+                   if valeur not in (None, "")}
+        form = BailForm({**donnees, "lieu_signature": "Muret"}, instance=bail)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        bail.refresh_from_db()
+        self.assertEqual((str(bail.date_signature), bail.lieu_signature), ("2026-10-10", "Muret"))
+
     def test_supprimer_un_bail(self):
         """Un bail non signé se supprime ; un bail signé, par un administrateur seulement."""
         from candidatures.models import Candidat, Candidature

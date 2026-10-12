@@ -115,7 +115,8 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
         Etape("Bail", detail=(retenue.noms or "candidat retenu") if retenue else (bail.noms_locataires if bail else ""),
               lien=bail.get_absolute_url() if bail else (
                   f"{reverse('contrats:creer')}?candidature={retenue.pk}" if retenue else "")),
-        Etape("Signature", date=bail.date_signature if bail else None, lien=bail.get_absolute_url() if bail else ""),
+        Etape("Signature", date=bail.date_signature if bail else None,
+              lien=f"{bail.get_absolute_url()}#signature" if bail else ""),
         Etape("Entrée dans les lieux", date=bail.date_effet if bail else None,
               prevue=bool(bail) and bail.date_effet > timezone.localdate()),
     ]
