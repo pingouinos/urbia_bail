@@ -355,9 +355,38 @@ dd { margin: 0; }
 .fiche-entete .actions form { display: inline; }
 
 /* Pièces du dossier d'un mandat. */
-.dossier form.en-ligne { margin: 0; }
-.dossier input[type=file] { max-width: 260px; }
-.dossier input[type=date] { width: auto; }
+.dossier-groupe { margin: 18px 0 6px; font-size: 0.95rem; }
+.dossier-groupe .discret { font-weight: 400; }
+.dossier { list-style: none; margin: 0; padding: 0; border: 1px solid var(--bord); border-radius: var(--rayon); overflow: hidden; }
+.dossier > li { display: grid; grid-template-columns: minmax(0, 1fr) 270px 120px; gap: 6px 20px; align-items: center; padding: 10px 14px; background: var(--carte); border-left: 3px solid transparent; }
+.dossier > li + li { border-top: 1px solid var(--bord); }
+.dossier > li.attendue { border-left-color: var(--corail); }
+.dossier > li.fournie { border-left-color: var(--vert); }
+.dossier-piece { display: grid; gap: 1px; }
+.dossier-piece .discret { font-size: 0.85rem; }
+.dossier-etat { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 0.9rem; }
+.dossier-depot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; margin: 0; }
+.dossier-depot input[type=date] { width: auto; padding: 4px 8px; }
+.dossier-date { font-size: 0.85rem; color: var(--discret); }
+.dossier-fichier { flex-basis: 100%; text-align: right; font-size: 0.8rem; overflow-wrap: anywhere; }
+.dossier-fichier:empty { display: none; }
+button.bouton-petit.dossier-envoyer[type=submit] { padding: 6px 14px; }
+/* Avec le script, le champ de fichier se cache derrière son bouton, et la
+   date n'apparaît qu'une fois le fichier choisi. */
+.js .dossier-choisir { position: relative; overflow: hidden; cursor: pointer; }
+.js .dossier-choisir input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.js .dossier-depot .dossier-date, .js .dossier-depot .dossier-envoyer { display: none; }
+.js .dossier-depot.attend-date .dossier-date { display: inline-flex; align-items: center; gap: 6px; }
+.js .dossier-depot.attend-date .dossier-envoyer { display: inline-block; }
+/* La date demandée s'affiche sur sa propre ligne, sans resserrer le reste. */
+.dossier-depot.attend-date { grid-column: 1 / -1; padding-top: 6px; border-top: 1px dashed var(--bord); }
+.dossier-depot.attend-date .dossier-fichier { flex-basis: auto; order: -1; margin-right: auto; }
+html:not(.js) .dossier-choisir { border: 0; padding: 0; background: none; }
+@media (max-width: 900px) {
+  .dossier > li { grid-template-columns: 1fr; }
+  .dossier-depot { justify-content: flex-start; }
+  .dossier-fichier { text-align: left; }
+}
 
 /* Entrée « Administration » du panneau, quand on s'y trouve. */
 .lien-admin[aria-current=page] { background: var(--melon-clair); color: var(--acier); font-weight: 600; }

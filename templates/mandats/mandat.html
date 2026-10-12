@@ -61,28 +61,58 @@
     <h2>Pièces du dossier</h2>
     {% if nb_manquantes %}<span class="pastille pastille-libre">{{ nb_manquantes }} pièce{{ nb_manquantes|pluralize }} à fournir</span>{% else %}<span class="pastille pastille-loue">Dossier complet</span>{% endif %}
   </div>
-  <p class="discret">Pièces remises par le mandant. La pièce d'identité et le RIB sont rattachés au bailleur et valent pour tous ses mandats ; les autres sont rattachées à la propriété. PDF ou image, 20 Mo au maximum.</p>
-  <table class="dossier">
-    <thead><tr><th>Pièce</th><th>État</th><th>Déposer{% if dossier %} ou remplacer{% endif %}</th></tr></thead>
-    <tbody>
-    {% for ligne in dossier %}
-      <tr>
-        <td>{{ ligne.libelle }}{% if ligne.note or not ligne.obligatoire %}<br><span class="discret">{% if not ligne.obligatoire %}Facultatif{% if ligne.note %} : {% endif %}{% endif %}{{ ligne.note }}</span>{% endif %}</td>
-        <td>{% if ligne.piece %}<a href="{% url 'proprietes:piece' ligne.piece.pk %}" target="_blank" rel="noopener">Ouvrir</a> · {% if ligne.piece.perime %}<span class="pastille pastille-libre">Périmé depuis le {{ ligne.piece.expire_le|date:"d/m/Y" }}</span>{% else %}<span class="pastille pastille-loue">Fourni</span>{% endif %}<br><span class="discret">déposé le {{ ligne.piece.cree_le|date:"d/m/Y" }}{% if ligne.piece.expire_le and not ligne.piece.perime %}, valable jusqu'au {{ ligne.piece.expire_le|date:"d/m/Y" }}{% endif %}</span>{% elif ligne.obligatoire %}<span class="pastille pastille-libre">À fournir</span>{% else %}<span class="discret">—</span>{% endif %}</td>
-        <td>
-          <form method="post" enctype="multipart/form-data" class="en-ligne" action="{% if ligne.du_bailleur %}{% url 'proprietes:bailleur_piece_deposer' ligne.cible.pk %}{% else %}{% url 'proprietes:piece_deposer' ligne.cible.pk %}{% endif %}">
-            {% csrf_token %}
-            <input type="hidden" name="type" value="{{ ligne.type }}">
-            <input type="hidden" name="retour" value="{{ mandat.get_absolute_url }}#dossier">
-            <input type="file" name="fichier" accept=".pdf,.jpg,.jpeg,.png" required aria-label="Fichier : {{ ligne.libelle }}">
-            {% if ligne.avec_date %}<label class="discret">établi le <input type="date" name="date_document" aria-label="Date du document"></label>{% endif %}
-            <button type="submit" class="bouton-petit secondaire">Déposer</button>
-          </form>
-        </td>
-      </tr>
+  <p class="discret">PDF ou image, 20 Mo au maximum. Choisir un fichier le dépose aussitôt ; quand la pièce a une date, elle est demandée avant l'envoi.</p>
+  {% regroup dossier by du_bailleur as groupes %}
+  {% for groupe in groupes %}
+  <h3 class="dossier-groupe">{% if groupe.grouper %}Bailleur <span class="discret">· {{ mandat.propriete.bailleur }} · valables pour tous ses mandats</span>{% else %}Propriété <span class="discret">· {{ mandat.propriete.adresse }}{% if mandat.propriete.complement %}, {{ mandat.propriete.complement }}{% endif %}</span>{% endif %}</h3>
+  <ul class="dossier">
+    {% for ligne in groupe.list %}
+    <li class="{% if ligne.piece and not ligne.piece.perime %}fournie{% elif ligne.obligatoire %}attendue{% else %}facultative{% endif %}">
+      <div class="dossier-piece">
+        <strong>{{ ligne.libelle }}</strong>
+        {% if ligne.note or not ligne.obligatoire %}<span class="discret">{% if not ligne.obligatoire %}Facultatif{% if ligne.note %} · {% endif %}{% endif %}{{ ligne.note }}</span>{% endif %}
+      </div>
+      <div class="dossier-etat">
+        {% if ligne.piece %}
+          {% if ligne.piece.perime %}<span class="pastille pastille-libre">Périmé</span>{% else %}<span class="pastille pastille-loue">Fourni</span>{% endif %}
+          <a href="{% url 'proprietes:piece' ligne.piece.pk %}" target="_blank" rel="noopener">Ouvrir</a>
+          <span class="discret">{% if ligne.piece.perime %}depuis le {{ ligne.piece.expire_le|date:"d/m/Y" }}{% elif ligne.piece.expire_le %}jusqu'au {{ ligne.piece.expire_le|date:"d/m/Y" }}{% else %}le {{ ligne.piece.cree_le|date:"d/m/Y" }}{% endif %}</span>
+        {% elif ligne.obligatoire %}<span class="pastille pastille-libre">À fournir</span>
+        {% else %}<span class="discret">Non fourni</span>{% endif %}
+      </div>
+      <form method="post" enctype="multipart/form-data" class="dossier-depot" action="{% if ligne.du_bailleur %}{% url 'proprietes:bailleur_piece_deposer' ligne.cible.pk %}{% else %}{% url 'proprietes:piece_deposer' ligne.cible.pk %}{% endif %}"{% if ligne.avec_date %} data-avec-date{% endif %}>
+        {% csrf_token %}
+        <input type="hidden" name="type" value="{{ ligne.type }}">
+        <input type="hidden" name="retour" value="{{ mandat.get_absolute_url }}#dossier">
+        <label class="bouton-petit secondaire dossier-choisir">{% if ligne.piece %}Remplacer{% else %}Déposer{% endif %}<input type="file" name="fichier" accept=".pdf,.jpg,.jpeg,.png" required aria-label="Fichier : {{ ligne.libelle }}"></label>
+        {% if ligne.avec_date %}<label class="dossier-date">Établi le <input type="date" name="date_document" aria-label="Date du document : {{ ligne.libelle }}"></label>{% endif %}
+        <button type="submit" class="bouton-petit dossier-envoyer">Envoyer</button>
+        <span class="dossier-fichier discret" aria-live="polite"></span>
+      </form>
+    </li>
     {% endfor %}
-    </tbody>
-  </table>
+  </ul>
+  {% endfor %}
+  <script>
+    // Dépôt en un geste : choisir le fichier l'envoie. Si la pièce a une
+    // date, on la demande d'abord. Sans script, le formulaire reste complet.
+    document.querySelectorAll(".dossier-depot").forEach(function (depot) {
+      var fichier = depot.querySelector("input[type=file]");
+      var nom = depot.querySelector(".dossier-fichier");
+      var date = depot.querySelector("input[type=date]");
+      fichier.addEventListener("change", function () {
+        if (!fichier.files.length) return;
+        nom.textContent = fichier.files[0].name;
+        if (date && !date.value) {
+          depot.classList.add("attend-date");
+          date.focus();
+        } else {
+          nom.textContent = "Envoi de " + fichier.files[0].name + "…";
+          depot.submit();
+        }
+      });
+    });
+  </script>
 </section>
 
 <section class="carte" id="signature">

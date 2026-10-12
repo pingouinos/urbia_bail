@@ -230,8 +230,7 @@ class Mandat(Contrat):
             (T.IDENTITE, bailleur, True, "du représentant, pour une société" if bailleur.societe else ""),
             (T.RIB, bailleur, True, ""),
             # Une société : son existence et le pouvoir de celui qui signe pour elle.
-            *([(T.KBIS, bailleur, True, "extrait RNE, que l'agence peut télécharger elle-même gratuitement sur "
-                                        "annuaire-entreprises.data.gouv.fr avec le SIREN, ou extrait Kbis"),
+            *([(T.KBIS, bailleur, True, "extrait RNE, gratuit sur annuaire-entreprises.data.gouv.fr, ou Kbis"),
                (T.STATUTS, bailleur, False, "pour vérifier les pouvoirs du gérant")] if bailleur.societe else []),
             (T.TAXE_FONCIERE, propriete, True, ""),
             (T.TITRE, propriete, True, ""),
