@@ -20,6 +20,7 @@ from pathlib import Path
 
 from django.conf import settings
 from docxtpl import DocxTemplate
+from jinja2.sandbox import SandboxedEnvironment
 
 journal = logging.getLogger(__name__)
 
@@ -47,9 +48,16 @@ def montant(valeur):
     return texte.replace(",", " ").replace(".", ",")
 
 
+def remplir(document, contexte):
+    """Remplit les balises d'un modèle dans un environnement Jinja protégé :
+    un modèle venu d'un Google Doc ou d'un fichier déposé ne peut ni atteindre
+    les rouages de Python ni exécuter de code sur le serveur."""
+    document.render(contexte, jinja_env=SandboxedEnvironment(), autoescape=True)
+
+
 def generer_docx(nom_modele, contexte):
     document = DocxTemplate(chemin_modele(nom_modele))
-    document.render(contexte, autoescape=True)
+    remplir(document, contexte)
     flux = io.BytesIO()
     document.save(flux)
     return placer_logo(flux.getvalue())

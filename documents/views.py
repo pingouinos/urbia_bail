@@ -23,7 +23,9 @@ from core.fichiers import controler_archive, servir
 from core.journal import noter
 
 from . import google
-from .generation import DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, convertir_pdf, generer_docx
+from .generation import (
+    DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, convertir_pdf, generer_docx, remplir,
+)
 from .models import Modele
 
 # Modèles remplaçables : libellé, et objet dont le dernier modifié sert au
@@ -102,7 +104,7 @@ def verifier_modele(nom, contenu):
     if objet is not None:
         # Remplissage d'essai avec le dernier document de ce type.
         try:
-            DocxTemplate(io.BytesIO(contenu)).render(objet.contexte_document(), autoescape=True)
+            remplir(DocxTemplate(io.BytesIO(contenu)), objet.contexte_document())
         except Exception as erreur:
             return f"Le remplissage d'essai échoue ({erreur})."
     return None
