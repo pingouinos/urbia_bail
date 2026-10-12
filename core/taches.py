@@ -16,8 +16,13 @@ from contrats.models import Bail
 from mandats.models import Mandat
 from proprietes.models import Bailleur, Piece, Propriete
 
+from .processus import processus_mandat
+
 # Rubriques, dans l'ordre d'affichage.
 RUBRIQUES = ["Mises en location", "Loyers", "Mandats", "Candidatures", "Baux", "Documents", "Fiches à compléter"]
+# Rubriques dont chaque ligne est un dossier qui suit un processus : le tableau
+# de bord les montre en cartes, avec la frise de leurs étapes.
+RUBRIQUES_DOSSIERS = ["Mises en location", "Mandats"]
 # Un diagnostic est signalé un peu avant sa fin de validité.
 PREAVIS_VALIDITE = dt.timedelta(days=60)
 
@@ -31,6 +36,7 @@ class Tache:
     action: str
     urgent: bool = False
     detail: str = ""
+    processus: object = None  # core.processus.Processus, pour la frise du dossier
 
 
 def _adresse(propriete):
@@ -43,7 +49,7 @@ def taches(locations):
     aujourd_hui = timezone.localdate()
     liste = [
         Tache("Mises en location", ligne["etape"], _adresse(ligne["propriete"]), ligne["lien"], ligne["action"],
-              detail=ligne["detail"])
+              detail=ligne["detail"], processus=ligne.get("processus"))
         for ligne in locations
     ]
 
@@ -64,6 +70,7 @@ def taches(locations):
             mandat.get_absolute_url() + ("#dossier" if mandat.signe else ""),
             "Ouvrir le mandat" if not mandat.signe else "Compléter le dossier",
             detail=", ".join(manquantes[:3]) + ("…" if nombre > 3 else ""),
+            processus=processus_mandat(mandat, manquantes),
         ))
     sous_mandat = Mandat.objects.filter(date_fin__isnull=True).values("propriete")
     sans_mandat = Propriete.objects.filter(actif=True).exclude(pk__in=sous_mandat).count()

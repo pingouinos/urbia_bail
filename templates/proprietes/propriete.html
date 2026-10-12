@@ -46,6 +46,7 @@
     {% if situation.bail %}{% if situation.bail.conge_recu_le %}<span class="pastille pastille-preavis">Préavis</span>{% elif not situation.bail.date_signature %}<span class="pastille pastille-libre">À signer</span>{% else %}<span class="pastille pastille-loue">En cours</span>{% endif %}{% endif %}
   </div>
   {% if situation.bail %}{% with bail=situation.bail %}
+  {% include "_frise.html" with processus=processus_bail %}
   <dl class="resume">
     <div><dt>Locataires</dt><dd>{{ bail.noms_locataires|default:"Locataire à renseigner" }}</dd></div>
     <div><dt>Bail</dt><dd><a href="{{ bail.get_absolute_url }}">bail du {{ bail.date_effet|date:"d/m/Y" }}</a>{% if not bail.date_signature %} · <span class="alerte">à faire signer</span>{% endif %}</dd></div>
@@ -68,16 +69,9 @@
 </section>
 
 {% if etape and situation.code != "loue" %}
-<section class="carte">
+<section class="carte carte-frise">
   <h2>Mise en location</h2>
-  <ol class="etapes" aria-label="Étapes de la mise en location">
-    <li{% if etape == 1 %} aria-current="step"{% else %} class="faite"{% endif %}><span>1</span> Mandat</li>
-    <li{% if etape == 2 %} aria-current="step"{% elif etape > 2 %} class="faite"{% endif %}><span>2</span> Mise en location</li>
-    <li{% if etape == 3 %} aria-current="step"{% elif etape > 3 %} class="faite"{% endif %}><span>3</span> Candidatures</li>
-    <li{% if etape == 4 %} aria-current="step"{% elif etape > 4 %} class="faite"{% endif %}><span>4</span> Bail</li>
-    <li{% if etape == 5 %} aria-current="step"{% elif etape > 5 %} class="faite"{% endif %}><span>5</span> Signature</li>
-    <li{% if etape == 6 %} aria-current="step"{% endif %}><span>6</span> Entrée dans les lieux</li>
-  </ol>
+  {% include "_frise.html" with processus=location %}
   {% if situation.a_venir %}
   <p>Prochain locataire : <strong>{{ situation.a_venir.noms_locataires|default:"à renseigner" }}</strong>, entrée le {{ situation.a_venir.date_effet|date:"d/m/Y" }} · <a href="{{ situation.a_venir.get_absolute_url }}">bail</a>{% if not situation.a_venir.date_signature %} · <span class="alerte">à faire signer</span>{% endif %}</p>
   {% endif %}

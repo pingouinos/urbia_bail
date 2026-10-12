@@ -13,6 +13,7 @@ from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from contacts.models import Contact
 from core.journal import noter
+from core.processus import processus_bail
 from mandats.models import Mandat
 from documents import views as documents
 
@@ -67,7 +68,7 @@ def liste(request):
 def bail(request, pk):
     objet = get_object_or_404(Bail.objects.select_related("propriete__bailleur", "mandat"), pk=pk)
     return render(request, "contrats/bail.html", {
-        "bail": objet,
+        "bail": objet, "processus": processus_bail(objet),
         # Bannière de fin de parcours, une seule fois après la création.
         "vient_d_etre_cree": request.session.pop("bail_cree", None) == objet.pk,
         "historique": objet.history.select_related("history_user")[:10],

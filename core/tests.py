@@ -5,6 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from comptes.roles import ADMINISTRATEURS, GESTIONNAIRES, attribuer_role, est_administrateur
 from mandats.models import Mandat
@@ -300,3 +301,104 @@ class OrganisationTests(TestCase):
         # Réservé aux administrateurs.
         self.connecter(GESTIONNAIRES)
         self.assertEqual(self.client.get(reverse("journal")).status_code, 403)
+
+
+@override_settings(MFA_OBLIGATOIRE=False)
+class ProcessusTests(TestCase):
+    """Mandat, bail et mise en location suivent des étapes déduites des
+    fiches : la frise avance d'elle-même quand l'action est faite."""
+
+    def setUp(self):
+        from contrats.tests import Donnees
+
+        self.donnees = Donnees()
+        self.propriete = self.donnees.creer_propriete()
+
+    def etats(self, processus):
+        return [etape.etat for etape in processus.etapes]
+
+    def test_mandat(self):
+        import datetime as dt
+
+        from .processus import processus_mandat
+
+        mandat = Mandat.depuis_propriete(self.propriete)
+        mandat.save()
+        processus = processus_mandat(mandat)
+        self.assertEqual(processus.courante.libelle, "Signature")
+        self.assertEqual(self.etats(processus), ["faite", "courante", "a_venir", "a_venir", "a_venir"])
+        self.assertIn("pièces à fournir", processus.etapes[2].detail)
+        mandat.date_signature = dt.date(2026, 10, 1)
+        processus = processus_mandat(mandat)
+        self.assertEqual(processus.courante.libelle, "Dossier du mandant")
+        self.assertEqual(processus_mandat(mandat, manquantes=[]).courante.libelle, "Gestion")
+        # Terminé sans dossier complet : l'étape n'a plus à être relancée.
+        mandat.date_fin = dt.date(2026, 12, 1)
+        processus = processus_mandat(mandat)
+        self.assertIsNone(processus.courante)
+        self.assertEqual(processus.etapes[2].etat, "sautee")
+        self.assertEqual(processus.avancement, 100)
+
+    def test_bail(self):
+        import datetime as dt
+        from unittest import mock
+
+        from .processus import processus_bail
+
+        bail = self.donnees.creer_bail(propriete=self.propriete, date_effet=dt.date(2026, 11, 1))
+        aujourd_hui = dt.date(2026, 10, 12)
+        with mock.patch("django.utils.timezone.localdate", return_value=aujourd_hui):
+            self.assertEqual(processus_bail(bail, alertes=["DPE manquant"]).courante.libelle, "Rédaction")
+            self.assertEqual(processus_bail(bail, alertes=[]).courante.libelle, "Signature")
+            bail.date_signature = dt.date(2026, 10, 10)
+            processus = processus_bail(bail)
+            self.assertEqual(processus.courante.libelle, "Entrée dans les lieux")
+            self.assertTrue(processus.courante.prevue)
+        with mock.patch("django.utils.timezone.localdate", return_value=dt.date(2026, 12, 1)):
+            self.assertEqual(processus_bail(bail).courante.libelle, "Location en cours")
+            bail.conge_recu_le, bail.date_depart_prevue = dt.date(2027, 1, 5), dt.date(2027, 4, 5)
+        with mock.patch("django.utils.timezone.localdate", return_value=dt.date(2027, 2, 1)):
+            self.assertEqual(processus_bail(bail).courante.libelle, "Préavis")
+        with mock.patch("django.utils.timezone.localdate", return_value=dt.date(2027, 5, 1)):
+            # Départ prévu passé et non confirmé : la sortie est en retard.
+            processus = processus_bail(bail)
+            self.assertEqual((processus.courante.libelle, processus.courante.etat), ("Sortie", "alerte"))
+            bail.date_fin_effective = dt.date(2027, 4, 5)
+            self.assertIsNone(processus_bail(bail).courante)
+
+    def test_mise_en_location_sans_mandat(self):
+        from .processus import processus_location
+
+        self.propriete.mise_en_location_le = self.propriete.disponible_le = timezone.localdate()
+        processus = processus_location(self.propriete, a_etudier=2)
+        self.assertEqual(processus.courante.libelle, "Candidatures")
+        self.assertEqual(processus.etapes[2].detail, "2 à étudier")
+        # Le mandat manque alors que la location avance : il est signalé.
+        self.assertEqual(processus.etapes[0].etat, "alerte")
+        self.assertTrue(processus.en_alerte)
+
+    def test_frises_affichees(self):
+        attribuer_role(utilisateur := User.objects.create_user("elodie", password="x"), ADMINISTRATEURS)
+        self.client.force_login(utilisateur)
+        mandat = Mandat.depuis_propriete(self.propriete)
+        mandat.save()
+        bail = self.donnees.creer_bail(propriete=self.propriete)
+        accueil = self.client.get(reverse("accueil"))
+        self.assertContains(accueil, "Où en sont les dossiers")
+        # Le mandat à faire signer et le bail à faire signer, chacun avec sa frise.
+        self.assertContains(accueil, "Dossiers à faire avancer")
+        self.assertContains(accueil, 'aria-label="Mandat : étapes"')
+        self.assertContains(accueil, 'aria-label="Mise en location : étapes"')
+        mises_en_location = dict(accueil.context["ensemble"][0][1])
+        self.assertEqual(mises_en_location["Signature"], 1)
+        page = self.client.get(bail.get_absolute_url())
+        self.assertContains(page, "Avancement du bail")
+        self.assertContains(page, 'aria-current="step"')
+        self.assertContains(self.client.get(mandat.get_absolute_url()), "Avancement du mandat")
+        self.assertContains(self.client.get(self.propriete.get_absolute_url()), 'aria-label="Mise en location : étapes"')
+        # Logement loué : la fiche montre la frise du bail en cours.
+        import datetime as dt
+
+        loue = self.donnees.creer_propriete(adresse="3 rue du Taur")
+        self.donnees.creer_bail(propriete=loue, date_effet=dt.date(2025, 1, 1), date_signature=dt.date(2024, 12, 20))
+        self.assertContains(self.client.get(loue.get_absolute_url()), 'aria-label="Bail : étapes"')
