@@ -10,6 +10,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from contacts.models import Contact
 from contrats.models import Bail
 from contrats.tests import Donnees as DonneesBaux
 from mandats.models import Mandat
@@ -95,6 +96,14 @@ class CandidatureTests(Donnees, TestCase):
             Candidature.objects.order_by("pk"), [*gardees, retenue_avec_bail], ordered=False
         )
         self.assertEqual(Candidat.objects.count(), 6)
+
+    def test_purge_sans_trace_dans_l_historique(self):
+        candidature = self.creer_candidature(candidats=(("Oubli", 1500),), statut=Candidature.Statut.NON_RETENUE)
+        self.assertTrue(Contact.history.filter(nom="Oubli").exists())
+        self.vieillir(candidature, 91)
+        Candidature.purger()
+        self.assertFalse(Contact.objects.filter(nom="Oubli").exists())
+        self.assertFalse(Contact.history.filter(nom="Oubli").exists())
 
     def test_texte_de_refus_neutre(self):
         texte = self.creer_candidature().texte_refus("Elodie")

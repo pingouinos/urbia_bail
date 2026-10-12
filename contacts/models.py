@@ -162,11 +162,17 @@ class Contact(Horodatage):
 
     @classmethod
     def effacer_orphelins(cls):
-        """Efface les contacts automatiques auxquels plus rien ne se rattache."""
-        return cls.objects.filter(
+        """Efface les contacts automatiques auxquels plus rien ne se rattache,
+        historique compris : il garderait sinon une copie de la personne
+        (candidat purgé au bout de trois mois, par exemple)."""
+        orphelins = cls.objects.filter(
             automatique=True, bailleurs__isnull=True, locataires__isnull=True, candidats__isnull=True,
             garants__isnull=True, societes__isnull=True, associes__isnull=True,
-        ).delete()
+        )
+        identifiants = list(orphelins.values_list("pk", flat=True))
+        resultat = orphelins.delete()
+        cls.history.filter(id__in=identifiants).delete()
+        return resultat
 
     # --- Catégories et liens ----------------------------------------------------
 
