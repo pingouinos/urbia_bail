@@ -82,7 +82,11 @@ class OrganisationTests(TestCase):
         self.assertEqual(Organisation.objects.count(), 1)
         self.assertEqual(organisation.manquants, [])
         self.assertEqual(organisation.contexte_document()["garantie_montant"], "120 000")
-        self.assertNotContains(self.client.get(reverse("accueil")), "La fiche de l'agence est incomplète")
+        accueil = self.client.get(reverse("accueil"))
+        self.assertNotContains(accueil, "La fiche de l'agence est incomplète")
+        # Le tableau de bord porte le nom de l'agence, puis celui de la personne connectée.
+        self.assertContains(accueil, "<h1>Agence du Canal</h1>", html=True)
+        self.assertContains(accueil, "Bonjour administrateurs")
 
     def test_mentions_obligatoires(self):
         self.connecter(ADMINISTRATEURS)

@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% block titre %}Tableau de bord · {{ agence.designation }}{% endblock %}
 {% block contenu %}
 <section class="accroche">
   <div>
-    <h1>Bonjour {{ user.first_name|default:user.username }}</h1>
+    <h1>{{ agence.designation }}</h1>
+    <p class="accroche-salut">Bonjour {{ user.get_full_name|default:user.username }}</p>
     <p>{% if nb_taches %}{{ nb_taches }} action{{ nb_taches|pluralize }} en attente{% if nb_urgentes %}, dont {{ nb_urgentes }} en retard{% endif %}.{% else %}Tout est à jour.{% endif %}</p>
   </div>
 </section>
