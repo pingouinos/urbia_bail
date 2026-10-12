@@ -12,9 +12,22 @@ from django.conf import settings
 journal = logging.getLogger("securite")
 
 
+# Adresses de la machine elle-même : celle de cloudflared, qui tourne sur le
+# NAS à côté de l'application (réseau de l'hôte).
+LOCALES = ("127.0.0.1", "::1")
+
+
 def adresse_ip(request):
-    """Adresse du poste. Derrière le proxy de production, c'est la dernière
-    adresse ajoutée à X-Forwarded-For, la seule que le client ne choisit pas."""
+    """Adresse du poste. Par le tunnel Cloudflare, c'est l'en-tête
+    CF-Connecting-IP, que Cloudflare réécrit toujours ; il n'est cru que pour
+    une demande venue de la machine elle-même (cloudflared), jamais d'un poste
+    du réseau. Derrière le proxy de production, c'est la dernière adresse
+    ajoutée à X-Forwarded-For, la seule que le client ne choisit pas."""
+    if request is None:
+        return ""
+    cloudflare = request.META.get("HTTP_CF_CONNECTING_IP", "")
+    if cloudflare and request.META.get("REMOTE_ADDR") in LOCALES:
+        return cloudflare.strip()[:45]
     if settings.HTTPS:
         suivies = request.META.get("HTTP_X_FORWARDED_FOR", "")
         if suivies:

@@ -2,18 +2,21 @@ import io
 import shutil
 import tempfile
 import urllib.error
+from pathlib import Path
 from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from docx import Document
+from jinja2.exceptions import SecurityError
 
 from comptes.roles import ADMINISTRATEURS, attribuer_role
 from mandats.tests import Donnees, texte_docx
 
 from . import google
-from .generation import MODELES_PAR_DEFAUT
+from .generation import MODELES_PAR_DEFAUT, generer_docx
 from .models import Modele
 
 LIEN = "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit?usp=sharing"
@@ -113,6 +116,20 @@ class ModelesTests(Donnees, TestCase):
                 self.assertContains(self.reprendre(modele_mandat(paragraphe)), message)
                 self.assertNotIn("sans fin", self.texte_mandat())
         self.assertFalse(Modele.objects.filter(origine=Modele.Origine.GOOGLE).exists())
+
+    def test_modele_ne_peut_pas_executer_de_code(self):
+        # Une balise qui remonte aux classes de Python passerait le contrôle des
+        # balises inconnues : c'est l'environnement protégé qui la bloque.
+        piege = "{{ ''.__class__.__mro__[1].__subclasses__()|length }}"
+        reponse = self.reprendre(modele_mandat(piege))
+        self.assertContains(reponse, "Le remplissage d&#x27;essai échoue")
+        self.assertFalse(Modele.objects.filter(origine=Modele.Origine.GOOGLE).exists())
+        # Même déposé directement sur le disque, le modèle ne produit rien.
+        depose = Path(settings.MEDIA_ROOT) / "modeles" / "mandat_gestion.docx"
+        depose.parent.mkdir(parents=True, exist_ok=True)
+        depose.write_bytes(modele_mandat(piege))
+        with self.assertRaises(SecurityError):
+            generer_docx("mandat_gestion.docx", self.mandat.contexte_document())
 
     def test_lien_ou_partage_incorrect(self):
         reponse = self.client.post(self.url, {"lien_google": "https://exemple.fr/doc"}, follow=True)
