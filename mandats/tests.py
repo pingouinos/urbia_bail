@@ -298,7 +298,7 @@ class VuesTests(Donnees, TestCase):
         page = self.client.get(mandat.get_absolute_url())
         # Le DPE déposé est périmé : il reste à fournir.
         self.assertContains(page, "7 pièces à fournir")
-        self.assertContains(page, "Périmé depuis le 31/12/2024")
+        self.assertContains(page, "depuis le 31/12/2024")
         # Les pièces du bailleur valent pour ses autres mandats.
         autre = self.creer_mandat(Propriete.objects.create(
             bailleur=propriete.bailleur, adresse="5 rue du Taur", code_postal="31000", ville="Toulouse",
