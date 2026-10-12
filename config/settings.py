@@ -203,9 +203,10 @@ AXES_COOLOFF_TIME = 1  # heure
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
 AXES_RESET_ON_SUCCESS = True
 AXES_LOCKOUT_TEMPLATE = "comptes/verrouille.html"
-# Adresse réelle du client transmise par Caddy.
-AXES_IPWARE_PROXY_COUNT = 1 if HTTPS else 0
-AXES_IPWARE_META_PRECEDENCE_ORDER = ["HTTP_X_FORWARDED_FOR", "REMOTE_ADDR"]
+# Adresse réelle du client, lue comme pour le journal de sécurité (derrière
+# Caddy ou le tunnel Cloudflare) : sans cela, axes verrait l'adresse du proxy
+# et un inconnu pourrait bloquer un compte depuis n'importe où.
+AXES_CLIENT_IP_CALLABLE = "core.journal.adresse_ip"
 
 # --- Connexion Google Workspace (OpenID Connect) -----------------------------
 # Domaine Google Workspace de l'agence : seuls ses comptes sont acceptés.

@@ -238,6 +238,36 @@ class OrganisationTests(TestCase):
         public = self.client.get("/locataire/jeton-inconnu/")
         self.assertEqual(public["Referrer-Policy"], "no-referrer")
 
+    def test_adresse_du_client(self):
+        from django.test import RequestFactory
+
+        from .journal import adresse_ip
+
+        demande = RequestFactory().get
+        # Par le tunnel Cloudflare : cloudflared parle depuis la machine elle-même.
+        self.assertEqual(adresse_ip(demande("/", HTTP_CF_CONNECTING_IP="203.0.113.7")), "203.0.113.7")
+        # Un poste du réseau ne peut pas se faire passer pour un autre.
+        self.assertEqual(
+            adresse_ip(demande("/", REMOTE_ADDR="192.168.1.20", HTTP_CF_CONNECTING_IP="203.0.113.7")), "192.168.1.20",
+        )
+        with self.settings(HTTPS=True):
+            self.assertEqual(
+                adresse_ip(demande("/", REMOTE_ADDR="172.18.0.2", HTTP_X_FORWARDED_FOR="1.2.3.4, 198.51.100.9")),
+                "198.51.100.9",
+            )
+
+    def test_limite_de_debit_par_candidat_derriere_le_tunnel(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        with self.settings(LIMITE_FORMULAIRE_PUBLIC=2):
+            premier = [self.client.get("/locataire/x/", HTTP_CF_CONNECTING_IP="203.0.113.7").status_code
+                       for _ in range(3)]
+            self.assertEqual(premier[-1], 429)
+            # Un autre candidat, arrivé par le même tunnel, garde sa propre limite.
+            self.assertNotEqual(self.client.get("/locataire/x/", HTTP_CF_CONNECTING_IP="203.0.113.8").status_code, 429)
+        cache.clear()
+
     def test_limite_de_debit_du_formulaire_public(self):
         from django.core.cache import cache
 
