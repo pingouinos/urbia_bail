@@ -65,7 +65,7 @@
   {% regroup dossier by du_bailleur as groupes %}
   {% for groupe in groupes %}
   <h3 class="dossier-groupe">{% if groupe.grouper %}Bailleur <span class="discret">· {{ mandat.propriete.bailleur }} · valables pour tous ses mandats</span>{% else %}Propriété <span class="discret">· {{ mandat.propriete.adresse }}{% if mandat.propriete.complement %}, {{ mandat.propriete.complement }}{% endif %}</span>{% endif %}</h3>
-  <ul class="dossier">
+  <ul class="pieces">
     {% for ligne in groupe.list %}
     <li class="{% if ligne.piece and not ligne.piece.perime %}fournie{% elif ligne.obligatoire %}attendue{% else %}facultative{% endif %}">
       <div class="dossier-piece">
@@ -74,7 +74,7 @@
       </div>
       <div class="dossier-etat">
         {% if ligne.piece %}
-          {% if ligne.piece.perime %}<span class="pastille pastille-libre">Périmé</span>{% else %}<span class="pastille pastille-loue">Fourni</span>{% endif %}
+          {% if ligne.piece.perime %}<span class="pastille pastille-libre">Périmé</span>{% else %}<span class="piece-fournie">✓ Fourni</span>{% endif %}
           <a href="{% url 'proprietes:piece' ligne.piece.pk %}" target="_blank" rel="noopener">Ouvrir</a>
           <span class="discret">{% if ligne.piece.perime %}depuis le {{ ligne.piece.expire_le|date:"d/m/Y" }}{% elif ligne.piece.expire_le %}jusqu'au {{ ligne.piece.expire_le|date:"d/m/Y" }}{% else %}le {{ ligne.piece.cree_le|date:"d/m/Y" }}{% endif %}</span>
         {% elif ligne.obligatoire %}<span class="pastille pastille-libre">À fournir</span>

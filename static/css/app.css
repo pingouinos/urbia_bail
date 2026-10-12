@@ -357,13 +357,15 @@ dd { margin: 0; }
 /* Pièces du dossier d'un mandat. */
 .dossier-groupe { margin: 18px 0 6px; font-size: 0.95rem; }
 .dossier-groupe .discret { font-weight: 400; }
-.dossier { list-style: none; margin: 0; padding: 0; border: 1px solid var(--bord); border-radius: var(--rayon); overflow: hidden; }
-.dossier > li { display: grid; grid-template-columns: minmax(0, 1fr) 270px 120px; gap: 6px 20px; align-items: center; padding: 10px 14px; background: var(--carte); border-left: 3px solid transparent; }
-.dossier > li + li { border-top: 1px solid var(--bord); }
-.dossier > li.attendue { border-left-color: var(--corail); }
-.dossier > li.fournie { border-left-color: var(--vert); }
+/* Liste nommée « pieces » : la classe « dossier » est celle des cartes du tableau de bord. */
+.pieces { list-style: none; margin: 0; padding: 0; border: 1px solid var(--bord); border-radius: var(--rayon); overflow: hidden; }
+.pieces > li { display: grid; grid-template-columns: minmax(0, 1fr) 270px 120px; gap: 6px 20px; align-items: center; padding: 10px 14px; background: var(--carte); }
+.pieces > li + li { border-top: 1px solid var(--bord); }
 .dossier-piece { display: grid; gap: 1px; }
+.dossier-piece strong { font-weight: 600; }
+.pieces > li.facultative .dossier-piece strong { font-weight: 500; }
 .dossier-piece .discret { font-size: 0.85rem; }
+.piece-fournie { color: #3f7d2c; font-weight: 600; }
 .dossier-etat { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 0.9rem; }
 .dossier-depot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; margin: 0; }
 .dossier-depot input[type=date] { width: auto; padding: 4px 8px; }
@@ -383,7 +385,7 @@ button.bouton-petit.dossier-envoyer[type=submit] { padding: 6px 14px; }
 .dossier-depot.attend-date .dossier-fichier { flex-basis: auto; order: -1; margin-right: auto; }
 html:not(.js) .dossier-choisir { border: 0; padding: 0; background: none; }
 @media (max-width: 900px) {
-  .dossier > li { grid-template-columns: 1fr; }
+  .pieces > li { grid-template-columns: 1fr; }
   .dossier-depot { justify-content: flex-start; }
   .dossier-fichier { text-align: left; }
 }
