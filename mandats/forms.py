@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from proprietes.models import Propriete
 from core.fichiers import controler_fichier
-from documents.forms import FichierSigneMixin
+from documents.forms import FichierSigneMixin, SignatureMixin
 
 from .models import (
     PLAFOND_BAIL_HORS_ZONE_TENDUE, PLAFOND_BAIL_ZONE_TENDUE, PLAFOND_ETAT_DES_LIEUX, Mandat, plafonds_locataire,
@@ -77,33 +77,9 @@ class MandatForm(forms.ModelForm):
         ]
 
 
-class SignatureForm(forms.ModelForm):
-    """Enregistrement de la signature d'un mandat : sa date, et le scan de
-    l'exemplaire signé s'il est disponible."""
-
+class SignatureForm(SignatureMixin, forms.ModelForm):
     class Meta:
         model = Mandat
-        fields = ["date_signature", "fichier_signe"]
-        widgets = {
-            "date_signature": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
-            "fichier_signe": FichierSigneMixin.WIDGET,
-        }
-        labels = {"date_signature": "Signé le", "fichier_signe": "Exemplaire signé (scan)"}
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["date_signature"].required = True
-        if not self.instance.date_signature:
-            self.initial["date_signature"] = timezone.localdate()
-
-    def clean_date_signature(self):
-        date = self.cleaned_data["date_signature"]
-        if date > timezone.localdate():
-            raise forms.ValidationError("La date de signature ne peut pas être dans le futur.")
-        return date
-
-    def clean_fichier_signe(self):
-        fichier = self.cleaned_data.get("fichier_signe")
-        if fichier and hasattr(fichier, "content_type"):
-            controler_fichier(fichier, FichierSigneMixin.TAILLE_MAX)
-        return fichier
+        fields = SignatureMixin.CHAMPS
+        widgets = SignatureMixin.WIDGETS
+        labels = SignatureMixin.LIBELLES
