@@ -9,13 +9,57 @@
 {% if agence_manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ agence_manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux. <a href="{% url 'agence' %}">Compléter la fiche</a></p>{% endif %}
 
 <section class="carte">
+  <h2>Où en sont les dossiers</h2>
+  <div class="ensemble">
+    {% for nom, etapes, total in ensemble %}
+    <div>
+      <h3>{{ nom }} <span class="discret">({{ total }})</span></h3>
+      <ol class="frise frise-compte" style="--etapes: {{ etapes|length }}" aria-label="{{ nom }} : nombre de dossiers à chaque étape">
+        {% for libelle, nombre in etapes %}
+        <li class="{% if nombre %}occupee{% else %}vide-etape{% endif %}">
+          <span class="frise-point" aria-hidden="true">{{ nombre }}</span>
+          <span class="frise-texte"><span class="frise-libelle">{{ libelle }}</span><span class="masque"> : {{ nombre }} dossier{{ nombre|pluralize }}</span></span>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% if dossiers %}
+<section class="carte">
   <div class="titre-actions">
-    <h2>À faire{% if nb_taches %} <span class="compteur">{{ nb_taches }}</span>{% endif %}</h2>
+    <h2>Dossiers à faire avancer</h2>
     {% if nb_urgentes %}<span class="pastille pastille-libre">{{ nb_urgentes }} en retard</span>{% endif %}
   </div>
-  {% if taches %}
+  <p class="discret">Chaque dossier suit ses étapes, déduites des fiches : il avance de lui-même quand l'action est faite.</p>
+  {% for rubrique, lignes in dossiers %}
+  <h3 class="rubrique-dossiers">{{ rubrique }} <span class="compteur">{{ lignes|length }}</span></h3>
+  <ul class="dossiers">
+    {% for tache in lignes %}
+    <li class="dossier{% if tache.urgent %} dossier-urgent{% elif tache.processus.en_alerte %} dossier-alerte{% endif %}">
+      <p class="dossier-sujet"><a href="{{ tache.lien }}">{{ tache.sujet }}</a></p>
+      {% if tache.processus %}{% include "_frise.html" with processus=tache.processus compacte=True %}{% endif %}
+      <div class="dossier-pied">
+        <p>{{ tache.titre }}{% if tache.urgent %} <span class="pastille pastille-libre">En retard</span>{% endif %}{% if tache.detail %}<br><span class="discret">{{ tache.detail }}</span>{% endif %}</p>
+        <a class="bouton-petit{% if not tache.urgent %} secondaire{% endif %}" href="{{ tache.lien }}">{{ tache.action }}</a>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if autres_taches or not dossiers %}
+<section class="carte">
+  <div class="titre-actions">
+    <h2>{% if dossiers %}Autres actions{% else %}À faire{% endif %}</h2>
+  </div>
+  {% if autres_taches %}
   <p class="discret">Les actions en attente, déduites des fiches : une ligne disparaît d'elle-même quand l'action est faite.</p>
-  {% for rubrique, lignes in taches %}
+  {% for rubrique, lignes in autres_taches %}
   <h3 class="rubrique-taches">{{ rubrique }} <span class="discret">({{ lignes|length }})</span></h3>
   <table class="taches">
     <tbody>
@@ -33,6 +77,7 @@
   <p class="discret">Rien en attente. Les actions à mener apparaîtront ici : mandat à faire signer, pièces à fournir, candidatures à étudier, bail à rédiger, diagnostic périmé.</p>
   {% endif %}
 </section>
+{% endif %}
 
 <section class="carte">
   <div class="titre-actions">
@@ -41,13 +86,13 @@
   </div>
   {% if derniers_baux %}
   <table>
-    <thead><tr><th>Logement</th><th>Locataires</th><th class="masquer-mobile">Prise d'effet</th><th>Document</th></tr></thead>
+    <thead><tr><th>Logement</th><th>Locataires</th><th class="masquer-mobile">Avancement</th><th>Document</th></tr></thead>
     <tbody>
     {% for bail in derniers_baux %}
       <tr>
         <td><a href="{{ bail.get_absolute_url }}">{{ bail.propriete.adresse }}</a><br><span class="discret">{{ bail.propriete.code_postal }} {{ bail.propriete.ville }}</span></td>
         <td>{% for locataire in bail.locataires.all %}{{ locataire }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-        <td class="masquer-mobile">{{ bail.date_effet|date:"d/m/Y" }}</td>
+        <td class="masquer-mobile colonne-frise">{% include "_frise.html" with processus=bail.processus compacte=True %}</td>
         <td class="liens"><a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> <a href="{% url 'contrats:word' bail.pk %}">Word</a></td>
       </tr>
     {% endfor %}

@@ -9,6 +9,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from core.journal import noter
+from core.processus import processus_mandat
 from proprietes.models import Propriete
 from proprietes.tableur import sans_formule
 from documents import views as documents
@@ -74,7 +75,7 @@ def mandat(request, pk):
     objet = get_object_or_404(Mandat.objects.select_related("propriete__bailleur"), pk=pk)
     dossier = objet.dossier
     return render(request, "mandats/mandat.html", {
-        "mandat": objet, "dossier": dossier,
+        "mandat": objet, "dossier": dossier, "processus": processus_mandat(objet),
         "nb_fournies": sum(1 for ligne in dossier if ligne["piece"] and not ligne["piece"].perime),
         "nb_manquantes": sum(1 for ligne in dossier if ligne["obligatoire"] and (not ligne["piece"] or ligne["piece"].perime)),
         "historique": objet.history.select_related("history_user")[:10],

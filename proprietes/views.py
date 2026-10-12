@@ -20,6 +20,7 @@ from candidatures.models import Candidature
 from contacts.models import Contact
 from core.fichiers import servir
 from core.journal import noter
+from core.processus import processus_bail, processus_location
 from mandats.models import Mandat
 
 from . import tableur
@@ -112,22 +113,14 @@ def propriete(request, pk):
     retenue = next((c for c in candidatures if c.statut == Candidature.Statut.RETENUE), None)
     mandats = list(objet.mandats.order_by("-numero"))
     mandat = next((m for m in mandats if m.date_fin is None), None)
-    # Étape de la mise en location : mandat, mise en location, candidatures,
-    # bail, signature, entrée. Rien à suivre quand le logement est loué sans
-    # départ annoncé.
+    # Mise en location : mandat, mise en location, candidatures, bail,
+    # signature, entrée. Rien à suivre quand le logement est loué sans départ
+    # annoncé.
     nouveau_bail = situation.a_venir or (situation.bail if situation.code == "loue" else None)
-    if situation.code == "loue" and situation.bail.date_signature:
-        etape = None
-    elif nouveau_bail:
-        etape = 6 if nouveau_bail.date_signature else 5
-    elif retenue:
-        etape = 4
-    elif objet.a_louer or candidatures:
-        etape = 3
-    elif mandat:
-        etape = 2
-    else:
-        etape = 1
+    location = processus_location(
+        objet, mandat, sum(c.statut == Candidature.Statut.A_ETUDIER for c in candidatures), retenue, nouveau_bail,
+    )
+    etape = None if situation.code == "loue" and situation.bail.date_signature else location.rang
     pieces = list(objet.pieces.select_related("depose_par"))
     return render(request, "proprietes/propriete.html", {
         "propriete": objet, "onglet": onglet, "situation": situation, "candidatures": candidatures,
@@ -135,7 +128,8 @@ def propriete(request, pk):
         "contrats": sorted(
             [*objet.baux.all(), *mandats], key=lambda contrat: contrat.debut or contrat.cree_le.date(), reverse=True,
         ),
-        "etape": etape, "nouveau_bail": nouveau_bail,
+        "etape": etape, "nouveau_bail": nouveau_bail, "location": location,
+        "processus_bail": processus_bail(situation.bail) if situation.bail else None,
         "pieces": pieces, "piece_dpe": next((piece for piece in pieces if piece.type == Piece.Type.DPE), None),
         "form_piece": PieceForm() if onglet == "documents" else None,
         "historique": objet.history.select_related("history_user")[:20] if onglet == "historique" else [],
