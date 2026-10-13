@@ -22,8 +22,8 @@ from .fichiers import servir
 from .forms import OrganisationForm, UtilisateurForm
 from .journal import noter
 from .models import Evenement, Organisation
-from .processus import ETAPES_LOCATION, processus_location, processus_mandat, vue_ensemble
-from .taches import RUBRIQUES_DOSSIERS, de, par_rubrique, taches
+from .processus import processus_location
+from .taches import de, par_rubrique, taches
 
 
 def locations_en_cours():
@@ -90,54 +90,24 @@ def locations_en_cours():
     return sorted(lignes.values(), key=lambda l: (l["propriete"].ville, l["propriete"].adresse))
 
 
-# Étapes montrées pour les mandats : un mandat existant est rédigé, et la fin
-# d'un mandat n'attend aucune action.
-ETAPES_MANDAT_ACCUEIL = ["Signature", "Dossier du mandant", "Gestion"]
-
-
-def fil(libelles, processus, lignes, calmes=()):
-    """Les étapes d'un processus, dans l'ordre, avec le nombre de dossiers
-    arrêtés à chacune et les actions qui les feront avancer. Une étape
-    « calme » compte ses dossiers mais n'attend rien (mandat en gestion)."""
-    comptes = dict(vue_ensemble(processus, libelles))
-    return [
-        {
-            "libelle": libelle, "nombre": comptes[libelle], "calme": libelle in calmes,
-            "taches": [t for t in lignes if t.processus and t.processus.courante and t.processus.courante.libelle == libelle],
-        }
-        for libelle in libelles
-    ]
-
-
 def accueil(request):
-    """Page d'accueil : les actions en attente, rangées sous les étapes de la
-    mise en location et du mandat, puis les autres actions et les derniers
-    contrats."""
+    """Page d'accueil : les actions en attente en une liste, rangée par sujet,
+    chacune avec un repère de l'étape où attend son dossier ; puis les
+    derniers contrats."""
     est_admin = est_administrateur(request.user)
     locations = locations_en_cours()
     a_faire = taches(locations)
-    rubriques = dict(par_rubrique(a_faire))
     mandats = Mandat.objects.filter(date_fin__isnull=True).select_related("propriete__bailleur").prefetch_related(
         "propriete__pieces", "propriete__bailleur__pieces",
     )
-    lignes_mandats = rubriques.get("Mandats", [])
-    fils = []
-    if locations:
-        fils.append(("Mises en location", fil(ETAPES_LOCATION, [l["processus"] for l in locations], rubriques.get("Mises en location", [])), []))
-    if lignes_mandats:
-        fils.append(("Mandats", fil(ETAPES_MANDAT_ACCUEIL, [processus_mandat(m) for m in mandats], lignes_mandats, calmes=["Gestion"]),
-                     [t for t in lignes_mandats if not t.processus]))
     return render(request, "core/accueil.html", {
         "est_admin": est_admin,
         "agence_manquants": Organisation.courante().manquants if est_admin else [],
-        "fils": [
-            (nom, etapes, sum(e["nombre"] for e in etapes if not e["calme"]) + len(hors_etapes), hors_etapes)
-            for nom, etapes, hors_etapes in fils
-        ],
-        "autres_taches": [(rubrique, lignes) for rubrique, lignes in rubriques.items() if rubrique not in RUBRIQUES_DOSSIERS],
         "derniers_baux": Bail.objects.select_related("propriete__bailleur").prefetch_related("locataires").order_by("-modifie_le")[:5],
-        "locations": locations, "taches": list(rubriques.items()), "nb_taches": len(a_faire),
+        "locations": locations, "taches": par_rubrique(a_faire), "nb_taches": len(a_faire),
         "nb_urgentes": sum(tache.urgent for tache in a_faire),
+        # Mandats en cours pas encore en gestion : signature ou dossier à finir.
+        "nb_mandats_a_finaliser": sum(1 for mandat in mandats if not mandat.signe or mandat.pieces_manquantes),
     })
 
 

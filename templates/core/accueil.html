@@ -5,43 +5,26 @@
   <div>
     <h1>{{ agence.designation }}</h1>
     <p class="accroche-salut">Bonjour {{ user.get_full_name|default:user.username }}</p>
-    <p>{% if nb_taches %}{{ nb_taches }} action{{ nb_taches|pluralize }} en attente{% if nb_urgentes %}, dont {{ nb_urgentes }} en retard{% else %}, aucune en retard{% endif %}.{% else %}Tout est à jour.{% endif %}</p>
+    {% if nb_taches %}
+    <p class="puces">
+      {% if locations %}<span class="puce"><b>{{ locations|length }}</b> mise{{ locations|length|pluralize }} en location</span>{% endif %}
+      {% if nb_mandats_a_finaliser %}<span class="puce"><b>{{ nb_mandats_a_finaliser }}</b> mandat{{ nb_mandats_a_finaliser|pluralize }} à finaliser</span>{% endif %}
+      {% if nb_urgentes %}<span class="puce puce-retard"><b>{{ nb_urgentes }}</b> en retard</span>{% else %}<span class="puce puce-ok">Aucun retard</span>{% endif %}
+    </p>
+    {% else %}<p>Tout est à jour.</p>{% endif %}
   </div>
 </section>
 {% if agence_manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ agence_manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux. <a href="{% url 'agence' %}">Compléter la fiche</a></p>{% endif %}
 
-{% for nom, etapes, total, hors_etapes in fils %}
 <section class="carte">
-  <h2 class="titre-compte">{{ nom }} <span class="compteur">{{ total }}</span></h2>
-  {% if total > hors_etapes|length %}
-  <ol class="fil-etapes" aria-label="{{ nom }} : actions rangées par étape">
-    {% for etape in etapes %}
-    <li class="{% if etape.taches %}avec-actions{% else %}sans-action{% endif %}">
-      <span class="fil-point" aria-hidden="true">{{ etape.nombre }}</span>
-      <span class="fil-etape">{{ etape.libelle }}{% if etape.calme and etape.nombre %} <small>rien à faire</small>{% endif %}<span class="masque"> : {{ etape.nombre }} dossier{{ etape.nombre|pluralize }}</span></span>
-      {% if etape.taches %}{% include "core/_lignes_taches.html" with lignes=etape.taches %}{% endif %}
-    </li>
-    {% endfor %}
-  </ol>
-  {% endif %}
-  {% if hors_etapes %}{% include "core/_lignes_taches.html" with lignes=hors_etapes %}{% endif %}
-</section>
-{% endfor %}
-
-{% if autres_taches %}
-<section class="carte">
-  <h2 class="titre-compte">Autres actions</h2>
-  {% for rubrique, lignes in autres_taches %}
+  <h2 class="titre-compte">À faire{% if nb_taches %} <span class="compteur">{{ nb_taches }}<span class="masque"> action{{ nb_taches|pluralize }}</span></span>{% endif %}</h2>
+  {% for rubrique, lignes in taches %}
   <h3 class="rubrique-taches">{{ rubrique }}</h3>
   {% include "core/_lignes_taches.html" %}
+  {% empty %}
+  <p class="discret">Rien en attente. Les actions à mener apparaîtront ici : mandat à faire signer, pièces à fournir, candidatures à étudier, bail à rédiger, diagnostic périmé.</p>
   {% endfor %}
 </section>
-{% elif not fils %}
-<section class="carte">
-  <h2>À faire</h2>
-  <p class="discret">Rien en attente. Les actions à mener apparaîtront ici : mandat à faire signer, pièces à fournir, candidatures à étudier, bail à rédiger, diagnostic périmé.</p>
-</section>
-{% endif %}
 
 <section class="carte">
   <div class="titre-actions">
