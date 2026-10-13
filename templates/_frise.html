@@ -1,16 +1,15 @@
 {% comment %}
-Frise d'un processus (mandat, bail, mise en location) : un point par étape.
-Paramètres : processus (core.processus.Processus) ; compacte (points sans
-dates ni détails, pour le tableau de bord).
+Frise d'un processus (mandat, bail, mise en location) : un point par étape,
+avec sa date et son détail. Paramètre : processus (core.processus.Processus).
 {% endcomment %}
-<ol class="frise{% if compacte %} frise-compacte{% endif %}" style="--etapes: {{ processus.etapes|length }}" aria-label="{{ processus.nom }} : étapes">
+<ol class="frise" style="--etapes: {{ processus.etapes|length }}" aria-label="{{ processus.nom }} : étapes">
   {% for etape in processus.etapes %}
   <li class="frise-{{ etape.etat }}{% if forloop.counter <= processus.rang %} frise-atteinte{% endif %}{% if forloop.counter < processus.rang %} frise-suite{% if forloop.counter|add:1 == processus.rang %}-courante{% endif %}{% endif %}"{% if forloop.counter == processus.rang %} aria-current="step"{% endif %}>
-    <span class="frise-point" aria-hidden="true">{% if etape.etat == "faite" %}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>{% elif etape.etat == "alerte" %}!{% elif etape.etat == "sautee" %}–{% elif not compacte %}{{ forloop.counter }}{% endif %}</span>
+    <span class="frise-point" aria-hidden="true">{% if etape.etat == "faite" %}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>{% elif etape.etat == "alerte" %}!{% elif etape.etat == "sautee" %}–{% else %}{{ forloop.counter }}{% endif %}</span>
     <span class="frise-texte">
-      <span class="frise-libelle">{% if etape.lien and not compacte %}<a href="{{ etape.lien }}">{{ etape.libelle }}</a>{% else %}{{ etape.libelle }}{% endif %}</span>
+      <span class="frise-libelle">{% if etape.lien %}<a href="{{ etape.lien }}">{{ etape.libelle }}</a>{% else %}{{ etape.libelle }}{% endif %}</span>
       <span class="masque">, {{ etape.etat_libelle }}</span>
-      {% if not compacte %}{% if etape.date %}<span class="frise-date">{% if etape.prevue %}prévue le {% endif %}{{ etape.date|date:"d/m/Y" }}</span>{% endif %}{% if etape.detail %}<span class="frise-detail">{{ etape.detail }}</span>{% endif %}{% endif %}
+      {% if etape.date %}<span class="frise-date">{% if etape.prevue %}prévue le {% endif %}{{ etape.date|date:"d/m/Y" }}</span>{% endif %}{% if etape.detail %}<span class="frise-detail">{{ etape.detail }}</span>{% endif %}
     </span>
   </li>
   {% endfor %}

@@ -1,0 +1,12 @@
+{% comment %}Actions en attente : une ligne par action, verbe en tête ; toute la ligne mène à la fiche où la faire.{% endcomment %}
+<ul class="lignes-taches">
+  {% for tache in lignes %}
+  <li><a class="ligne-tache" href="{{ tache.lien }}">
+    <span class="ligne-tache-texte">
+      <span class="ligne-tache-titre">{{ tache.titre }}{% if tache.urgent %} <span class="pastille pastille-libre">En retard</span>{% elif tache.processus.en_alerte %} <span class="pastille pastille-libre">Sans mandat</span>{% endif %}</span>
+      <span class="discret">{{ tache.sujet }}{% if tache.detail %} · {{ tache.detail }}{% endif %}</span>
+    </span>
+    <span class="ligne-tache-fleche" aria-hidden="true">›</span>
+  </a></li>
+  {% endfor %}
+</ul>
