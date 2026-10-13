@@ -5,79 +5,41 @@
   <div>
     <h1>{{ agence.designation }}</h1>
     <p class="accroche-salut">Bonjour {{ user.get_full_name|default:user.username }}</p>
-    <p>{% if nb_taches %}{{ nb_taches }} action{{ nb_taches|pluralize }} en attente{% if nb_urgentes %}, dont {{ nb_urgentes }} en retard{% endif %}.{% else %}Tout est à jour.{% endif %}</p>
+    <p>{% if nb_taches %}{{ nb_taches }} action{{ nb_taches|pluralize }} en attente{% if nb_urgentes %}, dont {{ nb_urgentes }} en retard{% else %}, aucune en retard{% endif %}.{% else %}Tout est à jour.{% endif %}</p>
   </div>
 </section>
 {% if agence_manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ agence_manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux. <a href="{% url 'agence' %}">Compléter la fiche</a></p>{% endif %}
 
+{% for nom, etapes, total, hors_etapes in fils %}
 <section class="carte">
-  <h2>Où en sont les dossiers</h2>
-  <div class="ensemble">
-    {% for nom, etapes, total in ensemble %}
-    <div>
-      <h3>{{ nom }} <span class="discret">({{ total }})</span></h3>
-      <ol class="frise frise-compte" style="--etapes: {{ etapes|length }}" aria-label="{{ nom }} : nombre de dossiers à chaque étape">
-        {% for libelle, nombre in etapes %}
-        <li class="{% if nombre %}occupee{% else %}vide-etape{% endif %}">
-          <span class="frise-point" aria-hidden="true">{{ nombre }}</span>
-          <span class="frise-texte"><span class="frise-libelle">{{ libelle }}</span><span class="masque"> : {{ nombre }} dossier{{ nombre|pluralize }}</span></span>
-        </li>
-        {% endfor %}
-      </ol>
-    </div>
-    {% endfor %}
-  </div>
-</section>
-
-{% if dossiers %}
-<section class="carte">
-  <div class="titre-actions">
-    <h2>Dossiers à faire avancer</h2>
-    {% if nb_urgentes %}<span class="pastille pastille-libre">{{ nb_urgentes }} en retard</span>{% endif %}
-  </div>
-  <p class="discret">Chaque dossier suit ses étapes, déduites des fiches : il avance de lui-même quand l'action est faite.</p>
-  {% for rubrique, lignes in dossiers %}
-  <h3 class="rubrique-dossiers">{{ rubrique }} <span class="compteur">{{ lignes|length }}</span></h3>
-  <ul class="dossiers">
-    {% for tache in lignes %}
-    <li class="dossier{% if tache.urgent %} dossier-urgent{% elif tache.processus.en_alerte %} dossier-alerte{% endif %}">
-      <p class="dossier-sujet"><a href="{{ tache.lien }}">{{ tache.sujet }}</a></p>
-      {% if tache.processus %}{% include "_frise.html" with processus=tache.processus compacte=True %}{% endif %}
-      <div class="dossier-pied">
-        <p>{{ tache.titre }}{% if tache.urgent %} <span class="pastille pastille-libre">En retard</span>{% endif %}{% if tache.detail %}<br><span class="discret">{{ tache.detail }}</span>{% endif %}</p>
-        <a class="bouton-petit{% if not tache.urgent %} secondaire{% endif %}" href="{{ tache.lien }}">{{ tache.action }}</a>
-      </div>
+  <h2 class="titre-compte">{{ nom }} <span class="compteur">{{ total }}</span></h2>
+  {% if total > hors_etapes|length %}
+  <ol class="fil-etapes" aria-label="{{ nom }} : actions rangées par étape">
+    {% for etape in etapes %}
+    <li class="{% if etape.taches %}avec-actions{% else %}sans-action{% endif %}">
+      <span class="fil-point" aria-hidden="true">{{ etape.nombre }}</span>
+      <span class="fil-etape">{{ etape.libelle }}{% if etape.calme and etape.nombre %} <small>rien à faire</small>{% endif %}<span class="masque"> : {{ etape.nombre }} dossier{{ etape.nombre|pluralize }}</span></span>
+      {% if etape.taches %}{% include "core/_lignes_taches.html" with lignes=etape.taches %}{% endif %}
     </li>
     {% endfor %}
-  </ul>
+  </ol>
+  {% endif %}
+  {% if hors_etapes %}{% include "core/_lignes_taches.html" with lignes=hors_etapes %}{% endif %}
+</section>
+{% endfor %}
+
+{% if autres_taches %}
+<section class="carte">
+  <h2 class="titre-compte">Autres actions</h2>
+  {% for rubrique, lignes in autres_taches %}
+  <h3 class="rubrique-taches">{{ rubrique }}</h3>
+  {% include "core/_lignes_taches.html" %}
   {% endfor %}
 </section>
-{% endif %}
-
-{% if autres_taches or not dossiers %}
+{% elif not fils %}
 <section class="carte">
-  <div class="titre-actions">
-    <h2>{% if dossiers %}Autres actions{% else %}À faire{% endif %}</h2>
-  </div>
-  {% if autres_taches %}
-  <p class="discret">Les actions en attente, déduites des fiches : une ligne disparaît d'elle-même quand l'action est faite.</p>
-  {% for rubrique, lignes in autres_taches %}
-  <h3 class="rubrique-taches">{{ rubrique }} <span class="discret">({{ lignes|length }})</span></h3>
-  <table class="taches">
-    <tbody>
-    {% for tache in lignes %}
-      <tr>
-        <td><a href="{{ tache.lien }}">{{ tache.titre }}</a>{% if tache.urgent %} <span class="pastille pastille-libre">En retard</span>{% endif %}{% if tache.detail %}<br><span class="discret">{{ tache.detail }}</span>{% endif %}</td>
-        <td class="discret">{{ tache.sujet }}</td>
-        <td class="actions-ligne"><a class="bouton-petit{% if not tache.urgent %} secondaire{% endif %}" href="{{ tache.lien }}">{{ tache.action }}</a></td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% endfor %}
-  {% else %}
+  <h2>À faire</h2>
   <p class="discret">Rien en attente. Les actions à mener apparaîtront ici : mandat à faire signer, pièces à fournir, candidatures à étudier, bail à rédiger, diagnostic périmé.</p>
-  {% endif %}
 </section>
 {% endif %}
 
@@ -87,27 +49,13 @@
     <a href="{% url 'contrats:liste' %}">Tous les contrats</a>
   </div>
   {% if derniers_baux %}
-  <table>
-    <thead><tr><th>Logement</th><th>Locataires</th><th class="masquer-mobile">Avancement</th><th>Document</th></tr></thead>
-    <tbody>
-    {% for bail in derniers_baux %}
-      <tr>
-        <td><a href="{{ bail.get_absolute_url }}">{{ bail.propriete.adresse }}</a><br><span class="discret">{{ bail.propriete.code_postal }} {{ bail.propriete.ville }}</span></td>
-        <td>{% for locataire in bail.locataires.all %}{{ locataire }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-        <td class="masquer-mobile colonne-frise">{% include "_frise.html" with processus=bail.processus compacte=True %}</td>
-        <td class="liens"><a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> <a href="{% url 'contrats:word' bail.pk %}">Word</a></td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <ul class="derniers-contrats">
+    {% for bail in derniers_baux %}{% with etat=bail.etat %}
+    <li><a href="{{ bail.get_absolute_url }}"><strong>{{ bail.propriete.adresse }}</strong><span class="discret">{{ bail.noms_locataires|default:"Locataire à renseigner" }}</span></a><span class="pastille pastille-{{ etat.0 }}">{{ etat.1 }}</span><a class="discret" href="{% url 'contrats:pdf' bail.pk %}">PDF</a></li>
+    {% endwith %}{% endfor %}
+  </ul>
   {% else %}
   <p class="discret">Aucun contrat pour l'instant.</p>
   {% endif %}
 </section>
-
-<div class="grille raccourcis">
-  <a class="carte" href="{% url 'candidatures:liste' %}"><strong>Candidatures</strong><span class="discret">{{ nb_candidatures }} à étudier</span></a>
-  <a class="carte" href="{% url 'proprietes:liste' %}"><strong>Propriétés</strong><span class="discret">{{ nb_proprietes }} lot(s) actif(s)</span></a>
-  <a class="carte" href="{% url 'mandats:registre' %}"><strong>Registre des mandats</strong><span class="discret">{{ nb_mandats }} en cours</span></a>
-</div>
 {% endblock %}

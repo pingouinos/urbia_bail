@@ -404,8 +404,6 @@ button.lien.lien-danger { color: var(--erreur); }
 /* Liste des actions en attente, sur le tableau de bord. */
 .compteur { display: inline-block; min-width: 1.6em; padding: 1px 8px; border-radius: 999px; background: var(--acier); color: #fff; font-size: 0.8rem; text-align: center; vertical-align: middle; }
 .rubrique-taches { margin: 18px 0 6px; font-size: 0.95rem; }
-.taches td:first-child { width: 46%; }
-.taches td { padding-top: 8px; padding-bottom: 8px; }
 
 /* En tête de page : fil d'Ariane à gauche, actions de la fiche à droite. */
 .barre-fiche { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 14px; }
@@ -470,61 +468,46 @@ button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erre
   .frise li[aria-current=step]:not(.frise-alerte) .frise-point { animation: frise-pouls 2.4s ease-in-out infinite; }
 }
 @keyframes frise-pouls { 50% { box-shadow: 0 0 0 9px rgb(255 188 163 / 0.25); } }
-/* Version compacte (tableau de bord) : petits points, libellés courts. */
-.frise-compacte { --point: 18px; --trait: 3px; margin: 10px 0 6px; }
-.frise-compacte li { gap: 6px; }
-.frise-compacte .frise-point { font-size: 0.7rem; border-width: 2px; }
-.frise-compacte .frise-point svg { width: 10px; height: 10px; }
-.frise-compacte li[aria-current=step] .frise-point { box-shadow: 0 0 0 4px var(--melon-clair); }
-.frise-compacte .frise-libelle { font-size: 0.75rem; font-weight: 500; }
-.frise-compacte li[aria-current=step] .frise-libelle { font-weight: 700; }
 .carte-frise .frise { margin-top: 8px; }
 .carte-frise > p:last-child { margin-bottom: 0; }
-
-/* Tableau de bord : la frise de chaque processus avec le nombre de dossiers
-   arrêtés à chaque étape. */
-.ensemble { display: grid; gap: 18px; }
-.ensemble h3 { margin: 0 0 2px; font-size: 0.95rem; }
-.frise-compte .frise-point { font-size: 0.95rem; }
-.frise-compte .vide-etape .frise-point { color: var(--bord); }
-.frise-compte li.occupee .frise-point { border-color: var(--acier); background: var(--acier); color: #fff; }
-.frise-compte li.occupee .frise-libelle { color: var(--texte); }
-.frise-compte li::before { background: var(--bord); }
-
-/* Dossiers en cours : une carte par dossier, avec sa frise compacte. */
-.dossiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-.dossier { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--bord); border-left: 4px solid var(--melon); border-radius: var(--rayon); background: var(--carte); }
-.dossier-urgent, .dossier-alerte { border-left-color: var(--erreur); }
-.dossier-sujet { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-.dossier-sujet a { color: var(--texte); }
-.dossier-sujet a:hover { color: var(--lien-survol); }
-.dossier-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
-.dossier-pied p { margin: 0; flex: 1 1 200px; }
-.rubrique-dossiers { display: flex; align-items: baseline; gap: 8px; margin: 22px 0 10px; font-size: 0.95rem; }
-.rubrique-dossiers:first-of-type { margin-top: 8px; }
 
 @media (max-width: 760px) {
   /* Frise complète en colonne : point à gauche, texte à droite, et un trait
      qui descend de chaque point jusqu'au suivant. */
-  .frise:not(.frise-compacte) { grid-template-columns: 1fr; }
-  .frise:not(.frise-compacte) li { flex-direction: row; align-items: flex-start; gap: 14px; padding: 0 0 16px; text-align: left; }
-  .frise:not(.frise-compacte) li:last-child { padding-bottom: 0; }
-  .frise:not(.frise-compacte) li::before { display: none; }
-  .frise:not(.frise-compacte) li:not(:last-child)::after { content: ""; position: absolute; z-index: 0; top: calc(var(--point) / 2); left: calc(var(--point) / 2 - var(--trait) / 2); width: var(--trait); height: 100%; background: var(--bord); }
-  .frise:not(.frise-compacte) li.frise-suite::after { background: var(--vert); }
-  .frise:not(.frise-compacte) li.frise-suite-courante::after { background: linear-gradient(180deg, var(--vert), var(--melon)); }
-  .frise:not(.frise-compacte) .frise-texte { padding-top: 5px; }
-  /* Compacte : seuls les points, et le libellé de l'étape en cours. */
-  .frise-compacte li:not([aria-current=step]) .frise-libelle { display: none; }
-  .frise-compacte li[aria-current=step] .frise-texte { position: absolute; top: calc(var(--point) + 6px); white-space: nowrap; }
-  .frise-compacte li:first-child[aria-current=step] .frise-texte { left: 0; }
-  .frise-compacte li:last-child[aria-current=step] .frise-texte { right: 0; }
-  .frise-compacte { padding-bottom: 20px; }
-  /* Vue d'ensemble : la colonne est resserrée. */
-  .frise-compte { --point: 24px; --trait: 3px; }
-  .frise.frise-compte li { gap: 10px; padding-bottom: 6px; }
-  .frise.frise-compte .frise-point { font-size: 0.8rem; }
-  .frise.frise-compte .frise-texte { padding-top: 2px; }
+  .frise { grid-template-columns: 1fr; }
+  .frise li { flex-direction: row; align-items: flex-start; gap: 14px; padding: 0 0 16px; text-align: left; }
+  .frise li:last-child { padding-bottom: 0; }
+  .frise li::before { display: none; }
+  .frise li:not(:last-child)::after { content: ""; position: absolute; z-index: 0; top: calc(var(--point) / 2); left: calc(var(--point) / 2 - var(--trait) / 2); width: var(--trait); height: 100%; background: var(--bord); }
+  .frise li.frise-suite::after { background: var(--vert); }
+  .frise li.frise-suite-courante::after { background: linear-gradient(180deg, var(--vert), var(--melon)); }
+  .frise .frise-texte { padding-top: 5px; }
 }
-.colonne-frise { min-width: 300px; }
-.colonne-frise .frise-compacte { margin: 0; }
+
+/* Tableau de bord : les actions rangées sous les étapes du processus, sur un
+   seul fil vertical. Le point porte le nombre de dossiers arrêtés à l'étape. */
+.titre-compte { display: flex; align-items: center; gap: 8px; }
+.fil-etapes { display: grid; margin: 4px 0 0; padding: 0; list-style: none; }
+.fil-etapes > li { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 12px; padding-bottom: 10px; }
+.fil-etapes > li:last-child { padding-bottom: 0; }
+.fil-etapes > li:not(:last-child)::before { content: ""; position: absolute; left: 13px; top: 26px; bottom: -2px; width: 2px; background: var(--bord); }
+.fil-point { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--bord); border-radius: 50%; background: var(--carte); color: var(--discret); font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fil-etapes .avec-actions .fil-point { border-color: var(--acier); background: var(--acier); color: #fff; }
+.fil-etape { padding-top: 3px; font-weight: 700; }
+.fil-etapes .sans-action .fil-etape { font-weight: 500; color: var(--discret); }
+.fil-etape small { margin-left: 6px; font-size: 0.82rem; font-weight: 500; color: var(--discret); }
+.fil-etapes .lignes-taches { grid-column: 2; margin-top: 2px; }
+.lignes-taches { margin: 0; padding: 0; list-style: none; }
+.lignes-taches > li + li { border-top: 1px solid var(--bord); }
+.ligne-tache { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 8px; border-radius: 8px; color: var(--texte); }
+.ligne-tache:hover { background: var(--melon-clair); color: var(--texte); }
+.ligne-tache-texte { display: grid; gap: 1px; min-width: 0; }
+.ligne-tache-titre { font-weight: 600; }
+.ligne-tache-texte .discret { font-size: 0.88rem; overflow-wrap: anywhere; }
+.ligne-tache-fleche { color: var(--discret); font-size: 1.25rem; line-height: 1; }
+.lignes-taches + .lignes-taches, .fil-etapes + .lignes-taches { margin-top: 8px; border-top: 1px solid var(--bord); padding-top: 4px; }
+.derniers-contrats { margin: 0; padding: 0; list-style: none; }
+.derniers-contrats > li + li { border-top: 1px solid var(--bord); }
+.derniers-contrats > li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 0; }
+.derniers-contrats > li > a:first-child { display: grid; min-width: 0; color: var(--texte); }
+.derniers-contrats > li > a:first-child:hover strong { color: var(--lien-survol); }

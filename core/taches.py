@@ -21,7 +21,7 @@ from .processus import processus_mandat
 # Rubriques, dans l'ordre d'affichage.
 RUBRIQUES = ["Mises en location", "Loyers", "Mandats", "Candidatures", "Baux", "Documents", "Fiches à compléter"]
 # Rubriques dont chaque ligne est un dossier qui suit un processus : le tableau
-# de bord les montre en cartes, avec la frise de leurs étapes.
+# de bord range leurs lignes sous les étapes de ce processus.
 RUBRIQUES_DOSSIERS = ["Mises en location", "Mandats"]
 # Un diagnostic est signalé un peu avant sa fin de validité.
 PREAVIS_VALIDITE = dt.timedelta(days=60)
@@ -36,7 +36,16 @@ class Tache:
     action: str
     urgent: bool = False
     detail: str = ""
-    processus: object = None  # core.processus.Processus, pour la frise du dossier
+    processus: object = None  # core.processus.Processus : l'étape où attend le dossier
+
+
+def de(nom):
+    """« de Jean », « d'Inès » : le complément de nom avec élision."""
+    return f"d'{nom}" if nom[:1].upper() in "AEIOUYÀÂÉÈÊËÎÏÔÛ" else f"de {nom}"
+
+
+def _nb_pieces(nombre):
+    return f"{nombre} pièce{'s' if nombre > 1 else ''}"
 
 
 def _adresse(propriete):
@@ -53,31 +62,47 @@ def taches(locations):
         for ligne in locations
     ]
 
-    # Mandats : à faire signer, dossier de pièces à compléter.
+    # Mandats : à faire signer, dossier de pièces à compléter. Les dossiers à
+    # compléter d'un même bailleur tiennent sur une ligne : ses pièces à lui
+    # (identité, RIB, Kbis) valent pour tous ses mandats.
     mandats = Mandat.objects.filter(date_fin__isnull=True).select_related("propriete__bailleur").prefetch_related(
         "propriete__pieces", "propriete__bailleur__pieces",
-    )
+    ).order_by("numero")
+    a_completer = {}
     for mandat in mandats:
-        # Une ligne par mandat : ce qui lui manque, signature et pièces.
         manquantes = mandat.pieces_manquantes
-        nombre = len(manquantes)
-        pieces = f"{nombre} pièce{'s' if nombre > 1 else ''} du dossier à fournir" if nombre else ""
-        if mandat.signe and not nombre:
-            continue
-        titre = "Mandat à faire signer" + (f", {pieces}" if pieces else "") if not mandat.signe else pieces.capitalize()
-        liste.append(Tache(
-            "Mandats", titre, f"n° {mandat.numero} · {_adresse(mandat.propriete)}",
-            mandat.get_absolute_url() + ("#dossier" if mandat.signe else ""),
-            "Ouvrir le mandat" if not mandat.signe else "Compléter le dossier",
-            detail=", ".join(manquantes[:3]) + ("…" if nombre > 3 else ""),
-            processus=processus_mandat(mandat, manquantes),
-        ))
+        if not mandat.signe:
+            liste.append(Tache(
+                "Mandats", f"Faire signer le mandat n° {mandat.numero}",
+                f"{mandat.propriete.bailleur} · {_adresse(mandat.propriete)}", mandat.get_absolute_url(), "Ouvrir le mandat",
+                detail=f"{_nb_pieces(len(manquantes))} aussi à fournir" if manquantes else "",
+                processus=processus_mandat(mandat, manquantes),
+            ))
+        elif manquantes:
+            a_completer.setdefault(mandat.propriete.bailleur, []).append((mandat, manquantes))
+    for bailleur, groupe in a_completer.items():
+        if len(groupe) == 1:
+            mandat, manquantes = groupe[0]
+            liste.append(Tache(
+                "Mandats", f"Compléter le dossier du mandat n° {mandat.numero}",
+                f"{bailleur} · {_adresse(mandat.propriete)}", mandat.get_absolute_url() + "#dossier",
+                "Compléter le dossier", detail=f"{_nb_pieces(len(manquantes))} à fournir",
+                processus=processus_mandat(mandat, manquantes),
+            ))
+        else:
+            numeros = ", ".join(str(mandat.numero) for mandat, _ in groupe)
+            liste.append(Tache(
+                "Mandats", f"Compléter {len(groupe)} dossiers de mandat", f"{bailleur} · mandats n° {numeros}",
+                bailleur.get_absolute_url(), "Voir le bailleur",
+                processus=processus_mandat(*groupe[0]),
+            ))
     sous_mandat = Mandat.objects.filter(date_fin__isnull=True).values("propriete")
     sans_mandat = Propriete.objects.filter(actif=True).exclude(pk__in=sous_mandat).count()
     if sans_mandat:
         liste.append(Tache(
-            "Mandats", f"{sans_mandat} propriété{'s' if sans_mandat > 1 else ''} sans mandat en cours", "Portefeuille",
+            "Mandats", f"Créer {'les mandats manquants' if sans_mandat > 1 else 'le mandat manquant'}", "Portefeuille",
             f"{reverse('proprietes:liste')}?mandat=sans", "Voir la liste",
+            detail=f"{sans_mandat} propriété{'s' if sans_mandat > 1 else ''} sans mandat en cours",
         ))
 
     # Candidatures : réponse due aux candidats non retenus.

@@ -216,22 +216,35 @@ class OrganisationTests(TestCase):
         for attendu in ("Réponse à envoyer à Lina ROUX", "Représentant de la société à renseigner",
                         "Diagnostic de performance énergétique (DPE) périmé", "Départ à confirmer : locataire"):
             self.assertIn(attendu, titres)
-        # Une seule ligne par mandat : la signature et les pièces qui lui manquent.
-        du_mandat = [titre for titre in titres if "Mandat" in titre or "dossier" in titre]
+        # Une seule ligne par mandat : la signature, et les pièces qui lui manquent en détail.
+        du_mandat = [tache for tache in titres.values() if tache.rubrique == "Mandats"]
         self.assertEqual(len(du_mandat), 1)
-        self.assertRegex(du_mandat[0], r"^Mandat à faire signer, \d+ pièces du dossier à fournir$")
+        self.assertEqual(du_mandat[0].titre, f"Faire signer le mandat n° {mandat.numero}")
+        self.assertRegex(du_mandat[0].detail, r"^\d+ pièces aussi à fournir$")
         self.assertTrue(titres["Départ à confirmer : locataire"].urgent)
         page = self.client.get(reverse("accueil"))
-        self.assertContains(page, "Mandat à faire signer")
+        self.assertContains(page, "Faire signer le mandat")
         self.assertContains(page, "en retard")
-        # Le mandat signé, sa ligne disparaît.
+        # Le mandat signé, il reste son dossier à compléter.
         mandat.date_signature = dt.date(2026, 9, 1)
         mandat.save()
-        du_mandat = [tache.titre for tache in taches([]) if "dossier" in tache.titre]
-        self.assertRegex(du_mandat[0], r"^\d+ pièces du dossier à fournir$")
+        du_mandat = [tache for tache in taches([]) if tache.rubrique == "Mandats"]
+        self.assertEqual(du_mandat[0].titre, f"Compléter le dossier du mandat n° {mandat.numero}")
+        self.assertRegex(du_mandat[0].detail, r"^\d+ pièces à fournir$")
+        # Un deuxième mandat du même bailleur à compléter : une seule ligne pour les deux.
+        autre = Propriete.objects.create(
+            bailleur=sci, adresse="7 rue des Lois", code_postal="31000", ville="Toulouse", dernier_loyer=600,
+        )
+        second = Mandat.depuis_propriete(autre)
+        second.date_signature = dt.date(2026, 9, 1)
+        second.save()
+        du_mandat = [tache for tache in taches([]) if tache.rubrique == "Mandats"]
+        self.assertEqual([tache.titre for tache in du_mandat], ["Compléter 2 dossiers de mandat"])
+        self.assertIn(f"mandats n° {mandat.numero}, {second.numero}", du_mandat[0].sujet)
         # Une propriété hors mandat est comptée en une seule ligne.
         Propriete.objects.create(bailleur=sci, adresse="5 rue du Taur", code_postal="31000", ville="Toulouse")
-        self.assertIn("1 propriété sans mandat en cours", {tache.titre for tache in taches([])})
+        sans_mandat = next(tache for tache in taches([]) if tache.titre == "Créer le mandat manquant")
+        self.assertEqual(sans_mandat.detail, "1 propriété sans mandat en cours")
 
     def test_entetes_de_securite(self):
         reponse = self.client.get(reverse("connexion"))
@@ -388,13 +401,15 @@ class ProcessusTests(TestCase):
         mandat.save()
         bail = self.donnees.creer_bail(propriete=self.propriete)
         accueil = self.client.get(reverse("accueil"))
-        self.assertContains(accueil, "Où en sont les dossiers")
-        # Le mandat à faire signer et le bail à faire signer, chacun avec sa frise.
-        self.assertContains(accueil, "Dossiers à faire avancer")
-        self.assertContains(accueil, 'aria-label="Mandat : étapes"')
-        self.assertContains(accueil, 'aria-label="Mise en location : étapes"')
-        mises_en_location = dict(accueil.context["ensemble"][0][1])
-        self.assertEqual(mises_en_location["Signature"], 1)
+        # Les actions sont rangées sous l'étape où attend leur dossier.
+        fils = {nom: etapes for nom, etapes, _, _ in accueil.context["fils"]}
+        signature = next(e for e in fils["Mises en location"] if e["libelle"] == "Signature")
+        self.assertEqual((signature["nombre"], [t.titre for t in signature["taches"]]),
+                         (1, ["Faire signer le bail de Paul MARTIN"]))
+        self.assertEqual([t.titre for t in next(e for e in fils["Mandats"] if e["libelle"] == "Signature")["taches"]],
+                         [f"Faire signer le mandat n° {mandat.numero}"])
+        self.assertContains(accueil, 'aria-label="Mises en location : actions rangées par étape"')
+        self.assertContains(accueil, "aucune en retard")
         page = self.client.get(bail.get_absolute_url())
         self.assertContains(page, "Avancement du bail")
         self.assertContains(page, 'aria-current="step"')

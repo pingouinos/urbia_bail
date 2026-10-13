@@ -22,8 +22,8 @@ from .fichiers import servir
 from .forms import OrganisationForm, UtilisateurForm
 from .journal import noter
 from .models import Evenement, Organisation
-from .processus import ETAPES_BAIL, ETAPES_LOCATION, ETAPES_MANDAT, processus_bail, processus_location, processus_mandat, vue_ensemble
-from .taches import RUBRIQUES_DOSSIERS, par_rubrique, taches
+from .processus import ETAPES_LOCATION, processus_location, processus_mandat, vue_ensemble
+from .taches import RUBRIQUES_DOSSIERS, de, par_rubrique, taches
 
 
 def locations_en_cours():
@@ -61,66 +61,83 @@ def locations_en_cours():
         l["processus"] = processus_location(
             propriete, mandats.get(propriete.pk), l["a_etudier"], l["retenue"], l["a_signer"],
         )
+        disponible = propriete.disponible_le
         if l["preavis"]:
-            l["detail"] = f"Libre le {l['preavis'].date_depart_prevue:%d/%m/%Y}"
+            l["detail"] = f"libre le {l['preavis'].date_depart_prevue:%d/%m/%Y}"
+        elif propriete.a_louer and disponible:
+            l["detail"] = f"disponible {'depuis le' if disponible <= timezone.localdate() else 'le'} {disponible:%d/%m/%Y}"
         else:
-            l["detail"] = f"Disponible le {propriete.disponible_le:%d/%m/%Y}" if propriete.a_louer and propriete.disponible_le else ""
+            l["detail"] = ""
+        # L'action à faire, verbe en tête : elle sert de titre à la ligne.
         if l["a_signer"]:
-            l["etape"] = f"Bail à faire signer : {l['a_signer'].noms_locataires or 'locataire à renseigner'}"
+            noms = l["a_signer"].noms_locataires
+            l["etape"] = f"Faire signer le bail {de(noms)}" if noms else "Faire signer le bail"
             l["action"], l["lien"] = "Ouvrir le bail", l["a_signer"].get_absolute_url()
         elif l["retenue"]:
-            l["etape"] = f"Candidat retenu : {l['retenue'].noms or 'candidature'}"
+            noms = l["retenue"].noms
+            l["etape"] = f"Rédiger le bail {de(noms)}" if noms else "Rédiger le bail"
             l["action"], l["lien"] = "Rédiger le bail", f"{reverse('contrats:creer')}?candidature={l['retenue'].pk}"
         elif l["a_etudier"]:
             nombre = l["a_etudier"]
-            l["etape"] = f"{nombre} candidature{'s' if nombre > 1 else ''} à étudier"
+            l["etape"] = f"Étudier {nombre} candidature{'s' if nombre > 1 else ''}"
             l["action"], l["lien"] = "Étudier", f"{reverse('candidatures:liste')}?propriete={propriete.pk}&statut=a_etudier"
         elif propriete.a_louer:
-            l["etape"] = "À louer, aucune candidature"
+            l["etape"] = "Enregistrer une candidature"
             l["action"], l["lien"] = "Enregistrer une candidature", f"{reverse('candidatures:creer')}?propriete={propriete.pk}"
         else:
-            l["etape"] = "Départ annoncé"
+            l["etape"] = "Remettre en location"
             l["action"], l["lien"] = "Mettre en location", reverse("proprietes:mettre_en_location", args=[propriete.pk])
     return sorted(lignes.values(), key=lambda l: (l["propriete"].ville, l["propriete"].adresse))
 
 
-def vue_d_ensemble(locations):
-    """Pour chaque processus, le nombre de dossiers en cours arrêtés à chaque
-    étape : [(nom, [(étape, nombre)], total)]."""
-    mandats = Mandat.objects.filter(date_fin__isnull=True).select_related("propriete__bailleur").prefetch_related(
-        "propriete__pieces", "propriete__bailleur__pieces",
-    )
-    baux = Bail.objects.filter(date_fin_effective__isnull=True).select_related("propriete__bailleur", "mandat").prefetch_related("locataires")
-    groupes = [
-        ("Mises en location", [l["processus"] for l in locations], ETAPES_LOCATION),
-        ("Mandats en cours", [processus_mandat(mandat) for mandat in mandats], ETAPES_MANDAT),
-        ("Baux en cours", [processus_bail(bail) for bail in baux], ETAPES_BAIL),
+# Étapes montrées pour les mandats : un mandat existant est rédigé, et la fin
+# d'un mandat n'attend aucune action.
+ETAPES_MANDAT_ACCUEIL = ["Signature", "Dossier du mandant", "Gestion"]
+
+
+def fil(libelles, processus, lignes, calmes=()):
+    """Les étapes d'un processus, dans l'ordre, avec le nombre de dossiers
+    arrêtés à chacune et les actions qui les feront avancer. Une étape
+    « calme » compte ses dossiers mais n'attend rien (mandat en gestion)."""
+    comptes = dict(vue_ensemble(processus, libelles))
+    return [
+        {
+            "libelle": libelle, "nombre": comptes[libelle], "calme": libelle in calmes,
+            "taches": [t for t in lignes if t.processus and t.processus.courante and t.processus.courante.libelle == libelle],
+        }
+        for libelle in libelles
     ]
-    return [(nom, vue_ensemble(liste, etapes), len(liste)) for nom, liste, etapes in groupes]
 
 
 def accueil(request):
-    """Page d'accueil : où en sont les dossiers, ceux qui attendent une action
-    (avec leur frise), les autres actions, puis les derniers baux."""
+    """Page d'accueil : les actions en attente, rangées sous les étapes de la
+    mise en location et du mandat, puis les autres actions et les derniers
+    contrats."""
     est_admin = est_administrateur(request.user)
     locations = locations_en_cours()
     a_faire = taches(locations)
-    rubriques = par_rubrique(a_faire)
-    derniers_baux = list(Bail.objects.select_related("propriete__bailleur", "mandat").prefetch_related("locataires").order_by("-modifie_le")[:8])
-    for bail in derniers_baux:
-        bail.processus = processus_bail(bail)
+    rubriques = dict(par_rubrique(a_faire))
+    mandats = Mandat.objects.filter(date_fin__isnull=True).select_related("propriete__bailleur").prefetch_related(
+        "propriete__pieces", "propriete__bailleur__pieces",
+    )
+    lignes_mandats = rubriques.get("Mandats", [])
+    fils = []
+    if locations:
+        fils.append(("Mises en location", fil(ETAPES_LOCATION, [l["processus"] for l in locations], rubriques.get("Mises en location", [])), []))
+    if lignes_mandats:
+        fils.append(("Mandats", fil(ETAPES_MANDAT_ACCUEIL, [processus_mandat(m) for m in mandats], lignes_mandats, calmes=["Gestion"]),
+                     [t for t in lignes_mandats if not t.processus]))
     return render(request, "core/accueil.html", {
         "est_admin": est_admin,
         "agence_manquants": Organisation.courante().manquants if est_admin else [],
-        "derniers_baux": derniers_baux, "ensemble": vue_d_ensemble(locations),
-        "dossiers": [(rubrique, lignes) for rubrique, lignes in rubriques if rubrique in RUBRIQUES_DOSSIERS],
-        "autres_taches": [(rubrique, lignes) for rubrique, lignes in rubriques if rubrique not in RUBRIQUES_DOSSIERS],
-        "locations": locations, "taches": rubriques, "nb_taches": len(a_faire),
+        "fils": [
+            (nom, etapes, sum(e["nombre"] for e in etapes if not e["calme"]) + len(hors_etapes), hors_etapes)
+            for nom, etapes, hors_etapes in fils
+        ],
+        "autres_taches": [(rubrique, lignes) for rubrique, lignes in rubriques.items() if rubrique not in RUBRIQUES_DOSSIERS],
+        "derniers_baux": Bail.objects.select_related("propriete__bailleur").prefetch_related("locataires").order_by("-modifie_le")[:5],
+        "locations": locations, "taches": list(rubriques.items()), "nb_taches": len(a_faire),
         "nb_urgentes": sum(tache.urgent for tache in a_faire),
-        "nb_proprietes": Propriete.objects.filter(actif=True).count(),
-        "nb_baux": Bail.objects.filter(date_fin_effective__isnull=True).count(),
-        "nb_candidatures": Candidature.objects.filter(statut=Candidature.Statut.A_ETUDIER).count(),
-        "nb_mandats": Mandat.objects.filter(date_fin__isnull=True).count(),
     })
 
 

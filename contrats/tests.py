@@ -603,11 +603,13 @@ class VuesTests(Donnees, TestCase):
         self.assertEqual((lignes[a_signer.pk]["action"], lignes[a_signer.pk]["lien"]),
                          ("Ouvrir le bail", bail.get_absolute_url()))
         self.assertEqual((lignes[a_relouer.pk]["etape"], lignes[a_relouer.pk]["action"]),
-                         ("Départ annoncé", "Mettre en location"))
+                         ("Remettre en location", "Mettre en location"))
         Propriete.objects.filter(pk=a_relouer.pk).update(mise_en_location_le=aujourd_hui, disponible_le=aujourd_hui)
         page = self.client.get(reverse("accueil"))
         ligne = next(l for l in page.context["locations"] if l["propriete"].pk == a_relouer.pk)
-        self.assertEqual((ligne["etape"], ligne["action"]), ("À louer, aucune candidature", "Enregistrer une candidature"))
+        self.assertEqual((ligne["etape"], ligne["action"]), ("Enregistrer une candidature", "Enregistrer une candidature"))
+        # Le congé reçu donne la date à laquelle le logement sera libre.
+        self.assertEqual(ligne["detail"], f"libre le {aujourd_hui + dt.timedelta(days=30):%d/%m/%Y}")
 
     def test_liste_des_contrats_baux_et_mandats(self):
         """La rubrique Contrats réunit les deux sous-types, filtrables."""
