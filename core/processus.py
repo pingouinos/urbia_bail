@@ -198,13 +198,3 @@ def processus_bail(bail, alertes=None):
     _marquer(etapes, rang)
     return Processus("Bail", etapes, rang, termine=bool(bail.date_fin_effective))
 
-
-def vue_ensemble(processus, libelles):
-    """Nombre de dossiers arrêtés à chaque étape, pour la frise du tableau de
-    bord : [(libellé, nombre)]."""
-    comptes = dict.fromkeys(libelles, 0)
-    for p in processus:
-        courante = p.courante
-        if courante and courante.libelle in comptes:
-            comptes[courante.libelle] += 1
-    return list(comptes.items())

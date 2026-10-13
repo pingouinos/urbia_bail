@@ -20,9 +20,6 @@ from .processus import processus_mandat
 
 # Rubriques, dans l'ordre d'affichage.
 RUBRIQUES = ["Mises en location", "Loyers", "Mandats", "Candidatures", "Baux", "Documents", "Fiches à compléter"]
-# Rubriques dont chaque ligne est un dossier qui suit un processus : le tableau
-# de bord range leurs lignes sous les étapes de ce processus.
-RUBRIQUES_DOSSIERS = ["Mises en location", "Mandats"]
 # Un diagnostic est signalé un peu avant sa fin de validité.
 PREAVIS_VALIDITE = dt.timedelta(days=60)
 
@@ -56,10 +53,12 @@ def taches(locations):
     """Toutes les actions en attente. `locations` est le suivi des mises en
     location déjà calculé pour le tableau de bord."""
     aujourd_hui = timezone.localdate()
+    # Les mises en location les plus avancées d'abord : ce sont les plus
+    # proches d'un loyer.
     liste = [
         Tache("Mises en location", ligne["etape"], _adresse(ligne["propriete"]), ligne["lien"], ligne["action"],
               detail=ligne["detail"], processus=ligne.get("processus"))
-        for ligne in locations
+        for ligne in sorted(locations, key=lambda ligne: -ligne["processus"].rang if ligne.get("processus") else 0)
     ]
 
     # Mandats : à faire signer, dossier de pièces à compléter. Les dossiers à
@@ -80,7 +79,7 @@ def taches(locations):
             ))
         elif manquantes:
             a_completer.setdefault(mandat.propriete.bailleur, []).append((mandat, manquantes))
-    for bailleur, groupe in a_completer.items():
+    for bailleur, groupe in sorted(a_completer.items(), key=lambda item: -len(item[1])):
         if len(groupe) == 1:
             mandat, manquantes = groupe[0]
             liste.append(Tache(
@@ -91,9 +90,14 @@ def taches(locations):
             ))
         else:
             numeros = ", ".join(str(mandat.numero) for mandat, _ in groupe)
+            du_bailleur = [
+                ligne for ligne in groupe[0][0].dossier
+                if ligne["du_bailleur"] and ligne["obligatoire"] and (ligne["piece"] is None or ligne["piece"].perime)
+            ]
             liste.append(Tache(
-                "Mandats", f"Compléter {len(groupe)} dossiers de mandat", f"{bailleur} · mandats n° {numeros}",
+                "Mandats", f"Compléter {len(groupe)} dossiers {de(str(bailleur))}", f"Mandats n° {numeros}",
                 bailleur.get_absolute_url(), "Voir le bailleur",
+                detail=f"{_nb_pieces(len(du_bailleur))} du bailleur à fournir" if du_bailleur else "",
                 processus=processus_mandat(*groupe[0]),
             ))
     sous_mandat = Mandat.objects.filter(date_fin__isnull=True).values("propriete")

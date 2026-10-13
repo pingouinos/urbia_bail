@@ -403,7 +403,7 @@ button.lien.lien-danger { color: var(--erreur); }
 
 /* Liste des actions en attente, sur le tableau de bord. */
 .compteur { display: inline-block; min-width: 1.6em; padding: 1px 8px; border-radius: 999px; background: var(--acier); color: #fff; font-size: 0.8rem; text-align: center; vertical-align: middle; }
-.rubrique-taches { margin: 18px 0 6px; font-size: 0.95rem; }
+.rubrique-taches { margin: 14px 0 2px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--discret); }
 
 /* En tête de page : fil d'Ariane à gauche, actions de la fiche à droite. */
 .barre-fiche { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 14px; }
@@ -484,28 +484,38 @@ button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erre
   .frise .frise-texte { padding-top: 5px; }
 }
 
-/* Tableau de bord : les actions rangées sous les étapes du processus, sur un
-   seul fil vertical. Le point porte le nombre de dossiers arrêtés à l'étape. */
+/* Tableau de bord : les compteurs de l'accueil en pastilles, puis une seule
+   liste d'actions rangée par sujet. Chaque ligne porte à droite l'étape où
+   attend son dossier : une barre (étapes faites en vert, l'étape en cours en
+   corail) et le nom de l'étape. */
+.accroche .puces { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.puce { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid #fbd9cb; border-radius: 999px; background: var(--carte); font-size: 0.85rem; font-weight: 600; }
+.puce b { font-variant-numeric: tabular-nums; }
+.puce-ok { border-color: var(--vert); background: var(--vert-clair); }
+.puce-retard { border-color: #f3c3bf; background: var(--erreur-clair); color: var(--erreur); }
 .titre-compte { display: flex; align-items: center; gap: 8px; }
-.fil-etapes { display: grid; margin: 4px 0 0; padding: 0; list-style: none; }
-.fil-etapes > li { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 12px; padding-bottom: 10px; }
-.fil-etapes > li:last-child { padding-bottom: 0; }
-.fil-etapes > li:not(:last-child)::before { content: ""; position: absolute; left: 13px; top: 26px; bottom: -2px; width: 2px; background: var(--bord); }
-.fil-point { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--bord); border-radius: 50%; background: var(--carte); color: var(--discret); font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.fil-etapes .avec-actions .fil-point { border-color: var(--acier); background: var(--acier); color: #fff; }
-.fil-etape { padding-top: 3px; font-weight: 700; }
-.fil-etapes .sans-action .fil-etape { font-weight: 500; color: var(--discret); }
-.fil-etape small { margin-left: 6px; font-size: 0.82rem; font-weight: 500; color: var(--discret); }
-.fil-etapes .lignes-taches { grid-column: 2; margin-top: 2px; }
 .lignes-taches { margin: 0; padding: 0; list-style: none; }
 .lignes-taches > li + li { border-top: 1px solid var(--bord); }
-.ligne-tache { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 8px; border-radius: 8px; color: var(--texte); }
+.ligne-tache { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 4px 12px; padding: 10px 6px; border-radius: 8px; color: var(--texte); }
 .ligne-tache:hover { background: var(--melon-clair); color: var(--texte); }
+.ligne-tache-icone { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #eef0f5; color: var(--acier); }
+.ligne-tache-icone.icone-location { background: var(--melon-clair); }
 .ligne-tache-texte { display: grid; gap: 1px; min-width: 0; }
 .ligne-tache-titre { font-weight: 600; }
 .ligne-tache-texte .discret { font-size: 0.88rem; overflow-wrap: anywhere; }
-.ligne-tache-fleche { color: var(--discret); font-size: 1.25rem; line-height: 1; }
-.lignes-taches + .lignes-taches, .fil-etapes + .lignes-taches { margin-top: 8px; border-top: 1px solid var(--bord); padding-top: 4px; }
+.ligne-tache-etape { grid-column: 3; display: grid; justify-items: end; gap: 3px; font-size: 0.78rem; color: var(--discret); white-space: nowrap; }
+.barre-etapes { display: inline-grid; grid-auto-flow: column; gap: 3px; }
+.barre-etapes i { display: block; width: 12px; height: 5px; border-radius: 3px; background: var(--bord); }
+.barre-etapes .etape-faite, .barre-etapes .etape-sautee { background: var(--vert); }
+.barre-etapes .etape-courante { background: var(--corail); }
+.barre-etapes .etape-alerte { background: var(--erreur); }
+.ligne-tache-fleche { grid-column: 4; color: var(--discret); font-size: 1.25rem; line-height: 1; }
+@media (max-width: 760px) {
+  .ligne-tache { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .ligne-tache-icone { align-self: start; margin-top: 2px; }
+  .ligne-tache-etape { grid-column: 2; grid-row: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ligne-tache-fleche { grid-column: 3; grid-row: 1 / span 2; }
+}
 .derniers-contrats { margin: 0; padding: 0; list-style: none; }
 .derniers-contrats > li + li { border-top: 1px solid var(--bord); }
 .derniers-contrats > li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 0; }
