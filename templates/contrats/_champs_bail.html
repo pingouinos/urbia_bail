@@ -1,0 +1,71 @@
+{% comment %}
+Les champs du bail (étape « Bail ») : locataires, puis les sections du
+formulaire. Partagés par la rédaction d'un bail et la page de ses étapes.
+Paramètres : form (BailForm), locataires (LocataireFormSet).
+{% endcomment %}
+  <fieldset>
+    <legend>Locataires</legend>
+    {{ locataires.management_form }}
+    {% for erreur in locataires.non_form_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
+    <div id="locataires" class="pleine-largeur">
+      {% for sous_form in locataires %}{% include "contrats/_locataire.html" with numero=forloop.counter %}{% endfor %}
+    </div>
+    <template id="modele-locataire">{% include "contrats/_locataire.html" with sous_form=locataires.empty_form numero="__numero__" nouveau=True %}</template>
+    <div class="pleine-largeur ajout-locataire">
+      <button type="button" class="bouton-ajout" id="ajouter-locataire" hidden>+ Ajouter un locataire</button>
+      <small class="discret">Jusqu'à six locataires, qui signent le même bail.</small>
+    </div>
+    <div id="champ-colocation" class="pleine-largeur">{% include "proprietes/_champ.html" with champ=form.colocation %}</div>
+  </fieldset>
+  {% for section in form.sections %}
+  {% if section.repliee %}
+  <details class="section-repliee"{% if section.en_erreur %} open{% endif %}>
+    <summary>{{ section.titre }}</summary>
+    <fieldset>
+  {% else %}
+    <fieldset>
+      <legend>{{ section.titre }}</legend>
+  {% endif %}
+      {% if section.titre == "Précédent locataire (zone tendue)" %}<p class="discret pleine-largeur">En zone tendue, si le précédent locataire est parti depuis moins de 18 mois, le bail doit indiquer son dernier loyer.</p>{% endif %}
+      {% if section.titre == "Mandat et honoraires de location" %}<p class="discret pleine-largeur">Repris du mandat de gestion en cours ; à modifier seulement pour ce bail.</p>{% endif %}
+      {% for champ in section.champs %}{% include "proprietes/_champ.html" %}{% endfor %}
+    </fieldset>
+  {% if section.repliee %}</details>{% endif %}
+  {% endfor %}
+<script>
+  // Ajout d'un locataire sans recharger la page : copie du modèle vide du
+  // formulaire, numérotée à la suite.
+  (function () {
+    var total = document.getElementById("id_locataires-TOTAL_FORMS");
+    var maximum = parseInt(document.getElementById("id_locataires-MAX_NUM_FORMS").value, 10);
+    var liste = document.getElementById("locataires");
+    var modele = document.getElementById("modele-locataire");
+    var bouton = document.getElementById("ajouter-locataire");
+    var colocation = document.getElementById("champ-colocation");
+    function nombre() { return liste.querySelectorAll(".sous-formulaire:not([hidden])").length; }
+    function majAffichage() {
+      bouton.hidden = parseInt(total.value, 10) >= maximum;
+      colocation.hidden = nombre() < 2 && !colocation.querySelector("input").checked;
+    }
+    bouton.addEventListener("click", function () {
+      var index = parseInt(total.value, 10);
+      liste.insertAdjacentHTML("beforeend",
+        modele.innerHTML.replace(/__prefix__/g, index).replace(/__numero__/g, nombre() + 1));
+      total.value = index + 1;
+      liste.lastElementChild.querySelector("select, input:not([type=hidden])").focus();
+      majAffichage();
+    });
+    liste.addEventListener("click", function (evenement) {
+      if (!evenement.target.classList.contains("retirer-locataire")) return;
+      // Une ligne vidée est ignorée à l'enregistrement.
+      var bloc = evenement.target.closest(".sous-formulaire");
+      bloc.querySelectorAll("input:not([type=hidden]), select, textarea").forEach(function (champ) { champ.value = ""; });
+      bloc.hidden = true;
+      liste.querySelectorAll(".sous-formulaire:not([hidden]) .sous-titre").forEach(function (titre, i) {
+        titre.textContent = "Locataire " + (i + 1);
+      });
+      majAffichage();
+    });
+    majAffichage();
+  })();
+</script>

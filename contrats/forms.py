@@ -1,10 +1,11 @@
 from django import forms
+from django.utils import timezone
 
 from proprietes.forms import NouveauBailleurForm, RefIcsVideEnNullMixin
 from proprietes.models import Bailleur, Propriete
 from documents.forms import SignatureMixin
 
-from .models import Bail, Locataire
+from .models import Bail, Locataire, ajouter_mois
 
 DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
@@ -23,12 +24,14 @@ def verifier_fin(form, donnees):
 class BailForm(forms.ModelForm):
     class Meta:
         model = Bail
-        exclude = ["cree_le", "modifie_le", "fichier_signe", "date_signature"]
+        # La signature, le congé et le départ ont leur propre étape et leur
+        # propre formulaire (SignatureForm, FinBailForm).
+        exclude = [
+            "cree_le", "modifie_le", "fichier_signe", "date_signature",
+            "conge_origine", "conge_recu_le", "date_depart_prevue", "date_fin_effective",
+        ]
         widgets = {
-            **{nom: DATE for nom in (
-                "date_effet", "precedent_date_versement", "precedent_date_revision",
-                "conge_recu_le", "date_depart_prevue", "date_fin_effective",
-            )},
+            **{nom: DATE for nom in ("date_effet", "precedent_date_versement", "precedent_date_revision")},
             "garants": forms.Textarea(attrs={"rows": 2}),
             "travaux": forms.Textarea(attrs={"rows": 2}),
             "conditions_particulieres": forms.Textarea(attrs={"rows": 3}),
@@ -51,9 +54,7 @@ class BailForm(forms.ModelForm):
             "precedent_loyer", "precedent_date_versement", "precedent_date_revision", "travaux",
         ], True),
         ("Conditions particulières", ["conditions_particulieres"], True),
-        ("Fin du bail", ["conge_origine", "conge_recu_le", "date_depart_prevue", "date_fin_effective"], True),
     ]
-    FIN = ("conge_origine", "conge_recu_le", "date_depart_prevue", "date_fin_effective")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -64,11 +65,8 @@ class BailForm(forms.ModelForm):
         if self.instance.pk:
             self.fields["propriete"].disabled = True
         else:
-            # Le logement est choisi à l'étape précédente, et un bail en cours
-            # de rédaction n'a pas encore de fin.
+            # Le logement est choisi à l'étape précédente.
             self.fields["propriete"].widget = forms.HiddenInput()
-            for nom in self.FIN:
-                del self.fields[nom]
 
     def sections(self):
         sections = []
@@ -93,7 +91,6 @@ class BailForm(forms.ModelForm):
         propriete, mandat = donnees.get("propriete") or self.instance.propriete, donnees.get("mandat")
         if mandat and propriete and mandat.propriete_id != propriete.pk:
             self.add_error("mandat", "Ce mandat concerne un autre bien.")
-        verifier_fin(self, donnees)
         # Un logement déjà loué ne se reloue qu'une fois le congé reçu, et
         # après le départ du locataire en place.
         if propriete and donnees.get("date_effet"):
@@ -159,6 +156,20 @@ LocataireFormSet = forms.inlineformset_factory(
     Bail, Locataire, form=LocataireForm, extra=0, max_num=6, validate_max=True,
     min_num=1, validate_min=True, can_delete=True,
 )
+
+
+def initial_fin(bail):
+    """Ce que le départ du locataire propose d'avance : le congé reçu ce jour
+    et la fin du préavis, puis, le préavis fini, le départ à la date prévue."""
+    aujourd_hui = timezone.localdate()
+    if not bail.conge_recu_le:
+        return {
+            "conge_origine": Bail.Origine.LOCATAIRE, "conge_recu_le": aujourd_hui,
+            "date_depart_prevue": ajouter_mois(aujourd_hui, bail.mois_preavis),
+        }
+    if not bail.date_fin_effective and bail.date_depart_prevue <= aujourd_hui:
+        return {"date_fin_effective": bail.date_depart_prevue}
+    return {}
 
 
 class FinBailForm(forms.ModelForm):

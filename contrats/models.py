@@ -224,6 +224,18 @@ class Bail(Contrat):
         return self.date_fin_effective is None
 
     @property
+    def signature_retirable(self):
+        """Retour de l'entrée à la signature : la signature se retire tant
+        que le locataire n'est pas entré dans les lieux, et le bail redevient
+        modifiable."""
+        return self.signe and self.en_cours and not self.conge_recu_le and self.date_effet > timezone.localdate()
+
+    @property
+    def conge_annulable(self):
+        """Retour de la sortie à la location : tant que le locataire n'est pas parti."""
+        return bool(self.conge_recu_le) and self.en_cours
+
+    @property
     def parties(self):
         return self.noms_locataires
 
