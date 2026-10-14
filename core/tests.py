@@ -366,7 +366,14 @@ class ProcessusTests(TestCase):
         bail = self.donnees.creer_bail(propriete=self.propriete, date_effet=dt.date(2026, 11, 1))
         aujourd_hui = dt.date(2026, 10, 12)
         with mock.patch("django.utils.timezone.localdate", return_value=aujourd_hui):
-            self.assertEqual(processus_bail(bail, alertes=["DPE manquant"]).courante.libelle, "Rédaction")
+            # Une seule frise, de la mise en location à la sortie : un bail
+            # repris sans candidature n'a rien à montrer avant sa rédaction.
+            processus = processus_bail(bail, alertes=["DPE manquant"])
+            self.assertEqual([etape.libelle for etape in processus.etapes], [
+                "Mise en location", "Candidatures", "Bail", "Signature", "Entrée dans les lieux",
+                "Location en cours", "Sortie"])
+            self.assertEqual(self.etats(processus)[:3], ["sautee", "sautee", "courante"])
+            self.assertEqual(processus.etapes[2].detail, "1 point à vérifier")
             self.assertEqual(processus_bail(bail, alertes=[]).courante.libelle, "Signature")
             bail.date_signature = dt.date(2026, 10, 10)
             processus = processus_bail(bail)
@@ -376,7 +383,9 @@ class ProcessusTests(TestCase):
             self.assertEqual(processus_bail(bail).courante.libelle, "Location en cours")
             bail.conge_recu_le, bail.date_depart_prevue = dt.date(2027, 1, 5), dt.date(2027, 4, 5)
         with mock.patch("django.utils.timezone.localdate", return_value=dt.date(2027, 2, 1)):
-            self.assertEqual(processus_bail(bail).courante.libelle, "Préavis")
+            processus = processus_bail(bail)
+            self.assertEqual(processus.courante.libelle, "Sortie")
+            self.assertEqual(processus.courante.detail, "congé du locataire reçu le 05/01/2027")
         with mock.patch("django.utils.timezone.localdate", return_value=dt.date(2027, 5, 1)):
             # Départ prévu passé et non confirmé : la sortie est en retard.
             processus = processus_bail(bail)
@@ -390,10 +399,10 @@ class ProcessusTests(TestCase):
         self.propriete.mise_en_location_le = self.propriete.disponible_le = timezone.localdate()
         processus = processus_location(self.propriete, a_etudier=2)
         self.assertEqual(processus.courante.libelle, "Candidatures")
-        self.assertEqual(processus.etapes[2].detail, "2 à étudier")
+        self.assertEqual(processus.etapes[1].detail, "2 à étudier")
         # Le mandat manque alors que la location avance : il est signalé.
-        self.assertEqual(processus.etapes[0].etat, "alerte")
-        self.assertTrue(processus.en_alerte)
+        self.assertTrue(processus.sans_mandat)
+        self.assertFalse(processus_location(self.propriete, mandat=Mandat(), a_etudier=2).sans_mandat)
         # Sur le tableau de bord aussi, à côté de l'action.
         self.propriete.save()
         attribuer_role(utilisateur := User.objects.create_user("elodie", password="x"), ADMINISTRATEURS)
@@ -417,18 +426,20 @@ class ProcessusTests(TestCase):
         self.assertContains(accueil, '<span class="puce"><b>1</b> mandat à finaliser</span>', html=True)
         self.assertContains(accueil, "Aucun retard")
         page = self.client.get(bail.get_absolute_url())
-        # Le bail à faire signer porte les étapes du bail, comme sa fiche.
+        # Une seule frise : le bail à faire signer est à la même étape sur le
+        # tableau de bord, sa fiche et celle du logement.
         etape = page.context["processus"]
         self.assertEqual(etape.courante.libelle, "Signature")
-        self.assertContains(accueil, f"Signature · {etape.rang}/{len(etape.etapes)}")
+        self.assertContains(accueil, "Signature · 4/7")
+        self.assertEqual(self.client.get(self.propriete.get_absolute_url()).context["location"].rang, etape.rang)
         self.assertEqual(rubriques["Mises en location"][0].processus.rang, etape.rang)
         self.assertContains(page, "Avancement du bail")
         self.assertContains(page, 'aria-current="step"')
         self.assertContains(self.client.get(mandat.get_absolute_url()), "Avancement du mandat")
-        self.assertContains(self.client.get(self.propriete.get_absolute_url()), 'aria-label="Mise en location : étapes"')
+        self.assertContains(self.client.get(self.propriete.get_absolute_url()), 'aria-label="Location : étapes"')
         # Logement loué : la fiche montre la frise du bail en cours.
         import datetime as dt
 
         loue = self.donnees.creer_propriete(adresse="3 rue du Taur")
         self.donnees.creer_bail(propriete=loue, date_effet=dt.date(2025, 1, 1), date_signature=dt.date(2024, 12, 20))
-        self.assertContains(self.client.get(loue.get_absolute_url()), 'aria-label="Bail : étapes"')
+        self.assertContains(self.client.get(loue.get_absolute_url()), 'aria-label="Location : étapes"')
