@@ -63,7 +63,10 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
   {% endif %}
 
   {% elif numero == 2 %}
-  {% if mode == "ouverte" %}
+  {% if mode == "ouverte" and signature.active %}
+  {% url 'mandats:deposer_signe' mandat.pk as deposer %}{% url 'mandats:pdf' mandat.pk as pdf %}
+  {% include "signatures/_etape.html" with contrat=mandat type="mandat" deposer=deposer pdf=pdf completer=mandat.propriete.bailleur.get_absolute_url %}
+  {% elif mode == "ouverte" %}
   <p class="ligne-etape">Le mandat à faire signer : <a href="{% url 'mandats:pdf' mandat.pk %}">PDF</a> ou <a href="{% url 'mandats:word' mandat.pk %}">Word</a>. La date s'enregistre une fois le mandat signé par le mandant ; le scan peut attendre.</p>
   <form method="post" enctype="multipart/form-data" action="{% url 'mandats:deposer_signe' mandat.pk %}" id="form-signature">
     {% csrf_token %}

@@ -600,3 +600,25 @@ button.secondaire.bouton-danger[type=submit]:hover { background: var(--erreur-cl
 .derniers-contrats > li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 0; }
 .derniers-contrats > li > a:first-child { display: grid; min-width: 0; color: var(--texte); }
 .derniers-contrats > li > a:first-child:hover strong { color: var(--lien-survol); }
+
+/* Signature électronique : une ligne par signataire, dans l'ordre où ils signent. */
+.signataires { list-style: none; margin: 0; padding: 0; border: 1px solid var(--bord); border-radius: 8px; }
+.signataires li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 9px 12px; }
+.signataires li + li { border-top: 1px solid var(--bord); }
+.signataire-ordre { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #f2f0ef; color: var(--discret); font-size: 0.8rem; font-weight: 700; }
+.signataire-qui { display: grid; min-width: 0; }
+.signataire-qui span { color: var(--discret); font-size: 0.88rem; overflow-wrap: anywhere; }
+.signataire-qui span.erreur { color: var(--erreur); font-weight: 600; }
+.signataire-etat { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.signataire-etat form { margin: 0; }
+.signataire-etat small { color: var(--discret); }
+.signataire-signe { background: var(--vert-clair); border-color: var(--vert); }
+.signataire-ouvert, .signataire-attente { background: var(--melon-clair); border-color: var(--melon); }
+.signataire-refuse { background: var(--erreur-clair); border-color: #f6c9c6; color: var(--erreur); }
+.signature-papier summary { color: var(--lien); font-weight: 600; }
+.boutons-etape button[type=submit][disabled] { opacity: 0.45; cursor: not-allowed; }
+.signature-papier-form { display: grid; gap: 12px; margin-top: 12px; }
+@media (max-width: 640px) {
+  .signataires li { grid-template-columns: 24px minmax(0, 1fr); }
+  .signataire-etat { grid-column: 2; justify-content: flex-start; }
+}

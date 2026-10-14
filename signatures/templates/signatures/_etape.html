@@ -1,0 +1,58 @@
+{% comment %}
+Étape Signature quand la signature électronique est configurée (maquette A,
+« liste des signataires ») : avant l'envoi, qui signe et dans quel ordre ;
+après, où en est chacun, avec une relance par ligne. La signature sur papier
+reste possible par « Signé sur papier ? ».
+Attend : contrat, type (bail ou mandat), signature (signatures.services.etat_etape),
+form_signe, deposer (adresse du dépôt papier), pdf, completer (où ajouter un e-mail manquant).
+{% endcomment %}
+{% if signature.demande %}{% with demande=signature.demande %}
+<p class="ligne-etape">Envoyé en signature le {{ demande.envoyee_le|date:"d/m/Y" }}. Le {{ contrat.TYPE|lower }} signé arrivera ici tout seul, et l'étape se fermera d'elle-même.</p>
+<ol class="signataires">
+  {% for signataire in signature.signataires %}
+  <li>
+    <span class="signataire-ordre" aria-hidden="true">{{ signataire.ordre }}</span>
+    <span class="signataire-qui"><strong>{{ signataire.nom }} · {{ signataire.qualite }}</strong><span>{{ signataire.email }}</span></span>
+    <span class="signataire-etat">
+      <span class="pastille signataire-{{ signataire.statut }}">{% if signataire.signe_le %}Signé le {{ signataire.signe_le|date:"d/m" }}{% else %}{{ signataire.get_statut_display }}{% endif %}</span>
+      {% if signataire.statut != "signe" %}
+      {% if signataire.relance_le %}<small>relancé le {{ signataire.relance_le|date:"d/m" }}</small>{% endif %}
+      <form method="post" action="{% url 'signatures:relancer' signataire.pk %}">{% csrf_token %}<button type="submit" class="bouton-petit secondaire">Relancer</button></form>
+      {% endif %}
+    </span>
+  </li>
+  {% endfor %}
+</ol>
+<form method="post" action="{% url 'signatures:annuler' demande.pk %}" id="form-annuler-signature" onsubmit="return confirm('Annuler l\'envoi ? Les liens reçus ne permettront plus de signer.');">{% csrf_token %}</form>
+<div class="boutons-etape">
+  <button type="submit" form="form-annuler-signature" class="secondaire">Annuler l'envoi</button>
+  <small class="discret">Pour corriger le {{ contrat.TYPE|lower }} : annuler l'envoi, puis revenir à l'étape précédente.</small>
+</div>
+{% endwith %}{% else %}
+{% if signature.precedente %}<p class="message message-erreur">Le dernier envoi, du {{ signature.precedente.envoyee_le|date:"d/m/Y" }}, a été {{ signature.precedente.get_statut_display|lower }}. Il peut repartir ci-dessous.</p>{% endif %}
+<p class="ligne-etape">Le {{ contrat.TYPE|lower }} part en signature électronique, dans cet ordre ; chacun reçoit un e-mail avec son lien. <a href="{{ pdf }}">Voir le PDF</a></p>
+<ol class="signataires">
+  {% for signataire in signature.prevus %}
+  <li>
+    <span class="signataire-ordre" aria-hidden="true">{{ forloop.counter }}</span>
+    <span class="signataire-qui"><strong>{{ signataire.nom }} · {{ signataire.qualite }}</strong><span{% if not signataire.email %} class="erreur"{% endif %}>{{ signataire.email|default:"e-mail manquant" }}</span></span>
+  </li>
+  {% endfor %}
+</ol>
+{% if signature.manques %}<div class="alertes"><ul>{% for manque in signature.manques %}<li>{{ manque }}</li>{% endfor %}</ul>{% if completer %}<p><a href="{{ completer }}">Compléter</a></p>{% endif %}</div>{% endif %}
+<details class="signature-papier">
+  <summary>Signé sur papier ?</summary>
+  <form method="post" enctype="multipart/form-data" action="{{ deposer }}" class="signature-papier-form">
+    {% csrf_token %}
+    <div class="champs-etape">
+      {% include "proprietes/_champ.html" with champ=form_signe.date_signature %}
+      {% include "proprietes/_champ.html" with champ=form_signe.fichier_signe %}
+    </div>
+    <div><button type="submit" class="bouton-petit secondaire">Enregistrer la signature sur papier</button></div>
+  </form>
+</details>
+<form method="post" action="{% url 'signatures:envoyer' type contrat.pk %}" class="boutons-etape">
+  {% csrf_token %}
+  <button type="submit" class="pousse"{% if signature.manques %} disabled{% endif %}>Envoyer en signature à {{ signature.prevus|length }} personne{{ signature.prevus|length|pluralize }} ›</button>
+</form>
+{% endif %}
