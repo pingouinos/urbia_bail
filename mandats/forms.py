@@ -13,9 +13,8 @@ from .models import (
 class MandatForm(forms.ModelForm):
     class Meta:
         model = Mandat
-        exclude = ["cree_le", "modifie_le", "fichier_signe", "date_signature"]
+        exclude = ["cree_le", "modifie_le", "fichier_signe", "date_signature", "date_fin"]
         widgets = {
-            "date_fin": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "designation": forms.Textarea(attrs={"rows": 2}),
             "observations": forms.Textarea(attrs={"rows": 3}),
         }
@@ -26,7 +25,7 @@ class MandatForm(forms.ModelForm):
             "propriete", "mandant", "mandant_adresse", "mandant_code_postal_ville",
             "designation", "adresse_bien", "loyer_cc", "charges",
         ]),
-        ("Durée", ["duree_ans", "reconductions", "date_fin"]),
+        ("Durée", ["duree_ans", "reconductions"]),
         ("Gestion", ["taux_gestion", "base_gestion", "assurance_loyers_impayes", "taux_assurance"]),
         ("Honoraires de location", [
             "honoraires_bail_bailleur", "honoraires_bail_locataire",
@@ -75,6 +74,28 @@ class MandatForm(forms.ModelForm):
             f"({'zone tendue' if tendue else 'hors zone tendue'}) = {montant(plafonds[0])} €",
             f"État des lieux : {surface} m² × {montant(PLAFOND_ETAT_DES_LIEUX)} €/m² = {montant(plafonds[1])} €",
         ]
+
+
+class FinMandatForm(forms.ModelForm):
+    """Fin du mandat (résiliation ou échéance), sans rouvrir tout le mandat."""
+
+    class Meta:
+        model = Mandat
+        fields = ["date_fin"]
+        widgets = {"date_fin": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
+        labels = {"date_fin": "Fin du mandat le"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["date_fin"].required = True
+        if not self.instance.date_fin:
+            self.initial["date_fin"] = timezone.localdate()
+
+    def clean_date_fin(self):
+        date = self.cleaned_data["date_fin"]
+        if self.instance.date_signature and date < self.instance.date_signature:
+            raise forms.ValidationError("La fin du mandat ne peut pas précéder sa signature.")
+        return date
 
 
 class SignatureForm(SignatureMixin, forms.ModelForm):

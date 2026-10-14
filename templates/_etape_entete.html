@@ -1,0 +1,18 @@
+{% comment %}
+En-tête d'une section d'étape : numéro, titre, pastille, puis à droite le
+crayon (l'étape se rouvre), le cadenas (signée) ou « Corriger » (réservé aux
+administrateurs). Paramètres : section (core.processus.sections_etapes),
+signee (« bail signé », « mandat signé »).
+{% endcomment %}
+{% with etape=section.etape numero=section.numero %}
+<header>
+  <span class="etape-bail-numero" aria-hidden="true">{% if etape.etat == "sautee" %}–{% elif etape.etat == "faite" and section.mode == "grisee" %}<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>{% else %}{{ numero }}{% endif %}</span>
+  <h2 id="titre-etape-{{ numero }}">{{ numero }} · {{ etape.libelle }}</h2>
+  <div class="etape-actions">
+    <span class="pastille etat-{{ section.etat }}">{{ section.libelle_etat }}</span>
+    {% if section.verrou %}<span class="verrou" title="Verrouillé, {{ signee }}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg><span class="verrou-texte">verrouillé, {{ signee }}</span></span>{% endif %}
+    {% if section.corriger %}<a class="bouton-petit secondaire" href="?etape={{ numero }}#etape-{{ numero }}">Corriger</a>{% endif %}
+    {% if section.crayon %}<a class="crayon" href="?etape={{ numero }}#etape-{{ numero }}" title="Modifier cette étape" aria-label="Modifier l'étape « {{ etape.libelle }} »"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></a>{% endif %}
+  </div>
+</header>
+{% endwith %}

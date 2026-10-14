@@ -1,20 +1,13 @@
 {% extends "base.html" %}
-{% block titre %}{% if mandat %}Modifier le mandat{% else %}Nouveau mandat{% endif %} · {{ nom_application }}{% endblock %}
+{% block titre %}Nouveau mandat · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span>{% if mandat %}<a href="{{ mandat.get_absolute_url }}">Mandat n° {{ mandat.numero }}</a><span aria-hidden="true">›</span><span class="fil-ici">Modifier</span>{% else %}<a href="{% url 'contrats:choisir' %}">Nouveau contrat</a><span aria-hidden="true">›</span><span class="fil-ici">Mandat de gestion</span>{% endif %}</nav>
-<h1>{% if mandat %}Modifier le mandat n° {{ mandat.numero }}{% else %}Nouveau mandat{% endif %}</h1>
-<p class="discret">{% if mandat %}Corriger le numéro n'est utile que s'il a été mal recopié du registre papier ; la modification est gardée dans l'historique.{% else %}Inscrivez d'abord le mandat au registre papier, puis reportez ici le numéro qu'il y porte.{% endif %} Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><a href="{% url 'contrats:choisir' %}">Nouveau contrat</a><span aria-hidden="true">›</span><span class="fil-ici">Mandat de gestion</span></nav>
+<h1>Nouveau mandat</h1>
+<p class="discret">Inscrivez d'abord le mandat au registre papier, puis reportez ici le numéro qu'il y porte. Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
 <form method="post" class="formulaire">
   {% csrf_token %}
   {{ form.non_field_errors }}
-  {% for titre, champs in form.sections %}
-  <fieldset>
-    <legend>{{ titre }}</legend>
-    {% if titre == "Honoraires de location" and form.base_honoraires %}<p class="pleine-largeur">{% if mandat %}Plafonds légaux pour ce logement{% else %}Calculés automatiquement au plafond légal, à parts égales entre le bailleur et le locataire{% endif %} :{% for calcul in form.base_honoraires %}<br>{{ calcul }}{% endfor %}</p>{% endif %}
-    {% if titre == "Honoraires de location" %}<p class="discret pleine-largeur">La part du locataire ne peut dépasser ni celle du bailleur ni le plafond légal : 10 €/m² en zone tendue (8 €/m² ailleurs) pour la visite, le dossier et le bail, 3 €/m² pour l'état des lieux.</p>{% endif %}
-    {% for champ in champs %}{% include "proprietes/_champ.html" %}{% endfor %}
-  </fieldset>
-  {% endfor %}
+{% include "mandats/_champs_mandat.html" %}
   <button type="submit">Enregistrer</button>
 </form>
 {% endblock %}

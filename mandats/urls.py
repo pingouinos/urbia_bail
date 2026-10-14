@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import views
 
@@ -8,8 +9,11 @@ urlpatterns = [
     path("", views.registre, name="registre"),
     path("registre.xlsx", views.registre_export, name="registre_export"),
     path("nouveau/", views.mandat_editer, name="creer"),
-    path("<int:pk>/", views.mandat, name="mandat"),
-    path("<int:pk>/modifier/", views.mandat_editer, name="modifier"),
+    path("<int:pk>/", views.etapes, name="mandat"),
+    # Ancienne adresse de la page des étapes, gardée pour les liens déjà notés.
+    path("<int:pk>/modifier/", RedirectView.as_view(pattern_name="mandats:mandat", query_string=True), name="modifier"),
+    path("<int:pk>/signature/retirer/", views.retirer_signature, name="retirer_signature"),
+    path("<int:pk>/fin/", views.fin, name="fin"),
     path("<int:pk>/mandat.docx", views.telecharger, {"format_": "docx"}, name="word"),
     path("<int:pk>/mandat.pdf", views.telecharger, {"format_": "pdf"}, name="pdf"),
     path("<int:pk>/signe/", views.deposer_signe, name="deposer_signe"),
