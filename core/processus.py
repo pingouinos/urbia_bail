@@ -116,7 +116,6 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
     else:
         rang = 5 if bail.date_effet > aujourd_hui else 6
 
-    url = bail.get_absolute_url() if bail else ""
     candidature = _candidature(bail) if bail else None
     # La mise en location de ce locataire : la date du logement ne vaut que si
     # elle précède le bail (sinon elle concerne déjà le suivant).
@@ -127,7 +126,7 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
     etapes = [
         Etape("Mise en location", date=mise_en_location,
               detail=f"disponible le {propriete.disponible_le:%d/%m/%Y}" if propriete.disponible_le and not bail else "",
-              lien="" if bail else reverse("proprietes:mettre_en_location", args=[propriete.pk])),
+              lien=reverse("proprietes:mettre_en_location", args=[propriete.pk])),
         Etape("Candidatures",
               detail=(candidature.noms if candidature else "") if bail else (
                   f"{a_etudier} à étudier" if a_etudier else ("aucune pour l'instant" if rang == 2 else "")),
@@ -135,19 +134,22 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
         Etape("Bail", date=_date_redaction(bail) if bail else None,
               detail=_pluriel(len(alertes), "point") + " à vérifier" if alertes else (
                   bail.noms_locataires if bail else (retenue.noms or "candidat retenu") if retenue else ""),
-              lien=url or (f"{reverse('contrats:creer')}?candidature={retenue.pk}" if retenue else "")),
+              lien=f"{reverse('contrats:creer')}?candidature={retenue.pk}" if retenue else ""),
         Etape("Signature", date=bail.date_signature if bail else None,
-              detail=("scan déposé" if bail.fichier_signe else "scan à déposer") if bail and bail.signe else "",
-              lien=(url if bail.signe else reverse("contrats:modifier", args=[bail.pk])) if bail else ""),
+              detail=("scan déposé" if bail.fichier_signe else "scan à déposer") if bail and bail.signe else ""),
         Etape("Entrée dans les lieux", date=bail.date_effet if bail else None,
               prevue=bool(bail) and bail.date_effet > aujourd_hui),
-        Etape("Location en cours", detail=f"{bail.total_mensuel} € par mois".replace(".", ",") if bail else "",
-              lien=f"{url}#loyers" if bail else ""),
+        Etape("Location en cours", detail=f"{bail.total_mensuel} € par mois".replace(".", ",") if bail else ""),
         Etape("Sortie", date=(bail.date_fin_effective or depart or bail.date_fin) if bail else None,
               prevue=bool(bail) and not bail.date_fin_effective,
-              detail=_conge(bail) if bail else "",
-              lien=reverse("contrats:fin", args=[bail.pk]) if bail and not bail.date_fin_effective else ""),
+              detail=_conge(bail) if bail else ""),
     ]
+    if bail:
+        # Depuis un bail, chaque point de la frise ouvre son étape sur la page
+        # des étapes du bail.
+        page = reverse("contrats:modifier", args=[bail.pk])
+        for numero, etape in enumerate(etapes, 1):
+            etape.lien = f"{page}?etape={numero}#etape-{numero}"
     if bail and not candidature:
         # Bail fait sans passer par une candidature (locataire trouvé
         # ailleurs, bail repris à la mise en service) : rien à montrer avant.

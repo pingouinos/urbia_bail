@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block titre %}{% if bail %}Modifier le bail{% else %}Nouveau contrat{% endif %} · {{ nom_application }}{% endblock %}
+{% block titre %}Nouveau contrat · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span>{% if bail %}<a href="{{ bail.get_absolute_url }}">Bail · {{ bail.propriete.adresse }}</a><span aria-hidden="true">›</span><span class="fil-ici">Modifier</span>{% else %}<a href="{% url 'contrats:choisir' %}">Nouveau contrat</a><span aria-hidden="true">›</span><span class="fil-ici">Bail d'habitation</span>{% endif %}</nav>
-<h1>{% if bail %}Modifier le bail{% else %}Nouveau contrat{% endif %}</h1>
-{% if not bail %}{% include "contrats/_etapes.html" with etape=2 %}{% endif %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><a href="{% url 'contrats:choisir' %}">Nouveau contrat</a><span aria-hidden="true">›</span><span class="fil-ici">Bail d'habitation</span></nav>
+<h1>Nouveau contrat</h1>
+{% include "contrats/_etapes.html" with etape=2 %}
 
 {% if logement %}
 <section class="carte logement">
@@ -13,7 +13,7 @@
     <span class="discret">{% with mandat=logement.mandat_en_cours %}{% if mandat %}Mandat n° {{ mandat.numero }} : honoraires repris ci-dessous.{% else %}Aucun mandat de gestion en cours : honoraires à saisir.{% endif %}{% endwith %}</span>
     {% with manquants=logement.champs_manquants_pour_bail %}{% if manquants %}<span class="alerte">Fiche incomplète, le bail aura des blancs : {{ manquants|join:", " }}. <a href="{% url 'proprietes:propriete_modifier' logement.pk %}">Compléter la fiche</a></span>{% endif %}{% endwith %}
   </div>
-  {% if not bail and not candidature %}<a href="{% url 'contrats:creer' %}">Changer de logement</a>{% endif %}
+  {% if not candidature %}<a href="{% url 'contrats:creer' %}">Changer de logement</a>{% endif %}
 </section>
 {% endif %}
 
@@ -24,81 +24,9 @@
   <p class="message">D'après la <a href="{{ candidature.get_absolute_url }}">candidature retenue</a> : vérifier les locataires et compléter l'IRL.</p>{% endif %}
   {% if form.errors or locataires.total_error_count %}<p class="message message-erreur">Certains champs sont à corriger : ils sont signalés en rouge.</p>{% endif %}
   {{ form.non_field_errors }}
-  <fieldset>
-    <legend>Locataires</legend>
-    {{ locataires.management_form }}
-    {% for erreur in locataires.non_form_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
-    <div id="locataires" class="pleine-largeur">
-      {% for sous_form in locataires %}{% include "contrats/_locataire.html" with numero=forloop.counter %}{% endfor %}
-    </div>
-    <template id="modele-locataire">{% include "contrats/_locataire.html" with sous_form=locataires.empty_form numero="__numero__" nouveau=True %}</template>
-    <div class="pleine-largeur ajout-locataire">
-      <button type="button" class="bouton-ajout" id="ajouter-locataire" hidden>+ Ajouter un locataire</button>
-      <small class="discret">Jusqu'à six locataires, qui signent le même bail.</small>
-    </div>
-    <div id="champ-colocation" class="pleine-largeur">{% include "proprietes/_champ.html" with champ=form.colocation %}</div>
-  </fieldset>
-  {% for section in form.sections %}
-  {% if section.repliee %}
-  <details class="section-repliee"{% if section.en_erreur %} open{% endif %}>
-    <summary>{{ section.titre }}</summary>
-    <fieldset>
-  {% else %}
-    <fieldset>
-      <legend>{{ section.titre }}</legend>
-  {% endif %}
-      {% if section.titre == "Précédent locataire (zone tendue)" %}<p class="discret pleine-largeur">En zone tendue, si le précédent locataire est parti depuis moins de 18 mois, le bail doit indiquer son dernier loyer.</p>{% endif %}
-      {% if section.titre == "Mandat et honoraires de location" %}<p class="discret pleine-largeur">Repris du mandat de gestion en cours ; à modifier seulement pour ce bail.</p>{% endif %}
-      {% for champ in section.champs %}{% include "proprietes/_champ.html" %}{% endfor %}
-    </fieldset>
-  {% if section.repliee %}</details>{% endif %}
-  {% endfor %}
+  {% include "contrats/_champs_bail.html" %}
   <div class="barre-actions">
-    <button type="submit">{% if bail %}Enregistrer{% else %}Enregistrer et passer au document{% endif %}</button>
+    <button type="submit">Enregistrer et passer au document</button>
   </div>
 </form>
-{% if bail %}{% if not bail.signe or est_administrateur %}
-<form method="post" action="{% url 'contrats:supprimer' bail.pk %}" class="en-ligne" onsubmit="return confirm('{% if bail.signe %}Ce bail est signé. Le supprimer définitivement, avec son exemplaire signé ?{% else %}Supprimer définitivement ce bail ?{% endif %}');">
-  {% csrf_token %}
-  <button type="submit" class="danger">Supprimer ce bail</button>
-  <small class="discret">{% if bail.signe %}Bail signé : réservé aux administrateurs. Pour y mettre fin normalement, utilisez « Départ du locataire ».{% else %}Bail rédigé par erreur ou resté sans suite. La candidature retenue, s'il y en a une, est conservée.{% endif %}</small>
-</form>
-{% endif %}{% endif %}
-<script>
-  // Ajout d'un locataire sans recharger la page : copie du modèle vide du
-  // formulaire, numérotée à la suite.
-  (function () {
-    var total = document.getElementById("id_locataires-TOTAL_FORMS");
-    var maximum = parseInt(document.getElementById("id_locataires-MAX_NUM_FORMS").value, 10);
-    var liste = document.getElementById("locataires");
-    var modele = document.getElementById("modele-locataire");
-    var bouton = document.getElementById("ajouter-locataire");
-    var colocation = document.getElementById("champ-colocation");
-    function nombre() { return liste.querySelectorAll(".sous-formulaire:not([hidden])").length; }
-    function majAffichage() {
-      bouton.hidden = parseInt(total.value, 10) >= maximum;
-      colocation.hidden = nombre() < 2 && !colocation.querySelector("input").checked;
-    }
-    bouton.addEventListener("click", function () {
-      var index = parseInt(total.value, 10);
-      liste.insertAdjacentHTML("beforeend",
-        modele.innerHTML.replace(/__prefix__/g, index).replace(/__numero__/g, nombre() + 1));
-      total.value = index + 1;
-      liste.lastElementChild.querySelector("select, input:not([type=hidden])").focus();
-      majAffichage();
-    });
-    liste.addEventListener("click", function (evenement) {
-      if (!evenement.target.classList.contains("retirer-locataire")) return;
-      // Une ligne vidée est ignorée à l'enregistrement.
-      var bloc = evenement.target.closest(".sous-formulaire");
-      bloc.querySelectorAll("input:not([type=hidden]), select, textarea").forEach(function (champ) { champ.value = ""; });
-      bloc.hidden = true;
-      liste.querySelectorAll(".sous-formulaire:not([hidden]) .sous-titre").forEach(function (titre, i) {
-        titre.textContent = "Locataire " + (i + 1);
-      });
-      majAffichage();
-    });
-    majAffichage();
-  })();
-</script>
 {% endblock %}

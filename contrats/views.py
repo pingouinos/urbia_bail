@@ -13,14 +13,16 @@ from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from contacts.models import Contact
 from core.journal import noter
-from core.processus import processus_bail
+from core.processus import A_VENIR, ALERTE, COURANTE, FAITE, SAUTEE, processus_bail
 from mandats.models import Mandat
 from documents import views as documents
 
 from django.utils import timezone
 
-from .forms import BailForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm, SignatureForm
-from .models import Bail, Echeance, ajouter_mois
+from .forms import (
+    BailForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm, SignatureForm, initial_fin,
+)
+from .models import Bail, Echeance
 
 MODELE = "bail_habitation.docx"
 # Logements proposés à la fois à l'étape « Logement ».
@@ -174,18 +176,19 @@ def choisir(request):
     return render(request, "contrats/choisir.html")
 
 
-def bail_editer(request, pk=None):
-    objet = get_object_or_404(Bail, pk=pk) if pk else None
+def bail_editer(request):
+    """Rédaction d'un bail : logement, puis locataires et conditions. Un bail
+    déjà rédigé se modifie sur la page de ses étapes (`etapes`)."""
     # Bail rédigé depuis une candidature retenue : logement, date d'entrée et
     # locataires viennent de la fiche du candidat.
     candidature = None
     pk_candidature = request.GET.get("candidature") or request.POST.get("candidature") or ""
-    if objet is None and pk_candidature.isdigit():
+    if pk_candidature.isdigit():
         candidature = get_object_or_404(
             Candidature.objects.select_related("propriete"), statut=Candidature.Statut.RETENUE, bail__isnull=True,
             pk=pk_candidature,
         )
-    if objet is None and request.method == "GET":
+    if request.method == "GET":
         if not request.GET.get("propriete") and not candidature:
             return choisir_logement(request)
         propriete = candidature.propriete if candidature else get_object_or_404(
@@ -214,33 +217,136 @@ def bail_editer(request, pk=None):
             # Une ligne par candidat, sans ligne vide en plus.
             locataires.extra = max(len(initial) - locataires.min_num, 0)
     else:
-        form = BailForm(request.POST or None, instance=objet)
+        form = BailForm(request.POST or None)
         locataires = LocataireFormSet(request.POST or None, instance=form.instance)
         if request.method == "POST" and form.is_valid() and locataires.is_valid():
             if candidature and form.cleaned_data["propriete"] != candidature.propriete:
                 form.add_error("propriete", "La candidature porte sur un autre logement.")
             else:
                 with transaction.atomic():
-                    nouveau = objet is None
                     objet = form.save()
                     locataires.instance = objet
                     locataires.save()
                     if candidature:
                         candidature.bail = objet
                         candidature.save(update_fields=["bail", "modifie_le"])
-                    if nouveau and objet.propriete.a_louer:
+                    if objet.propriete.a_louer:
                         # Le bail rédigé clôt la mise en location.
                         objet.propriete.mise_en_location_le = objet.propriete.disponible_le = None
                         objet.propriete.save(update_fields=["mise_en_location_le", "disponible_le", "modifie_le"])
-                if nouveau:
-                    request.session["bail_cree"] = objet.pk
-                else:
-                    messages.success(request, "Bail enregistré.")
+                request.session["bail_cree"] = objet.pk
                 return redirect(objet)
     return render(request, "contrats/bail_form.html", {
-        "form": form, "locataires": locataires, "bail": objet, "candidature": candidature,
+        "form": form, "locataires": locataires, "candidature": candidature,
         "logement": form.instance.propriete if form.instance.propriete_id else None,
     })
+
+
+# L'état d'une étape, en tête de sa section.
+ETATS_ETAPE = {FAITE: "Fait", SAUTEE: "Sans objet", COURANTE: "En cours", ALERTE: "À vérifier", A_VENIR: "À venir"}
+
+
+def vers_etapes(bail, etape=None):
+    """La page des étapes du bail, à l'étape demandée ou à l'étape en cours."""
+    url = reverse("contrats:modifier", args=[bail.pk])
+    if etape:
+        return f"{url}?etape={etape}#etape-{etape}"
+    return f"{url}#etape-{min(processus_bail(bail).rang, 7)}"
+
+
+def etape_ouverte(bail, rang, demandee, administrateur):
+    """L'étape dont les champs s'ouvrent : l'étape en cours, ou une étape où
+    l'on peut revenir. Un bail non signé se reprend à tout moment ; signé, il
+    est verrouillé, sauf pour un administrateur une fois le locataire entré
+    (la signature ne se retire plus). Un congé s'enregistre depuis la
+    location en cours. None : bail terminé, plus rien à remplir."""
+    possibles = set()
+    if not bail.signe:
+        possibles.add(3)
+        if rang <= 4:
+            possibles.add(4)
+    elif administrateur and rang >= 6:
+        possibles.add(3)
+    if rang == 6:
+        possibles.add(7)
+    demandee = int(demandee) if str(demandee).isdigit() else None
+    if demandee in possibles:
+        return demandee
+    return rang if rang <= 7 else None
+
+
+def etapes(request, pk):
+    """Le bail étape par étape, comme sa frise : une section par étape, les
+    étapes faites grisées, l'étape ouverte avec ses champs et ses flèches
+    (‹ revenir à l'étape précédente quand c'est possible, › enregistrer et
+    passer à la suivante). Les champs du bail lui-même s'enregistrent ici ;
+    la signature et le départ ont leur propre vue."""
+    objet = get_object_or_404(Bail.objects.select_related("propriete__bailleur", "mandat"), pk=pk)
+    administrateur = est_administrateur(request.user)
+    form = BailForm(request.POST or None, instance=objet)
+    locataires = LocataireFormSet(request.POST or None, instance=objet)
+    if request.method == "POST":
+        if objet.signe and not administrateur:
+            messages.error(request, "Ce bail est signé : pour le corriger, revenir d'abord à la signature.")
+            return redirect(vers_etapes(objet))
+        if form.is_valid() and locataires.is_valid():
+            with transaction.atomic():
+                form.save()
+                locataires.save()
+            messages.success(request, "Bail enregistré.")
+            # › Étape suivante : la signature, si le bail l'attend encore.
+            return redirect(vers_etapes(objet, 4 if processus_bail(objet).rang <= 4 else None))
+    processus = processus_bail(objet)
+    ouverte = 3 if form.is_bound else etape_ouverte(objet, processus.rang, request.GET.get("etape"), administrateur)
+    # Revenir sur le bail (avant signature) le fait repasser « à venir » ;
+    # le corriger (administrateur, bail signé) laisse les étapes comme elles sont.
+    correction = ouverte == 3 and objet.signe
+    sections = []
+    for numero, etape in enumerate(processus.etapes, 1):
+        if numero == ouverte:
+            mode, etat = "ouverte", "alerte" if etape.etat == ALERTE else "courante"
+        elif numero < (processus.rang + 1 if correction else ouverte or 8):
+            mode, etat = "grisee", etape.etat
+        else:
+            mode, etat = "a-venir", A_VENIR
+        sections.append({"numero": numero, "etape": etape, "mode": mode, "etat": etat, "libelle_etat": ETATS_ETAPE[etat]})
+    return render(request, "contrats/etapes.html", {
+        "bail": objet, "processus": processus, "sections": sections, "ouverte": ouverte, "correction": correction,
+        "form": form, "locataires": locataires,
+        "form_signe": SignatureForm(instance=objet),
+        "form_fin": FinBailForm(instance=objet, initial=initial_fin(objet)),
+        "candidature": Candidature.objects.filter(bail=objet).prefetch_related("candidats").first(),
+    })
+
+
+@require_POST
+def retirer_signature(request, pk):
+    """‹ De l'entrée à la signature : la date de signature est retirée (le
+    scan reste), et le bail redevient modifiable. Plus possible une fois le
+    locataire entré."""
+    objet = get_object_or_404(Bail, pk=pk)
+    if not objet.signature_retirable:
+        messages.error(request, "Le locataire est entré dans les lieux : la signature ne se retire plus.")
+    else:
+        objet.date_signature = None
+        objet.save(update_fields=["date_signature", "modifie_le"])
+        messages.success(request, "Signature retirée : le bail est de nouveau modifiable.")
+    return redirect(vers_etapes(objet))
+
+
+@require_POST
+def annuler_conge(request, pk):
+    """‹ De la sortie à la location en cours : le congé est annulé, tant que
+    le locataire n'est pas parti."""
+    objet = get_object_or_404(Bail.objects.select_related("propriete"), pk=pk)
+    if not objet.conge_annulable:
+        messages.error(request, "Il n'y a pas de congé à annuler sur ce bail.")
+        return redirect(vers_etapes(objet))
+    objet.conge_origine, objet.conge_recu_le, objet.date_depart_prevue = "", None, None
+    objet.save(update_fields=["conge_origine", "conge_recu_le", "date_depart_prevue", "modifie_le"])
+    suite = " Le logement reste proposé à la location : la retirer depuis sa fiche si besoin." if objet.propriete.a_louer else ""
+    messages.success(request, "Congé annulé : la location continue." + suite)
+    return redirect(vers_etapes(objet))
 
 
 def choisir_logement(request):
@@ -289,16 +395,7 @@ def fin(request, pk):
     """Départ du locataire en une page : le congé reçu et la fin du préavis
     sont proposés d'avance, puis le départ effectif une fois le préavis fini."""
     objet = get_object_or_404(Bail.objects.select_related("propriete"), pk=pk)
-    aujourd_hui = timezone.localdate()
-    initial = {}
-    if not objet.conge_recu_le:
-        initial = {
-            "conge_origine": Bail.Origine.LOCATAIRE, "conge_recu_le": aujourd_hui,
-            "date_depart_prevue": ajouter_mois(aujourd_hui, objet.mois_preavis),
-        }
-    elif not objet.date_fin_effective and objet.date_depart_prevue <= aujourd_hui:
-        initial = {"date_fin_effective": objet.date_depart_prevue}
-    form = FinBailForm(request.POST or None, instance=objet, initial=initial)
+    form = FinBailForm(request.POST or None, instance=objet, initial=initial_fin(objet))
     if request.method == "POST" and form.is_valid():
         objet = form.save()
         if objet.date_fin_effective:
@@ -311,7 +408,7 @@ def fin(request, pk):
         if (objet.conge_recu_le or objet.date_fin_effective) and not propriete.a_louer and not propriete.situation.a_venir:
             # Le départ ouvre la mise en location du logement.
             return redirect("proprietes:mettre_en_location", pk=propriete.pk)
-        return redirect(propriete)
+        return redirect(vers_etapes(objet) if request.POST.get("etapes") else propriete)
     return render(request, "contrats/fin.html", {"bail": objet, "form": form})
 
 
@@ -362,7 +459,7 @@ def deposer_signe(request, pk):
         for erreurs in form.errors.values():
             for erreur in erreurs:
                 messages.error(request, erreur)
-    return redirect(f"{objet.get_absolute_url()}#signature")
+    return redirect(vers_etapes(objet) if request.POST.get("etapes") else f"{objet.get_absolute_url()}#signature")
 
 
 def fichier_signe(request, pk):

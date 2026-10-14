@@ -50,6 +50,21 @@ class Donnees:
                                      date_naissance=dt.date(1995, 4, 2), lieu_naissance="Albi")
         return bail
 
+    def donnees_bail(self, propriete, noms):
+        donnees = {
+            "propriete": propriete.pk, "type": "nu", "date_effet": "2026-11-01", "lieu_signature": "Toulouse",
+            "loyer": "700", "mode_charges": "provision", "charges": "50", "jour_paiement": "1",
+            "depot_garantie": "700", "irl_trimestre": "2e trimestre 2026", "irl_valeur": "146.68",
+            "honoraires_bail_bailleur": "0", "honoraires_bail_locataire": "0",
+            "honoraires_edl_bailleur": "0", "honoraires_edl_locataire": "0",
+            "locataires-TOTAL_FORMS": str(len(noms)), "locataires-INITIAL_FORMS": "0",
+            "locataires-MIN_NUM_FORMS": "1", "locataires-MAX_NUM_FORMS": "6",
+        }
+        for i, nom in enumerate(noms):
+            donnees[f"locataires-{i}-nom"] = nom
+            donnees[f"locataires-{i}-prenom"] = "Léa" if nom else ""
+        return donnees
+
 
 class BailTests(Donnees, TestCase):
     def test_ajouter_mois(self):
@@ -381,21 +396,6 @@ class VuesTests(Donnees, TestCase):
         self.assertEqual(Bailleur.objects.count(), 1)
         self.assertEqual(bailleur.proprietes.count(), 2)
 
-    def donnees_bail(self, propriete, noms):
-        donnees = {
-            "propriete": propriete.pk, "type": "nu", "date_effet": "2026-11-01", "lieu_signature": "Toulouse",
-            "loyer": "700", "mode_charges": "provision", "charges": "50", "jour_paiement": "1",
-            "depot_garantie": "700", "irl_trimestre": "2e trimestre 2026", "irl_valeur": "146.68",
-            "honoraires_bail_bailleur": "0", "honoraires_bail_locataire": "0",
-            "honoraires_edl_bailleur": "0", "honoraires_edl_locataire": "0",
-            "locataires-TOTAL_FORMS": str(len(noms)), "locataires-INITIAL_FORMS": "0",
-            "locataires-MIN_NUM_FORMS": "1", "locataires-MAX_NUM_FORMS": "6",
-        }
-        for i, nom in enumerate(noms):
-            donnees[f"locataires-{i}-nom"] = nom
-            donnees[f"locataires-{i}-prenom"] = "Léa" if nom else ""
-        return donnees
-
     def test_formulaire_un_locataire_et_bouton_ajouter(self):
         reponse = self.client.get(reverse("contrats:creer"), {"propriete": self.creer_propriete().pk})
         self.assertContains(reponse, 'name="locataires-TOTAL_FORMS" value="1"')
@@ -443,14 +443,10 @@ class VuesTests(Donnees, TestCase):
         self.assertEqual(Bail.objects.count(), 1)
 
         # Congé reçu : le bail se rédige, mais pas avant le départ prévu.
-        donnees = self.donnees_bail(propriete, ["Martin"])
-        donnees.update({"locataires-INITIAL_FORMS": "1", "locataires-0-id": en_place.locataires.get().pk,
-                        "date_effet": "2024-09-01", "conge_recu_le": "2026-10-05"})
-        reponse = self.client.post(reverse("contrats:modifier", args=[en_place.pk]), donnees)
-        self.assertIn("date_depart_prevue", reponse.context["form"].errors)
-        donnees["date_depart_prevue"] = "2026-11-05"
-        self.assertRedirects(self.client.post(reverse("contrats:modifier", args=[en_place.pk]), donnees),
-                             en_place.get_absolute_url())
+        fin = reverse("contrats:fin", args=[en_place.pk])
+        conge = {"conge_origine": "locataire", "conge_recu_le": "2026-10-05"}
+        self.assertIn("date_depart_prevue", self.client.post(fin, conge).context["form"].errors)
+        self.client.post(fin, {**conge, "date_depart_prevue": "2026-11-05"})
         self.assertContains(self.client.get(en_place.get_absolute_url()),
                             "congé reçu le 05/10/2026, départ prévu le 05/11/2026")
         self.assertEqual(self.client.get(reverse("contrats:creer"), {"propriete": propriete.pk}).status_code, 200)
@@ -460,9 +456,12 @@ class VuesTests(Donnees, TestCase):
         donnees_nouveau["date_effet"] = "2026-11-06"
         self.client.post(reverse("contrats:creer"), donnees_nouveau)
         self.assertEqual(Bail.objects.count(), 2)
-        # Le bail en place reste modifiable malgré le suivant.
+        # Le bail en place (non signé) reste modifiable malgré le suivant.
+        donnees = self.donnees_bail(propriete, ["Martin"])
+        donnees.update({"locataires-INITIAL_FORMS": "1", "locataires-0-id": en_place.locataires.get().pk,
+                        "date_effet": "2024-09-01"})
         self.assertRedirects(self.client.post(reverse("contrats:modifier", args=[en_place.pk]), donnees),
-                             en_place.get_absolute_url())
+                             f"{reverse('contrats:modifier', args=[en_place.pk])}#etape-7")
 
     def test_parcours_depart_du_locataire(self):
         """De « loué » à « libre » depuis la fiche du logement, sans rouvrir
@@ -679,3 +678,128 @@ class VuesTests(Donnees, TestCase):
                 self.assertEqual(self.client.get(url).status_code, 200)
         # L'accueil donne accès au PDF des derniers baux.
         self.assertContains(self.client.get(reverse("accueil")), reverse("contrats:pdf", args=[bail.pk]))
+
+
+@override_settings(MFA_OBLIGATOIRE=False)
+class EtapesTests(Donnees, TestCase):
+    """« Modifier » un bail ouvre ses étapes, comme sa frise : les étapes
+    faites grisées, l'étape en cours ouverte avec ses champs, des flèches pour
+    revenir quand c'est possible. Un bail signé est verrouillé."""
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_user("gestion"))
+        self.aujourd_hui = timezone.localdate()
+
+    def bail_avec_mandat(self, **autres):
+        propriete = self.creer_propriete()
+        mandat = Mandat.depuis_propriete(propriete)
+        mandat.save()
+        return self.creer_bail(propriete, mandat=mandat, **autres)
+
+    def etapes(self, bail, **parametres):
+        page = self.client.get(reverse("contrats:modifier", args=[bail.pk]), parametres)
+        return page, {section["numero"]: section["mode"] for section in page.context["sections"]}
+
+    def url_etapes(self, bail, suite=""):
+        return reverse("contrats:modifier", args=[bail.pk]) + suite
+
+    def test_bail_a_signer(self):
+        bail = self.bail_avec_mandat(date_effet=self.aujourd_hui + dt.timedelta(days=30))
+        page, modes = self.etapes(bail)
+        self.assertEqual(modes, {1: "grisee", 2: "grisee", 3: "grisee", 4: "ouverte", 5: "a-venir", 6: "a-venir", 7: "a-venir"})
+        self.assertContains(page, reverse("contrats:deposer_signe", args=[bail.pk]))
+        self.assertContains(page, "‹ Revenir au bail")
+        # Chaque point de la frise de la fiche mène à son étape.
+        self.assertContains(self.client.get(bail.get_absolute_url()), self.url_etapes(bail, "?etape=4#etape-4"))
+        # ‹ Revenir au bail : ses champs s'ouvrent, la signature repasse « à venir ».
+        page, modes = self.etapes(bail, etape=3)
+        self.assertEqual((modes[3], modes[4]), ("ouverte", "a-venir"))
+        self.assertContains(page, "Enregistrer et passer à la signature ›")
+        # › Le bail enregistré, la signature s'ouvre.
+        donnees = self.donnees_bail(bail.propriete, ["Martin"])
+        donnees.update({"locataires-INITIAL_FORMS": "1", "locataires-0-id": bail.locataires.get().pk,
+                        "date_effet": bail.date_effet.isoformat(), "loyer": "720", "mandat": bail.mandat_id})
+        reponse = self.client.post(self.url_etapes(bail), donnees)
+        self.assertRedirects(reponse, self.url_etapes(bail, "?etape=4#etape-4"))
+        bail.refresh_from_db()
+        self.assertEqual(bail.loyer, Decimal("720"))
+        # › La signature enregistrée, l'entrée s'ouvre.
+        reponse = self.client.post(reverse("contrats:deposer_signe", args=[bail.pk]),
+                                   {"date_signature": self.aujourd_hui.isoformat(), "etapes": "1"})
+        self.assertRedirects(reponse, self.url_etapes(bail, "#etape-5"))
+        _, modes = self.etapes(bail)
+        self.assertEqual((modes[4], modes[5]), ("grisee", "ouverte"))
+
+    def test_bail_signe_verrouille(self):
+        """Signé, le bail ne se modifie plus : pour le corriger, on revient à
+        la signature, tant que le locataire n'est pas entré."""
+        bail = self.bail_avec_mandat(date_effet=self.aujourd_hui + dt.timedelta(days=30), date_signature=self.aujourd_hui)
+        page, modes = self.etapes(bail, etape=3)
+        self.assertEqual((modes[3], modes[5]), ("grisee", "ouverte"))
+        self.assertContains(page, "verrouillé, bail signé")
+        self.assertNotContains(page, ">Corriger</a>")
+        donnees = self.donnees_bail(bail.propriete, ["Martin"])
+        donnees.update({"locataires-INITIAL_FORMS": "1", "locataires-0-id": bail.locataires.get().pk, "loyer": "900"})
+        reponse = self.client.post(self.url_etapes(bail), donnees, follow=True)
+        self.assertContains(reponse, "Ce bail est signé : pour le corriger, revenir d&#x27;abord à la signature.")
+        bail.refresh_from_db()
+        self.assertEqual(bail.loyer, Decimal("700"))
+        # ‹ Revenir à la signature : la date est retirée, le scan resterait.
+        reponse = self.client.post(reverse("contrats:retirer_signature", args=[bail.pk]))
+        self.assertRedirects(reponse, self.url_etapes(bail, "#etape-4"))
+        bail.refresh_from_db()
+        self.assertFalse(bail.signe)
+        _, modes = self.etapes(bail, etape=3)
+        self.assertEqual(modes[3], "ouverte")
+
+    def test_apres_l_entree(self):
+        """Le locataire entré, la signature ne se retire plus ; seul un
+        administrateur peut encore corriger le bail."""
+        from comptes.roles import ADMINISTRATEURS, attribuer_role
+
+        bail = self.bail_avec_mandat(date_effet=dt.date(2025, 2, 1), date_signature=dt.date(2025, 1, 20))
+        page, modes = self.etapes(bail)
+        self.assertEqual(modes[6], "ouverte")
+        self.assertContains(page, "Le locataire est entré : on ne revient plus en arrière.")
+        self.client.post(reverse("contrats:retirer_signature", args=[bail.pk]))
+        bail.refresh_from_db()
+        self.assertTrue(bail.signe)
+        _, modes = self.etapes(bail, etape=3)
+        self.assertEqual(modes[3], "grisee")
+        # « Corriger » : le bail s'ouvre, les autres étapes restent où elles sont.
+        admin = User.objects.create_user("admin")
+        attribuer_role(admin, ADMINISTRATEURS)
+        self.client.force_login(admin)
+        self.assertContains(self.client.get(self.url_etapes(bail)), ">Corriger</a>")
+        page, modes = self.etapes(bail, etape=3)
+        self.assertEqual(modes, {1: "grisee", 2: "grisee", 3: "ouverte", 4: "grisee", 5: "grisee", 6: "grisee", 7: "a-venir"})
+        self.assertContains(page, "Enregistrer la correction")
+        donnees = self.donnees_bail(bail.propriete, ["Martin"])
+        donnees.update({"locataires-INITIAL_FORMS": "1", "locataires-0-id": bail.locataires.get().pk,
+                        "date_effet": "2025-02-01", "lieu_signature": "Muret", "mandat": bail.mandat_id})
+        self.assertRedirects(self.client.post(self.url_etapes(bail), donnees), self.url_etapes(bail, "#etape-6"))
+        bail.refresh_from_db()
+        self.assertEqual((bail.lieu_signature, bail.signe), ("Muret", True))
+
+    def test_location_en_cours_et_conge(self):
+        bail = self.bail_avec_mandat(date_effet=dt.date(2025, 2, 1), date_signature=dt.date(2025, 1, 20))
+        page, modes = self.etapes(bail)
+        self.assertEqual(modes[6], "ouverte")
+        self.assertContains(page, "Un congé est arrivé ›")
+        # › Un congé est arrivé : la sortie s'ouvre, avec le préavis proposé.
+        page, modes = self.etapes(bail, etape=7)
+        self.assertEqual((modes[6], modes[7]), ("grisee", "ouverte"))
+        self.assertContains(page, "‹ Revenir à la location en cours")
+        depart = ajouter_mois(self.aujourd_hui, bail.mois_preavis)
+        self.assertEqual(page.context["form_fin"]["date_depart_prevue"].value(), depart)
+        self.client.post(reverse("contrats:fin", args=[bail.pk]), {
+            "conge_origine": "locataire", "conge_recu_le": self.aujourd_hui.isoformat(),
+            "date_depart_prevue": depart.isoformat(), "etapes": "1",
+        })
+        page, modes = self.etapes(bail)
+        self.assertEqual(modes[7], "ouverte")
+        self.assertContains(page, "‹ Annuler le congé")
+        # ‹ Annuler le congé : la location continue.
+        self.assertRedirects(self.client.post(reverse("contrats:annuler_conge", args=[bail.pk])), self.url_etapes(bail, "#etape-6"))
+        bail.refresh_from_db()
+        self.assertEqual((bail.conge_origine, bail.conge_recu_le, bail.date_depart_prevue), ("", None, None))
