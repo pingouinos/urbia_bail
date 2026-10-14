@@ -1,4 +1,6 @@
-"""Le mandat, le bail et la mise en location vus comme des processus à étapes.
+"""Le mandat et la location vus comme des processus à étapes. La location
+suit un locataire de la mise en location du logement à sa sortie : une seule
+frise, la même sur le tableau de bord, la fiche du bail et celle du logement.
 
 Comme la liste « À faire », rien n'est saisi : l'étape atteinte se déduit des
 fiches (date de signature, pièces déposées, congé reçu…). La frise d'un
@@ -9,19 +11,23 @@ Chaque étape a un état :
 - « courante » : c'est là que le dossier attend ;
 - « a_venir » : pas encore atteinte ;
 - « alerte » : en retard, ou manquante alors que la suite a avancé ;
-- « sautee » : n'a pas eu lieu (bail terminé sans préavis enregistré).
+- « sautee » : n'a pas eu lieu (bail fait sans candidature dans l'application,
+  mandat terminé sans signature enregistrée).
 """
 
 from dataclasses import dataclass, field
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from django.utils import timezone
 
 FAITE, COURANTE, A_VENIR, ALERTE, SAUTEE = "faite", "courante", "a_venir", "alerte", "sautee"
 
-ETAPES_LOCATION = ["Mandat", "Mise en location", "Candidatures", "Bail", "Signature", "Entrée dans les lieux"]
+# Une seule frise par locataire, de la mise en location du logement à sa
+# sortie. Le mandat n'en fait pas partie : il couvre plusieurs locataires
+# successifs et a sa propre frise.
+ETAPES_LOCATION = ["Mise en location", "Candidatures", "Bail", "Signature", "Entrée dans les lieux", "Location en cours", "Sortie"]
 ETAPES_MANDAT = ["Rédaction", "Signature", "Dossier du mandant", "Gestion", "Fin du mandat"]
-ETAPES_BAIL = ["Rédaction", "Signature", "Entrée dans les lieux", "Location en cours", "Préavis", "Sortie"]
 
 
 @dataclass
@@ -52,6 +58,8 @@ class Processus:
     #: d'étapes + 1 quand tout est fait.
     rang: int = 1
     termine: bool = False
+    #: La location avance alors que le logement n'a pas de mandat de gestion.
+    sans_mandat: bool = False
 
     @property
     def courante(self):
@@ -63,10 +71,6 @@ class Processus:
         if len(self.etapes) < 2:
             return 100
         return round(100 * (min(self.rang, len(self.etapes)) - 1) / (len(self.etapes) - 1))
-
-    @property
-    def en_alerte(self):
-        return any(etape.etat == ALERTE for etape in self.etapes)
 
 
 def _marquer(etapes, rang):
@@ -89,42 +93,93 @@ def _pluriel(nombre, mot):
     return f"{nombre} {mot}{'s' if nombre > 1 else ''}"
 
 
-def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=None):
-    """Mise en location d'un logement : du mandat à l'entrée du locataire.
-    `bail` est le nouveau bail, signé ou non ; `retenue` la candidature
-    retenue qui n'a pas encore de bail."""
-    if bail:
-        rang = 6 if bail.date_signature else 5
-    elif retenue:
-        rang = 4
-    elif propriete.a_louer or a_etudier:
-        rang = 3
-    elif mandat:
-        rang = 2
+def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=None, alertes=None):
+    """La location d'un logement à un locataire, de la mise en location à la
+    sortie. Avant le bail : `retenue` est la candidature retenue et
+    `a_etudier` le nombre de candidatures en attente. Ensuite, `bail` est le
+    bail de ce locataire ; `alertes` ses points à vérifier, calculés pour un
+    bail non signé si on ne les donne pas. `mandat` ne sert qu'à signaler une
+    location qui avance sans mandat de gestion."""
+    aujourd_hui = timezone.localdate()
+    if bail and alertes is None:
+        alertes = [] if bail.signe else bail.alertes
+    alertes = alertes or []
+    depart = bail.date_depart_prevue if bail else None
+    if not bail:
+        rang = 3 if retenue else 2 if propriete.a_louer or a_etudier else 1
+    elif bail.date_fin_effective:
+        rang = 8
+    elif bail.conge_recu_le:
+        rang = 7
+    elif not bail.signe:
+        rang = 3 if alertes else 4
     else:
-        rang = 1
+        rang = 5 if bail.date_effet > aujourd_hui else 6
+
+    url = bail.get_absolute_url() if bail else ""
+    candidature = _candidature(bail) if bail else None
+    # La mise en location de ce locataire : la date du logement ne vaut que si
+    # elle précède le bail (sinon elle concerne déjà le suivant).
+    cree = timezone.localdate(bail.cree_le) if bail and bail.cree_le else None
+    mise_en_location = propriete.mise_en_location_le
+    if bail and mise_en_location and cree and mise_en_location > cree:
+        mise_en_location = None
     etapes = [
-        Etape("Mandat", detail=f"n° {mandat.numero}" if mandat else "à créer",
-              lien=mandat.get_absolute_url() if mandat else f"{reverse('mandats:creer')}?propriete={propriete.pk}",
-              date=mandat.date_signature if mandat else None),
-        Etape("Mise en location", date=propriete.mise_en_location_le,
-              detail=f"disponible le {propriete.disponible_le:%d/%m/%Y}" if propriete.disponible_le else "",
-              lien=reverse("proprietes:mettre_en_location", args=[propriete.pk])),
-        Etape("Candidatures", detail=f"{a_etudier} à étudier" if a_etudier else ("aucune pour l'instant" if rang == 3 else ""),
+        Etape("Mise en location", date=mise_en_location,
+              detail=f"disponible le {propriete.disponible_le:%d/%m/%Y}" if propriete.disponible_le and not bail else "",
+              lien="" if bail else reverse("proprietes:mettre_en_location", args=[propriete.pk])),
+        Etape("Candidatures",
+              detail=(candidature.noms if candidature else "") if bail else (
+                  f"{a_etudier} à étudier" if a_etudier else ("aucune pour l'instant" if rang == 2 else "")),
               lien=f"{reverse('candidatures:liste')}?propriete={propriete.pk}"),
-        Etape("Bail", detail=(retenue.noms or "candidat retenu") if retenue else (bail.noms_locataires if bail else ""),
-              lien=bail.get_absolute_url() if bail else (
-                  f"{reverse('contrats:creer')}?candidature={retenue.pk}" if retenue else "")),
+        Etape("Bail", date=_date_redaction(bail) if bail else None,
+              detail=_pluriel(len(alertes), "point") + " à vérifier" if alertes else (
+                  bail.noms_locataires if bail else (retenue.noms or "candidat retenu") if retenue else ""),
+              lien=url or (f"{reverse('contrats:creer')}?candidature={retenue.pk}" if retenue else "")),
         Etape("Signature", date=bail.date_signature if bail else None,
-              lien=f"{bail.get_absolute_url()}#signature" if bail else ""),
+              detail=("scan déposé" if bail.fichier_signe else "scan à déposer") if bail and bail.signe else "",
+              lien=(url if bail.signe else reverse("contrats:modifier", args=[bail.pk])) if bail else ""),
         Etape("Entrée dans les lieux", date=bail.date_effet if bail else None,
-              prevue=bool(bail) and bail.date_effet > timezone.localdate()),
+              prevue=bool(bail) and bail.date_effet > aujourd_hui),
+        Etape("Location en cours", detail=f"{bail.total_mensuel} € par mois".replace(".", ",") if bail else "",
+              lien=f"{url}#loyers" if bail else ""),
+        Etape("Sortie", date=(bail.date_fin_effective or depart or bail.date_fin) if bail else None,
+              prevue=bool(bail) and not bail.date_fin_effective,
+              detail=_conge(bail) if bail else "",
+              lien=reverse("contrats:fin", args=[bail.pk]) if bail and not bail.date_fin_effective else ""),
     ]
-    if not mandat and rang > 1:
-        # La location avance sans mandat de gestion : à régulariser.
-        etapes[0].etat = ALERTE
+    if bail and not candidature:
+        # Bail fait sans passer par une candidature (locataire trouvé
+        # ailleurs, bail repris à la mise en service) : rien à montrer avant.
+        etapes[1].etat = SAUTEE
+        if not mise_en_location:
+            etapes[0].etat = SAUTEE
+    if bail and not bail.date_fin_effective and depart and depart < aujourd_hui:
+        # Départ annoncé passé et non confirmé.
+        etapes[6].etat = ALERTE
     _marquer(etapes, rang)
-    return Processus("Mise en location", etapes, rang)
+    return Processus("Location", etapes, rang, termine=bool(bail and bail.date_fin_effective),
+                     sans_mandat=not mandat and rang > 1)
+
+
+def processus_bail(bail, alertes=None):
+    """La frise vue depuis un bail : celle de la location à son locataire."""
+    return processus_location(bail.propriete, mandat=bail.mandat_id, bail=bail, alertes=alertes)
+
+
+def _candidature(bail):
+    try:
+        return bail.candidature
+    except ObjectDoesNotExist:
+        return None
+
+
+def _conge(bail):
+    """« congé du locataire reçu le 05/01/2027 », ou le terme du bail."""
+    if bail.conge_recu_le:
+        qui = "du bailleur" if bail.conge_origine == "bailleur" else "du locataire"
+        return f"congé {qui} reçu le {bail.conge_recu_le:%d/%m/%Y}"
+    return "" if bail.date_fin_effective else "terme du bail"
 
 
 def processus_mandat(mandat, manquantes=None):
@@ -156,45 +211,3 @@ def processus_mandat(mandat, manquantes=None):
         rang = 4
     _marquer(etapes, rang)
     return Processus("Mandat", etapes, rang, termine=bool(mandat.date_fin))
-
-
-def processus_bail(bail, alertes=None):
-    """Bail : rédaction, signature, entrée, location, préavis, sortie.
-    Les points à vérifier ne sont calculés que pour un bail non signé."""
-    aujourd_hui = timezone.localdate()
-    url = bail.get_absolute_url()
-    if alertes is None:
-        alertes = [] if bail.signe else bail.alertes
-    depart = bail.date_depart_prevue
-    etapes = [
-        Etape("Rédaction", date=_date_redaction(bail),
-              detail=_pluriel(len(alertes), "point") + " à vérifier" if alertes else "", lien=url),
-        Etape("Signature", date=bail.date_signature,
-              detail=("scan déposé" if bail.fichier_signe else "scan à déposer") if bail.signe else "",
-              lien=url if bail.signe else reverse("contrats:modifier", args=[bail.pk])),
-        Etape("Entrée dans les lieux", date=bail.date_effet, prevue=bail.date_effet > aujourd_hui),
-        Etape("Location en cours", detail=f"{bail.total_mensuel} € par mois".replace(".", ","), lien=f"{url}#loyers"),
-        Etape("Préavis", date=bail.conge_recu_le,
-              detail=("congé du bailleur" if bail.conge_origine == "bailleur" else "congé du locataire") if bail.conge_recu_le else ""),
-        Etape("Sortie", date=bail.date_fin_effective or depart or bail.date_fin,
-              prevue=not bail.date_fin_effective, detail="" if bail.date_fin_effective or depart else "terme du bail",
-              lien=reverse("contrats:fin", args=[bail.pk]) if not bail.date_fin_effective else ""),
-    ]
-    if bail.date_fin_effective:
-        rang = 7
-        if not bail.conge_recu_le:
-            etapes[4].etat = SAUTEE
-    elif bail.conge_recu_le:
-        rang = 6 if depart and depart < aujourd_hui else 5
-    elif not bail.signe:
-        rang = 1 if alertes else 2
-    elif bail.date_effet > aujourd_hui:
-        rang = 3
-    else:
-        rang = 4
-    if not bail.date_fin_effective and depart and depart < aujourd_hui:
-        # Départ annoncé passé et non confirmé.
-        etapes[5].etat = ALERTE
-    _marquer(etapes, rang)
-    return Processus("Bail", etapes, rang, termine=bool(bail.date_fin_effective))
-

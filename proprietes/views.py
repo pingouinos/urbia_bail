@@ -113,9 +113,9 @@ def propriete(request, pk):
     retenue = next((c for c in candidatures if c.statut == Candidature.Statut.RETENUE), None)
     mandats = list(objet.mandats.order_by("-numero"))
     mandat = next((m for m in mandats if m.date_fin is None), None)
-    # Mise en location : mandat, mise en location, candidatures, bail,
-    # signature, entrée. Rien à suivre quand le logement est loué sans départ
-    # annoncé.
+    # Frise du prochain locataire, de la mise en location à sa sortie ; celle
+    # du locataire en place est dans « Contrat en cours ». Rien à suivre quand
+    # le logement est loué sans départ annoncé.
     nouveau_bail = situation.a_venir or (situation.bail if situation.code == "loue" else None)
     location = processus_location(
         objet, mandat, sum(c.statut == Candidature.Statut.A_ETUDIER for c in candidatures), retenue, nouveau_bail,

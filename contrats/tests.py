@@ -506,7 +506,7 @@ class VuesTests(Donnees, TestCase):
         self.assertEqual((propriete.a_louer, propriete.mise_en_location_le, propriete.dernier_loyer),
                          (True, aujourd_hui, Decimal("720")))
         page = self.client.get(propriete.get_absolute_url())
-        self.assertEqual(page.context["etape"], 3)
+        self.assertEqual(page.context["location"].courante.libelle, "Candidatures")
         self.assertContains(page, "pastille-a_louer")
         self.assertContains(page, "Enregistrer une candidature")
         self.assertEqual([b.pk for b in self.client.get(reverse("proprietes:liste"), {"situation": "a_louer"}).context["page"]],
@@ -542,10 +542,12 @@ class VuesTests(Donnees, TestCase):
         page = self.client.get(propriete.get_absolute_url())
         self.assertContains(page, "Aucun bail enregistré")
         self.assertContains(page, "Créer le mandat")
-        self.assertEqual(page.context["etape"], 1)
+        self.assertEqual(page.context["location"].courante.libelle, "Mise en location")
         Mandat.depuis_propriete(propriete).save()
         page = self.client.get(propriete.get_absolute_url())
-        self.assertEqual(page.context["etape"], 2)
+        # Le mandat n'est pas une étape de la location : seule la mise en
+        # location la fait avancer.
+        self.assertEqual(page.context["location"].courante.libelle, "Mise en location")
         self.assertContains(page, f'href="{reverse("proprietes:mettre_en_location", args=[propriete.pk])}">Mettre en location</a>')
         # Les autres rubriques de la fiche sont dans leurs onglets.
         self.assertNotContains(page, "<h2>Description</h2>")
@@ -559,12 +561,12 @@ class VuesTests(Donnees, TestCase):
         # Bail rédigé pour une entrée à venir : il reste à le faire signer.
         bail = self.creer_bail(propriete=propriete, date_effet=timezone.localdate() + dt.timedelta(days=20))
         page = self.client.get(propriete.get_absolute_url())
-        self.assertEqual(page.context["etape"], 5)
+        self.assertEqual(page.context["location"].courante.libelle, "Signature")
         self.assertContains(page, "Faire signer le bail")
         self.assertContains(page, "Prochain locataire")
         bail.date_signature = timezone.localdate()
         bail.save()
-        self.assertEqual(self.client.get(propriete.get_absolute_url()).context["etape"], 6)
+        self.assertEqual(self.client.get(propriete.get_absolute_url()).context["location"].courante.libelle, "Entrée dans les lieux")
         page = self.client.get(propriete.get_absolute_url(), {"onglet": "contrats"})
         self.assertContains(page, "Paul MARTIN")
         self.assertEqual([contrat.TYPE for contrat in page.context["contrats"]], ["Bail", "Mandat"])
