@@ -4,7 +4,7 @@
   <li><a class="ligne-tache" href="{{ tache.lien }}">
     <span class="ligne-tache-icone{% if tache.rubrique == 'Mises en location' %} icone-location{% endif %}" aria-hidden="true">{% include "core/_icone_rubrique.html" with rubrique=tache.rubrique %}</span>
     <span class="ligne-tache-texte">
-      <span class="ligne-tache-titre">{{ tache.titre }}{% if tache.urgent %} <span class="pastille pastille-libre">En retard</span>{% elif processus.en_alerte %} <span class="pastille pastille-libre">Sans mandat</span>{% endif %}</span>
+      <span class="ligne-tache-titre">{{ tache.titre }}{% if tache.urgent %} <span class="pastille pastille-libre">En retard</span>{% elif tache.alerte %} <span class="pastille pastille-libre">{{ tache.alerte }}</span>{% endif %}</span>
       <span class="discret">{{ tache.sujet }}{% if tache.detail %} · {{ tache.detail }}{% endif %}</span>
     </span>
     {% if processus.courante %}<span class="ligne-tache-etape"><span class="barre-etapes" aria-hidden="true">{% for etape in processus.etapes %}<i class="etape-{{ etape.etat }}"></i>{% endfor %}</span><span><span class="masque">étape </span>{{ processus.courante.libelle }} · {{ processus.rang }}/{{ processus.etapes|length }}</span></span>{% endif %}

@@ -394,6 +394,12 @@ class ProcessusTests(TestCase):
         # Le mandat manque alors que la location avance : il est signalé.
         self.assertEqual(processus.etapes[0].etat, "alerte")
         self.assertTrue(processus.en_alerte)
+        # Sur le tableau de bord aussi, à côté de l'action.
+        self.propriete.save()
+        attribuer_role(utilisateur := User.objects.create_user("elodie", password="x"), ADMINISTRATEURS)
+        self.client.force_login(utilisateur)
+        lignes = dict(self.client.get(reverse("accueil")).context["taches"])["Mises en location"]
+        self.assertEqual([t.alerte for t in lignes], ["Sans mandat"])
 
     def test_frises_affichees(self):
         attribuer_role(utilisateur := User.objects.create_user("elodie", password="x"), ADMINISTRATEURS)
@@ -407,11 +413,15 @@ class ProcessusTests(TestCase):
         rubriques = dict(accueil.context["taches"])
         self.assertEqual([t.titre for t in rubriques["Mises en location"]], ["Faire signer le bail de Paul MARTIN"])
         self.assertEqual([t.titre for t in rubriques["Mandats"]], [f"Faire signer le mandat n° {mandat.numero}"])
-        self.assertContains(accueil, "Signature · 5/6")
         self.assertContains(accueil, "Signature · 2/5")
         self.assertContains(accueil, '<span class="puce"><b>1</b> mandat à finaliser</span>', html=True)
         self.assertContains(accueil, "Aucun retard")
         page = self.client.get(bail.get_absolute_url())
+        # Le bail à faire signer porte les étapes du bail, comme sa fiche.
+        etape = page.context["processus"]
+        self.assertEqual(etape.courante.libelle, "Signature")
+        self.assertContains(accueil, f"Signature · {etape.rang}/{len(etape.etapes)}")
+        self.assertEqual(rubriques["Mises en location"][0].processus.rang, etape.rang)
         self.assertContains(page, "Avancement du bail")
         self.assertContains(page, 'aria-current="step"')
         self.assertContains(self.client.get(mandat.get_absolute_url()), "Avancement du mandat")
