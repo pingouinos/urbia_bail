@@ -14,6 +14,7 @@ from core.processus import navigation, processus_mandat, sections_etapes
 from proprietes.models import Propriete
 from proprietes.tableur import sans_formule
 from documents import views as documents
+from signatures.services import en_cours, etat_etape
 
 from .forms import FinMandatForm, MandatForm, SignatureForm
 from .models import Mandat
@@ -137,6 +138,9 @@ def etapes(request, pk):
     administrateur = est_administrateur(request.user)
     form = MandatForm(request.POST or None, instance=objet)
     if request.method == "POST":
+        if en_cours(objet):
+            messages.error(request, "Ce mandat est chez les signataires : pour le corriger, annuler d'abord l'envoi.")
+            return redirect(vers_etapes(objet))
         if objet.signe and not administrateur:
             messages.error(request, "Ce mandat est signé : pour le corriger, revenir d'abord à la signature.")
             return redirect(vers_etapes(objet))
@@ -146,6 +150,8 @@ def etapes(request, pk):
             return redirect(vers_etapes(objet))
     dossier = objet.dossier
     manquantes = [ligne for ligne in dossier if ligne["obligatoire"] and (not ligne["piece"] or ligne["piece"].perime)]
+    # Relit d'abord la signature électronique : le contrat a pu être signé entre-temps.
+    signature = etat_etape(objet, request.user)
     processus = processus_mandat(objet)
     ouvrables = etapes_ouvrables(objet, processus.rang)
     # Signé et la signature ne se retire plus : seul un administrateur
@@ -172,6 +178,7 @@ def etapes(request, pk):
         "form": form, "form_signe": SignatureForm(instance=objet), "form_fin": FinMandatForm(instance=objet),
         "dossier": dossier, "nb_manquantes": len(manquantes),
         "historique": objet.history.select_related("history_user")[:10],
+        "signature": signature,
     })
 
 

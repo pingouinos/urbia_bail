@@ -511,6 +511,10 @@ class Bail(Contrat):
             "lieu_signature": self.lieu_signature,
             "date_signature": date(self.date_signature) or "……………………",
             "exemplaires": len(locataires) + 1,
+            # Emplacements de signature électronique : vides sur le document
+            # imprimé, remplis par signatures.services à l'envoi dans DocuSeal.
+            "signature_mandataire": "",
+            "signatures_locataires": [],
         }
 
     @property

@@ -31,6 +31,7 @@ urlpatterns = [
     path("contrats/", include("contrats.urls")),
     path("contacts/", include("contacts.urls")),
     path("modeles/", include("documents.urls")),
+    path("signature/", include("signatures.urls")),
     # Anciennes adresses, pour les favoris et les liens déjà envoyés.
     re_path(r"^biens/(?P<suite>.*)$", RedirectView.as_view(url="/proprietes/%(suite)s", query_string=True)),
     re_path(r"^baux/(?P<suite>.*)$", RedirectView.as_view(url="/contrats/%(suite)s", query_string=True)),

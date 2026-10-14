@@ -78,7 +78,10 @@ sur une ligne.
   {% endif %}
 
   {% elif numero == 4 %}
-  {% if mode == "ouverte" %}
+  {% if mode == "ouverte" and signature.active %}
+  {% url 'contrats:deposer_signe' bail.pk as deposer %}{% url 'contrats:pdf' bail.pk as pdf %}
+  {% include "signatures/_etape.html" with contrat=bail type="bail" deposer=deposer pdf=pdf completer="?etape=3#etape-3" %}
+  {% elif mode == "ouverte" %}
   <p class="ligne-etape">Le bail à faire signer : <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> ou <a href="{% url 'contrats:word' bail.pk %}">Word</a>. La date s'enregistre une fois le bail signé par les parties ; le scan peut attendre.</p>
   <div class="annexes-etape">
     <p><strong>Annexes à joindre</strong></p>

@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "contrats",
     "candidatures",
     "contacts",
+    "signatures",
 ]
 
 MIDDLEWARE = [
@@ -161,7 +162,8 @@ if HTTPS:
     # Caddy redirige déjà vers HTTPS ; l'application le fait aussi, sauf pour
     # la sonde de santé que Docker interroge en HTTP de l'intérieur.
     SECURE_SSL_REDIRECT = True
-    SECURE_REDIRECT_EXEMPT = [r"^sante/$"]
+    # Le retour de DocuSeal arrive aussi en HTTP quand il tourne à côté de l'application.
+    SECURE_REDIRECT_EXEMPT = [r"^sante/$", r"^signature/docuseal/"]
     # À n'activer que si tous les sous-domaines du site sont en HTTPS.
     SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("HSTS_SOUS_DOMAINES", default=False)
 SESSION_COOKIE_HTTPONLY = True
@@ -174,6 +176,16 @@ SESSION_COOKIE_AGE = 60 * 60 * 10  # une journée de travail
 
 # Service de conversion Word vers PDF (utilisé à l'étape « Baux »).
 GOTENBERG_URL = env("GOTENBERG_URL", default="http://gotenberg:3000")
+
+# Signature électronique (DocuSeal Pro hébergé par l'agence). Sans adresse ni
+# clé, les baux et mandats se signent sur papier comme avant.
+#   DOCUSEAL_URL : adresse publique de DocuSeal, celle où les signataires signent.
+#   DOCUSEAL_CLE_API : clé d'API (DocuSeal > Paramètres > API).
+#   DOCUSEAL_JETON_WEBHOOK : chaîne secrète ; le webhook de DocuSeal appelle
+#   <adresse de l'application>/signature/docuseal/<jeton>/.
+DOCUSEAL_URL = env("DOCUSEAL_URL", default="").rstrip("/")
+DOCUSEAL_CLE_API = env("DOCUSEAL_CLE_API", default="")
+DOCUSEAL_JETON_WEBHOOK = env("DOCUSEAL_JETON_WEBHOOK", default="")
 
 # Envoi des e-mails (réponses aux candidats). Sans EMAIL_URL, l'application
 # n'envoie rien : la réponse est à copier dans Gmail.

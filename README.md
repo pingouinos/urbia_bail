@@ -52,6 +52,14 @@ Un logement déjà loué ne peut pas recevoir de nouveau bail tant que le congé
 
 Avant signature, la fiche du bail signale : logement classé G, fiche du bien incomplète, absence de mandat, dépôt de garantie supérieur au maximum légal, loyer supérieur à celui du précédent locataire en zone tendue ou pour un logement classé F ou G, honoraires non conformes.
 
+## Signature électronique
+
+Quand DocuSeal est configuré (`DOCUSEAL_*` dans `.env`), l'étape Signature d'un bail ou d'un mandat liste les signataires dans leur ordre de passage : les locataires (ou le mandant), puis le collaborateur qui envoie, pour l'agence. « Envoyer en signature » produit le PDF avec le modèle en service et l'envoie dans DocuSeal, qui écrit à chacun ; la page montre ensuite où en est chaque signataire, avec une relance par ligne. Une fois tout le monde passé, le PDF signé est rangé sur le contrat, la date de signature se remplit et l'étape se ferme d'elle-même. Tant que le contrat est chez les signataires, il ne se modifie pas : on annule d'abord l'envoi. La signature sur papier reste possible (« Signé sur papier ? »).
+
+DocuSeal tourne chez l'agence, en version Pro (l'envoi d'un PDF par l'API lui est réservé), à une adresse publique puisque les signataires y signent. Dans DocuSeal : créer la clé d'API (`DOCUSEAL_CLE_API`), et un webhook vers `<adresse de l'application>/signature/docuseal/<DOCUSEAL_JETON_WEBHOOK>/`. Si DocuSeal ne peut pas joindre l'application, `python manage.py synchroniser_signatures` lancé régulièrement fait le même travail, et la page d'un contrat se met de toute façon à jour à l'ouverture.
+
+Les emplacements de signature sont les balises `{{ signature_mandataire }}`, `{{ signatures_locataires }}` (bail) et `{{ signature_mandant }}` (mandat) des modèles Word, écrites en blanc et en tout petit sous les mentions de signature : elles restent vides sur le document imprimé. Un modèle redéposé sans elles ne peut plus partir en signature électronique, et l'application le dit.
+
 ## Modèles Word
 
 Les documents sont produits à partir des modèles Word de l'agence (`documents/modeles/`), dont les parties variables sont écrites entre doubles accolades, par exemple `{{ mandant }}`. Un administrateur peut télécharger un modèle, le retoucher dans Word et le redéposer depuis la page « Modèles Word » de l'accueil ; l'application refuse un modèle qui contient une balise inconnue.

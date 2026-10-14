@@ -16,6 +16,7 @@ from core.journal import noter
 from core.processus import navigation, processus_bail, sections_etapes
 from mandats.models import Mandat
 from documents import views as documents
+from signatures.services import en_cours, etat_etape
 
 from django.utils import timezone
 
@@ -267,6 +268,9 @@ def etapes(request, pk):
     form = BailForm(request.POST or None, instance=objet)
     locataires = LocataireFormSet(request.POST or None, instance=objet)
     if request.method == "POST":
+        if en_cours(objet):
+            messages.error(request, "Ce bail est chez les signataires : pour le corriger, annuler d'abord l'envoi.")
+            return redirect(vers_etapes(objet))
         if objet.signe and not administrateur:
             messages.error(request, "Ce bail est signé : pour le corriger, revenir d'abord à la signature.")
             return redirect(vers_etapes(objet))
@@ -276,6 +280,8 @@ def etapes(request, pk):
                 locataires.save()
             messages.success(request, "Bail enregistré.")
             return redirect(vers_etapes(objet))
+    # Relit d'abord la signature électronique : le contrat a pu être signé entre-temps.
+    signature = etat_etape(objet, request.user)
     processus = processus_bail(objet)
     ouvrables = etapes_ouvrables(objet, processus.rang)
     # Une fois le locataire entré, seul un administrateur corrige le bail signé.
@@ -301,6 +307,7 @@ def etapes(request, pk):
         # Message de fin de parcours, une seule fois après la création.
         "vient_d_etre_cree": request.session.pop("bail_cree", None) == objet.pk,
         "historique": objet.history.select_related("history_user")[:10],
+        "signature": signature,
     })
 
 

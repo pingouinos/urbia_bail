@@ -9,8 +9,10 @@ from .google import BACKEND
 # Formulaire du candidat, accessible par son lien personnel. Seules
 # pages servies sur l'adresse publique URL_LOCATAIRES.
 CHEMINS_LOCATAIRES = ("/locataire/", "/static/", "/logo-agence/")
+# Retour de DocuSeal (webhook), protégé par le jeton secret de son adresse.
+CHEMIN_DOCUSEAL = "/signature/docuseal/"
 # Pages accessibles sans être connecté.
-CHEMINS_PUBLICS = ("/connexion/", "/oidc/", "/sante/", "/admin/login/", *CHEMINS_LOCATAIRES)
+CHEMINS_PUBLICS = ("/connexion/", "/oidc/", "/sante/", "/admin/login/", CHEMIN_DOCUSEAL, *CHEMINS_LOCATAIRES)
 # Pages accessibles connecté mais avant la double authentification.
 CHEMINS_MFA = ("/mfa/", "/deconnexion/")
 

@@ -331,6 +331,9 @@ class Mandat(Contrat):
             "honoraires_edl_bailleur": montant(self.honoraires_edl_bailleur),
             "honoraires_edl_locataire": montant(self.honoraires_edl_locataire),
             "date_signature": self.date_signature.strftime("%d/%m/%Y") if self.date_signature else "",
+            # Emplacements de signature électronique (voir signatures.services).
+            "signature_mandant": "",
+            "signature_mandataire": "",
         }
 
     @property
