@@ -418,12 +418,6 @@ button.lien.lien-danger { color: var(--erreur); }
 button.bouton-petit.bouton-supprimer[type=submit] { padding: 6px 14px; background: var(--carte); color: var(--erreur); border-color: var(--erreur); }
 button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erreur); color: #fff; }
 
-/* Suivi des loyers d'un bail. */
-.loyers form.en-ligne { margin: 0; }
-.loyers input[type=date] { width: auto; padding: 4px 8px; }
-.loyers td { white-space: nowrap; }
-.loyers form.en-ligne { flex-wrap: nowrap; }
-
 /* Éléments de navigation : ils gardent leur couleur, le survol colore leur fond. */
 .menu a, .onglets a, .raccourcis .carte, .segments a, .choix a, .ajouter-liste a, .marque,
 .menu a:hover, .onglets a:hover, .raccourcis .carte:hover, .segments a:hover, .choix a:hover, .ajouter-liste a:hover { color: var(--acier); }
