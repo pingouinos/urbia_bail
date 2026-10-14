@@ -58,7 +58,7 @@ class BailForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["propriete"].queryset = Propriete.objects.filter(actif=True).select_related("bailleur")
+        self.fields["propriete"].queryset = Propriete.choix_pour(self.instance)
         propriete = self.instance.propriete if self.instance.propriete_id else None
         if propriete is not None:
             self.fields["mandat"].queryset = propriete.mandats.all()

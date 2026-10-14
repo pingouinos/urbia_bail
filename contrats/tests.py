@@ -839,3 +839,16 @@ class EtapesTests(Donnees, TestCase):
         self.assertEqual(set(modes.values()), {"grisee"})
         self.assertEqual((self.crayons(page), self.fleches(page)), ([], (None, None)))
         self.assertContains(page, "Terminé")
+
+    def test_logement_plus_gere(self):
+        """Un logement décoché « Actif » (plus géré par l'agence) reste
+        affiché dans l'étape « Bail », qui s'enregistre toujours."""
+        bail = self.bail_avec_mandat(date_effet=self.aujourd_hui + dt.timedelta(days=30))
+        Propriete.objects.filter(pk=bail.propriete_id).update(actif=False)
+        page, modes = self.etapes(bail, etape=3)
+        self.assertEqual(modes[3], "ouverte")
+        self.assertIn(f'<option value="{bail.propriete_id}" selected>', str(page.context["form"]["propriete"]))
+        reponse = self.client.post(self.url_etapes(bail), self.donnees_modifiees(bail, loyer="710"))
+        self.assertRedirects(reponse, self.url_etapes(bail, "#etape-4"))
+        bail.refresh_from_db()
+        self.assertEqual(bail.loyer, Decimal("710"))

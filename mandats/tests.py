@@ -501,3 +501,16 @@ class EtapesTests(Donnees, TestCase):
             page, modes = self.etapes(mandat, etape=5)
             self.assertEqual(modes[5], "ouverte")
             self.assertContains(page, "Enregistrer la correction")
+
+    def test_bien_plus_gere(self):
+        """Un bien décoché « Actif » (plus géré par l'agence) reste affiché
+        dans la rédaction de son mandat, qui s'enregistre toujours."""
+        mandat = self.creer_mandat()
+        Propriete.objects.filter(pk=mandat.propriete_id).update(actif=False)
+        page = self.client.get(mandat.get_absolute_url(), {"etape": 1})
+        self.assertIn(f'<option value="{mandat.propriete_id}" selected>', str(page.context["form"]["propriete"]))
+        form = page.context["form"]
+        donnees = {nom: form[nom].value() for nom in form.fields if not form.fields[nom].disabled}
+        donnees = {nom: "" if valeur is None else valeur for nom, valeur in donnees.items() if valeur is not False}
+        donnees["mandant"] = "Monsieur DURAND Paul"
+        self.assertRedirects(self.client.post(mandat.get_absolute_url(), donnees), mandat.get_absolute_url() + "#etape-2")
