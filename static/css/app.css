@@ -484,25 +484,45 @@ button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erre
   .frise .frise-texte { padding-top: 5px; }
 }
 
-/* Étapes du bail (page « Modifier ») : la frise en haut, puis une section par
-   étape. Les étapes faites sont grisées et en lecture seule, l'étape ouverte
-   porte ses champs et ses flèches, les étapes à venir tiennent sur une ligne. */
-.titre-etapes { font-size: 1.35rem; }
-.etape-ici { display: none; margin: 4px 0 0; text-align: center; font-weight: 600; }
+/* Page d'un bail ou d'un mandat, façon PLM : en-tête avec ses documents, la
+   frise entre ses flèches ‹ ›, puis une section par étape. Les étapes faites
+   sont grisées et en lecture seule, avec un crayon à droite tant qu'elles se
+   modifient ; l'étape ouverte porte ses champs ; les étapes à venir tiennent
+   sur une ligne. */
+.entete-haut { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 6px 20px; }
+.entete-titre { min-width: 0; }
+.entete-titre p { margin: 2px 0 0; }
+.titre-pastille { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.titre-etapes { margin: 0; font-size: 1.35rem; }
+.actions-document { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-top: 4px; font-weight: 600; }
+.frise-zone { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; margin-top: 16px; }
+.frise-zone .frise { margin: 0; }
+.fleche-frise { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--bord); border-radius: 8px; background: var(--carte); color: var(--acier); font-size: 1.25rem; font-weight: 700; line-height: 1; text-decoration: none; }
+a.fleche-frise:hover { border-color: var(--melon); background: var(--melon-clair); color: var(--acier); }
+.fleche-frise[aria-disabled=true] { opacity: 0.35; cursor: not-allowed; }
+.frise-choisie .frise-point { outline: 2px solid var(--acier); outline-offset: 3px; }
+.etape-ici { display: none; margin: 6px 0 0; text-align: center; font-weight: 600; }
 .etapes-bail { display: grid; gap: 12px; margin: 16px 0; }
 .etape-bail { scroll-margin-top: 16px; display: grid; gap: 12px; min-width: 0; padding: 16px 20px; border: 1px solid var(--bord); border-radius: var(--rayon); background: var(--carte); }
 .etape-bail > header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-.etape-bail > header h2 { flex: 1; margin: 0; font-size: 1.05rem; }
+.etape-bail > header h2 { flex: 1; min-width: 0; margin: 0; font-size: 1.05rem; }
+.etape-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
 .etape-bail-numero { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--bord); border-radius: 50%; background: var(--carte); color: var(--discret); font-size: 0.8rem; font-weight: 700; }
 .etape-bail.grisee { padding-block: 12px; border-color: #e4e0de; background: #f2f0ef; color: var(--discret); }
 .etape-bail.grisee h2 { color: var(--discret); }
 .etape-bail.grisee .etape-bail-numero { border-color: var(--vert); background: var(--vert); color: var(--acier); }
+.etape-bail.grisee.en-cours .etape-bail-numero { border-color: var(--corail); background: var(--melon); }
+.etape-bail .en-ligne { min-width: 0; }
+.etape-bail .en-ligne label { min-width: 0; max-width: 100%; }
+.etape-bail input[type=file] { max-width: 100%; }
 .etape-bail.sans-objet .etape-bail-numero { border-style: dashed; border-color: #c7c0bd; background: transparent; color: var(--discret); }
 .etape-bail.ouverte { border: 2px solid var(--corail); box-shadow: 0 0 0 4px var(--melon-clair); }
 .etape-bail.ouverte .etape-bail-numero { border-color: var(--corail); background: var(--melon); color: var(--acier); }
 .etape-bail.a-venir { padding-block: 12px; border-style: dashed; background: transparent; }
 .etape-bail.a-venir h2 { color: var(--discret); font-weight: 600; }
 .etape-bail .alerte, .etape-bail .alertes { margin: 0; }
+.crayon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--bord); border-radius: 8px; background: var(--carte); color: var(--acier); }
+.crayon:hover { border-color: var(--melon); background: var(--melon-clair); color: var(--acier); }
 .ligne-etape { margin: 0; color: var(--discret); }
 .valeurs-etape { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 20px; margin: 0; font-size: 0.92rem; }
 .valeurs-etape dt { color: var(--discret); }
@@ -515,15 +535,17 @@ button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erre
 .etat-sautee { border-style: dashed; }
 .etape-bail .formulaire fieldset { margin-bottom: 12px; }
 .champs-etape { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 16px; }
-.fleches { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; padding-top: 12px; border-top: 1px solid var(--bord); }
-.fleches > * { display: grid; gap: 4px; justify-items: start; margin: 0; }
-.fleches .fleche-suivante { margin-left: auto; justify-items: end; }
-.fleches small { max-width: 42ch; color: var(--discret); font-size: 0.82rem; }
-.fleche-inactive .bouton { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+.annexes-etape { font-size: 0.92rem; }
+.annexes-etape p { margin: 0; }
+.annexes-etape ul { margin: 4px 0 0; padding-left: 20px; }
+.boutons-etape { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--bord); }
+.boutons-etape .pousse { margin-left: auto; }
+button.secondaire.bouton-danger[type=submit] { border-color: #e7b1ad; color: var(--erreur); }
+button.secondaire.bouton-danger[type=submit]:hover { background: var(--erreur-clair); }
 .supprimer-bail { margin-top: 24px; }
 @media (max-width: 760px) {
   /* Frise des étapes : horizontale, sans les libellés, et l'étape en cours
-     écrite dessous. */
+     écrite dessous. Les boutons tiennent toute la largeur. */
   .etapes-entete .frise { grid-template-columns: repeat(var(--etapes), minmax(0, 1fr)); --point: 28px; }
   .etapes-entete .frise li { flex-direction: column; align-items: center; gap: 0; padding: 0; text-align: center; }
   .etapes-entete .frise li::before { display: block; }
@@ -531,12 +553,14 @@ button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erre
   .etapes-entete .frise li::after { display: none; }
   .etapes-entete .frise .frise-texte { display: none; }
   .etapes-entete .etape-ici { display: block; }
+  .fleche-frise { width: 30px; height: 30px; }
   .etape-bail { padding: 14px; }
+  .verrou-texte { display: none; }
+  .crayon { width: 40px; height: 40px; }
   .valeurs-etape { grid-template-columns: 1fr; gap: 0; }
   .valeurs-etape dd { margin-bottom: 6px; }
-  .fleches { flex-direction: column; align-items: stretch; }
-  .fleches > *, .fleches .fleche-suivante { justify-items: stretch; margin-left: 0; }
-  .fleches .bouton, .fleches button { width: 100%; text-align: center; }
+  .boutons-etape > * { flex: 1 1 auto; text-align: center; }
+  .boutons-etape .pousse { margin-left: 0; }
 }
 
 /* Tableau de bord : les compteurs de l'accueil en pastilles, puis une seule

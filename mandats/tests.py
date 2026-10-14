@@ -150,7 +150,8 @@ class VuesTests(Donnees, TestCase):
         }
         reponse = self.client.post(reverse("mandats:creer"), donnees, follow=True)
         mandat = Mandat.objects.get()
-        self.assertRedirects(reponse, mandat.get_absolute_url())
+        # Le mandat rédigé s'ouvre sur sa page, à l'étape de la signature.
+        self.assertRedirects(reponse, mandat.get_absolute_url() + "#etape-2")
         self.assertContains(reponse, "dépasse celle du bailleur")
         self.assertEqual(propriete.mandat_en_cours, mandat)
         # Le numéro est celui du registre papier, reporté à la main.
@@ -164,7 +165,7 @@ class VuesTests(Donnees, TestCase):
         self.assertIn("numero", reponse.context["form"].errors)
         self.assertEqual(Mandat.objects.count(), 1)
         # Une erreur de recopie se corrige, et la correction reste dans l'historique.
-        self.client.post(reverse("mandats:modifier", args=[mandat.pk]), {**donnees, "numero": "413"})
+        self.client.post(mandat.get_absolute_url(), {**donnees, "numero": "413"})
         mandat.refresh_from_db()
         self.assertEqual((mandat.numero, mandat.history.count()), (413, 2))
         # Un bien sous mandat n'est plus proposé pour un nouveau mandat.
@@ -273,8 +274,9 @@ class VuesTests(Donnees, TestCase):
         self.assertContains(page, 'name="honoraires_bail_locataire" value="390.00"')
 
     def test_pieces_du_dossier(self):
-        """Les pièces remises par le mandant se déposent depuis la fiche du
-        mandat : identité et RIB sur le bailleur, le reste sur la propriété."""
+        """Les pièces remises par le mandant se déposent depuis l'étape
+        « Dossier » de la page du mandat, à tout moment : identité et RIB sur
+        le bailleur, le reste sur la propriété."""
         from proprietes.models import Piece
 
         propriete = self.creer_propriete(regime_juridique="copropriete")
@@ -282,7 +284,7 @@ class VuesTests(Donnees, TestCase):
         page = self.client.get(mandat.get_absolute_url())
         self.assertContains(page, "9 pièces à fournir")
         self.assertEqual([ligne["libelle"] for ligne in mandat.dossier if not ligne["obligatoire"]], ["Bail en cours", "État des lieux"])
-        retour = mandat.get_absolute_url() + "#dossier"
+        retour = mandat.get_absolute_url() + "?etape=3#etape-3"
 
         def deposer(type_, cible, **autres):
             nom = "proprietes:bailleur_piece_deposer" if cible is propriete.bailleur else "proprietes:piece_deposer"
@@ -295,7 +297,8 @@ class VuesTests(Donnees, TestCase):
         identite = Piece.objects.get(type="identite")
         self.assertEqual((identite.bailleur, identite.propriete), (propriete.bailleur, None))
         self.assertTrue(identite.fichier.name.startswith("bailleurs/"))
-        page = self.client.get(mandat.get_absolute_url())
+        page = self.client.get(mandat.get_absolute_url(), {"etape": 3})
+        self.assertEqual(page.context["ouverte"], 3)
         # Le DPE déposé est périmé : il reste à fournir.
         self.assertContains(page, "7 pièces à fournir")
         self.assertContains(page, "depuis le 31/12/2024")
@@ -372,7 +375,7 @@ class VuesTests(Donnees, TestCase):
         mandat = self.creer_mandat()
         for url in [
             reverse("mandats:registre"), reverse("mandats:mandat", args=[mandat.pk]),
-            reverse("mandats:modifier", args=[mandat.pk]), reverse("proprietes:propriete", args=[mandat.propriete.pk]),
+            reverse("proprietes:propriete", args=[mandat.propriete.pk]),
             reverse("accueil"),
         ]:
             with self.subTest(url=url):
@@ -406,3 +409,95 @@ class VuesTests(Donnees, TestCase):
         self.client.post(reverse("documents:retablir", args=["mandat_gestion.docx"]))
         texte = texte_docx(self.client.get(reverse("mandats:word", args=[mandat.pk])).content)
         self.assertNotIn("Ligne ajoutée", texte)
+
+
+@override_settings(MFA_OBLIGATOIRE=False)
+class EtapesTests(Donnees, TestCase):
+    """La page d'un mandat, comme celle du bail : une section par étape, un
+    crayon tant qu'une étape se modifie, un cadenas une fois le mandat signé,
+    et les flèches ‹ › de la frise."""
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_user("gestion"))
+        self.signe_le = timezone.localdate() - timezone.timedelta(days=30)
+
+    def etapes(self, mandat, **parametres):
+        page = self.client.get(mandat.get_absolute_url(), parametres)
+        return page, {section["numero"]: section["mode"] for section in page.context["sections"]}
+
+    def crayons(self, page):
+        return [section["numero"] for section in page.context["sections"] if section["crayon"]]
+
+    def fleches(self, page):
+        return tuple(fleche and fleche["numero"] for fleche in (page.context["precedente"], page.context["suivante"]))
+
+    def test_ancienne_adresse_modifier(self):
+        mandat = self.creer_mandat()
+        self.assertRedirects(self.client.get(reverse("mandats:modifier", args=[mandat.pk])), mandat.get_absolute_url())
+
+    def test_mandat_a_signer(self):
+        mandat = self.creer_mandat()
+        page, modes = self.etapes(mandat)
+        self.assertEqual(modes, {1: "grisee", 2: "ouverte", 3: "a-venir", 4: "a-venir", 5: "a-venir"})
+        self.assertEqual((self.crayons(page), self.fleches(page)), ([1], (1, None)))
+        self.assertContains(page, "Enregistrer et passer au dossier ›")
+        # Les pièces se déposent dès maintenant, et la fin s'enregistre à tout moment.
+        self.assertContains(page, '<a href="?etape=3#etape-3">dès maintenant</a>', html=True)
+        self.assertContains(page, "Mettre fin au mandat dès maintenant")
+        page, modes = self.etapes(mandat, etape=3)
+        self.assertEqual((modes[2], modes[3]), ("grisee", "ouverte"))
+        self.assertContains(page, "Fermer le dossier")
+        # ‹ ou le crayon : la rédaction se rouvre, › ramène à la signature.
+        page, modes = self.etapes(mandat, etape=1)
+        self.assertEqual((modes[1], modes[2]), ("ouverte", "grisee"))
+        self.assertEqual(self.fleches(page), (None, 2))
+        self.assertContains(page, "Enregistrer et passer à la signature ›")
+
+    def test_mandat_signe_dossier_incomplet(self):
+        """Signé, la rédaction se verrouille ; la signature se retire tant
+        que le mandat n'est pas en gestion et qu'aucun bail n'est signé."""
+        mandat = self.creer_mandat(date_signature=self.signe_le)
+        page, modes = self.etapes(mandat, etape=1)
+        self.assertEqual(modes, {1: "grisee", 2: "grisee", 3: "ouverte", 4: "a-venir", 5: "a-venir"})
+        self.assertContains(page, "verrouillé, mandat signé")
+        self.assertEqual((self.crayons(page), self.fleches(page)), ([2], (2, None)))
+        reponse = self.client.post(mandat.get_absolute_url(), {"numero": "999"}, follow=True)
+        self.assertContains(reponse, "Ce mandat est signé : pour le corriger, revenir d&#x27;abord à la signature.")
+        page, modes = self.etapes(mandat, etape=2)
+        self.assertEqual(modes[2], "ouverte")
+        self.assertContains(page, "Retirer la signature…")
+        reponse = self.client.post(reverse("mandats:retirer_signature", args=[mandat.pk]))
+        self.assertRedirects(reponse, mandat.get_absolute_url() + "?etape=1#etape-1")
+        mandat.refresh_from_db()
+        self.assertFalse(mandat.signe)
+
+    def test_en_gestion_puis_fin(self):
+        mandat = self.creer_mandat(date_signature=self.signe_le)
+        complet = mock.patch.object(Mandat, "pieces_manquantes", new_callable=mock.PropertyMock, return_value=[])
+        with complet:
+            page, modes = self.etapes(mandat)
+            self.assertEqual(modes, {1: "grisee", 2: "grisee", 3: "grisee", 4: "ouverte", 5: "a-venir"})
+            self.assertContains(page, "Mettre fin au mandat ›")
+            # La signature ne se retire plus ; le dossier se rouvre, pour remplacer une pièce.
+            self.assertEqual((self.crayons(page), self.fleches(page)), ([3], (3, None)))
+            self.assertContains(page, 'class="verrou"', count=2)
+            page, modes = self.etapes(mandat, etape=5)
+            self.assertEqual(modes[5], "ouverte")
+            fin = reverse("mandats:fin", args=[mandat.pk])
+            aujourd_hui = timezone.localdate().isoformat()
+            self.assertRedirects(self.client.post(fin, {"date_fin": aujourd_hui}), mandat.get_absolute_url() + "#etape-5")
+            mandat.refresh_from_db()
+            # Terminé : tout est verrouillé, seul un administrateur corrige.
+            page, modes = self.etapes(mandat, etape=5)
+            self.assertEqual(set(modes.values()), {"grisee"})
+            self.assertEqual((self.crayons(page), self.fleches(page)), ([], (None, None)))
+            self.assertNotContains(page, ">Corriger</a>")
+            reponse = self.client.post(fin, {"date_fin": aujourd_hui}, follow=True)
+            self.assertContains(reponse, "seul un administrateur peut corriger sa date de fin")
+            admin = User.objects.create_user("admin")
+            attribuer_role(admin, ADMINISTRATEURS)
+            self.client.force_login(admin)
+            self.assertContains(self.client.get(mandat.get_absolute_url()), ">Corriger</a>", count=2)
+            page, modes = self.etapes(mandat, etape=5)
+            self.assertEqual(modes[5], "ouverte")
+            self.assertContains(page, "Enregistrer la correction")

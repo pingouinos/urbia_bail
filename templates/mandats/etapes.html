@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block titre %}Mandat n° {{ mandat.numero }} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+{% comment %}
+La page d'un mandat, façon PLM et comme celle du bail : la frise en haut
+avec ses flèches ‹ ›, puis une section par étape. L'étape ouverte porte ses
+champs ; les étapes atteintes sont grisées, en lecture seule, avec un crayon
+tant qu'elles se modifient et un cadenas une fois le mandat signé.
+{% endcomment %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><a href="{% url 'mandats:registre' %}">Registre des mandats</a><span aria-hidden="true">›</span><span class="fil-ici">Mandat n° {{ mandat.numero }}</span></nav>
+
+<section class="carte etapes-entete">
+  <div class="entete-haut">
+    <div class="entete-titre">
+      <div class="titre-pastille">
+        <h1 class="titre-etapes">Mandat de gestion n° {{ mandat.numero }}</h1>
+        {% with etat=mandat.etat %}<span class="pastille pastille-{{ etat.0 }}">{{ etat.1 }}</span>{% endwith %}
+      </div>
+      <p class="discret">{{ mandat.mandant }} · <a href="{{ mandat.propriete.get_absolute_url }}">{{ mandat.adresse_bien }}</a></p>
+    </div>
+    <nav class="actions-document" aria-label="Documents du mandat">
+      <a href="{% url 'mandats:word' mandat.pk %}">Word</a>
+      <a href="{% url 'mandats:pdf' mandat.pk %}">PDF</a>
+      {% if mandat.fichier_signe %}<a href="{% url 'mandats:fichier_signe' mandat.pk %}" target="_blank" rel="noopener">Mandat signé</a>{% endif %}
+      <a href="#historique">Historique</a>
+    </nav>
+  </div>
+  {% include "_frise_fleches.html" %}
+</section>
+{% for alerte in mandat.alertes %}<p class="message alerte-fond">{{ alerte }}</p>{% endfor %}
+{% if correction %}<p class="message message-erreur">Correction d'un mandat signé, réservée aux administrateurs : le PDF téléchargé ne sera plus tout à fait celui qui a été signé.</p>{% endif %}
+
+<div class="etapes-bail">
+{% for section in sections %}{% with etape=section.etape numero=section.numero mode=section.mode %}
+<section class="etape-bail {{ mode }}{% if etape.etat == 'sautee' %} sans-objet{% elif mode == 'grisee' and numero == processus.rang %} en-cours{% endif %}" id="etape-{{ numero }}" aria-labelledby="titre-etape-{{ numero }}">
+  {% include "_etape_entete.html" with section=section signee="mandat signé" %}
+
+  {% if numero == 1 %}
+  {% if mode == "ouverte" %}
+  <form method="post" action="{{ mandat.get_absolute_url }}" class="formulaire">
+    {% csrf_token %}
+    {% if form.errors %}<p class="message message-erreur">Certains champs sont à corriger : ils sont signalés en rouge.</p>{% endif %}
+    {{ form.non_field_errors }}
+    <p class="discret">Corriger le numéro n'est utile que s'il a été mal recopié du registre papier ; la modification est gardée dans l'historique.</p>
+    {% include "mandats/_champs_mandat.html" %}
+    <div class="boutons-etape">
+      <a class="bouton secondaire" href="{{ annuler }}">Annuler</a>
+      <button type="submit" class="pousse">{% if correction %}Enregistrer la correction{% elif mandat.signe %}Enregistrer{% else %}Enregistrer et passer à la signature ›{% endif %}</button>
+    </div>
+  </form>
+  {% else %}
+  <dl class="valeurs-etape">
+    <dt>Registre</dt><dd>n° {{ mandat.numero }}</dd>
+    <dt>Mandant</dt><dd>{{ mandat.mandant }}, {{ mandat.mandant_adresse }} {{ mandat.mandant_code_postal_ville }}</dd>
+    <dt>Bien</dt><dd><a href="{{ mandat.propriete.get_absolute_url }}">{{ mandat.adresse_bien }}</a>{% if mandat.designation %}<br><span class="discret">{{ mandat.designation }}</span>{% endif %}</dd>
+    <dt>Loyer</dt><dd>{{ mandat.loyer_cc }} € charges comprises, dont {{ mandat.charges }} € de charges</dd>
+    <dt>Durée</dt><dd>{{ mandat.duree_texte|capfirst }}</dd>
+    <dt>Gestion</dt><dd>{{ mandat.taux_gestion }} % TTC · {{ mandat.get_base_gestion_display|lower }}</dd>
+    <dt>Loyers impayés</dt><dd>{% if mandat.assurance_loyers_impayes %}souscrite à {{ mandat.taux_assurance }} % TTC{% else %}non{% endif %}</dd>
+    <dt>Honoraires</dt><dd>Visite, dossier, bail : {{ mandat.honoraires_bail }} € TTC ({{ mandat.honoraires_bail_bailleur }} € bailleur, {{ mandat.honoraires_bail_locataire }} € locataire)<br>État des lieux : {{ mandat.honoraires_edl }} € TTC ({{ mandat.honoraires_edl_bailleur }} € bailleur, {{ mandat.honoraires_edl_locataire }} € locataire)</dd>
+    {% if mandat.observations %}<dt>Observations</dt><dd>{{ mandat.observations|linebreaksbr }}</dd>{% endif %}
+  </dl>
+  {% endif %}
+
+  {% elif numero == 2 %}
+  {% if mode == "ouverte" %}
+  <p class="ligne-etape">Le mandat à faire signer : <a href="{% url 'mandats:pdf' mandat.pk %}">PDF</a> ou <a href="{% url 'mandats:word' mandat.pk %}">Word</a>. La date s'enregistre une fois le mandat signé par le mandant ; le scan peut attendre.</p>
+  <form method="post" enctype="multipart/form-data" action="{% url 'mandats:deposer_signe' mandat.pk %}" id="form-signature">
+    {% csrf_token %}
+    <div class="champs-etape">
+      {% include "proprietes/_champ.html" with champ=form_signe.date_signature %}
+      {% include "proprietes/_champ.html" with champ=form_signe.fichier_signe %}
+    </div>
+  </form>
+  {% if mandat.signe %}<form method="post" action="{% url 'mandats:retirer_signature' mandat.pk %}" id="form-retirer" onsubmit="return confirm('Retirer la signature de ce mandat ? Il redevient modifiable, et il faudra le faire signer à nouveau. Le scan reste.');">{% csrf_token %}</form>{% endif %}
+  <div class="boutons-etape">
+    {% if mandat.signe %}<button type="submit" form="form-retirer" class="secondaire bouton-danger">Retirer la signature…</button>{% endif %}
+    {% if processus.rang != 2 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
+    <button type="submit" form="form-signature" class="pousse">{% if mandat.signe %}Enregistrer{% else %}Enregistrer et passer au dossier ›{% endif %}</button>
+  </div>
+  {% elif mode == "grisee" %}
+  {% if etape.etat == "sautee" %}
+  <p class="ligne-etape">Sans objet : mandat terminé sans signature enregistrée.</p>
+  {% else %}
+  <p class="ligne-etape">Signé le {{ mandat.date_signature|date:"d/m/Y" }}{% if mandat.fichier_signe %} · <a href="{% url 'mandats:fichier_signe' mandat.pk %}" target="_blank" rel="noopener">ouvrir le mandat signé</a>{% else %} · scan à déposer{% endif %}</p>
+  {% if not mandat.fichier_signe %}
+  <form method="post" enctype="multipart/form-data" action="{% url 'mandats:deposer_signe' mandat.pk %}" class="en-ligne">
+    {% csrf_token %}<input type="hidden" name="date_signature" value="{{ mandat.date_signature|date:'Y-m-d' }}">
+    <label>{{ form_signe.fichier_signe.label }} {{ form_signe.fichier_signe }}</label>
+    <button type="submit" class="bouton-petit secondaire">Déposer le scan</button>
+  </form>
+  {% endif %}
+  {% endif %}
+  {% else %}
+  <p class="ligne-etape">Date de signature, et scan de l'exemplaire signé.</p>
+  {% endif %}
+
+  {% elif numero == 3 %}
+  {% if mode == "ouverte" %}
+  <p class="ligne-etape">{% if nb_manquantes %}{{ nb_manquantes }} pièce{{ nb_manquantes|pluralize }} à fournir. L'étape se clôt d'elle-même quand toutes les pièces obligatoires sont déposées.{% else %}Dossier complet. Une pièce périmée ou à remplacer se dépose ici.{% endif %}</p>
+  {% with retour=mandat.get_absolute_url|add:"?etape=3#etape-3" %}{% include "mandats/_dossier_mandat.html" %}{% endwith %}
+  {% if processus.rang != 3 %}
+  <div class="boutons-etape">
+    <a class="bouton secondaire pousse" href="{{ annuler }}">Fermer le dossier</a>
+  </div>
+  {% endif %}
+  {% elif mode == "grisee" %}
+  <p class="ligne-etape">{% if etape.etat == "sautee" %}Sans objet : mandat terminé avec un dossier incomplet.{% else %}Dossier complet.{% endif %}</p>
+  {% else %}
+  <p class="ligne-etape">{% if nb_manquantes %}{{ nb_manquantes }} pièce{{ nb_manquantes|pluralize }} à fournir, une fois le mandat signé ou <a href="?etape=3#etape-3">dès maintenant</a>.{% else %}Dossier complet.{% endif %}</p>
+  {% endif %}
+
+  {% elif numero == 4 %}
+  {% if mode == "ouverte" %}
+  <p class="ligne-etape">En gestion depuis le {{ mandat.date_signature|date:"d/m/Y" }} · {{ mandat.taux_gestion }} % TTC des {{ mandat.get_base_gestion_display|lower }}.</p>
+  <div class="boutons-etape">
+    <a class="bouton pousse" href="?etape=5#etape-5">Mettre fin au mandat ›</a>
+  </div>
+  {% elif mode == "grisee" %}
+  <p class="ligne-etape">{% if mandat.date_fin %}Gestion {% if mandat.date_signature %}du {{ mandat.date_signature|date:"d/m/Y" }} {% endif %}au {{ mandat.date_fin|date:"d/m/Y" }}{% else %}En gestion depuis le {{ mandat.date_signature|date:"d/m/Y" }}{% endif %}</p>
+  {% else %}
+  <p class="ligne-etape">Commence une fois le mandat signé et son dossier complet.</p>
+  {% endif %}
+
+  {% elif numero == 5 %}
+  {% if mode == "ouverte" %}
+  <p class="ligne-etape">À la résiliation ou à l'échéance ({{ mandat.duree_texte }}). Le mandat terminé reste au registre.</p>
+  <form method="post" action="{% url 'mandats:fin' mandat.pk %}" id="form-fin"{% if not mandat.date_fin %} onsubmit="return confirm('Mettre fin au mandat n° {{ mandat.numero }} ?');"{% endif %}>
+    {% csrf_token %}
+    <div class="champs-etape">
+      {% include "proprietes/_champ.html" with champ=form_fin.date_fin %}
+    </div>
+  </form>
+  <div class="boutons-etape">
+    <a class="bouton secondaire" href="{{ annuler }}">Annuler</a>
+    <button type="submit" form="form-fin" class="pousse">{% if mandat.date_fin %}Enregistrer la correction{% else %}Enregistrer la fin du mandat{% endif %}</button>
+  </div>
+  {% elif mode == "grisee" %}
+  <p class="ligne-etape">Terminé le {{ mandat.date_fin|date:"d/m/Y" }}</p>
+  {% else %}
+  <p class="ligne-etape">Date de fin, à la résiliation ou à l'échéance : {{ mandat.duree_texte }}.{% if processus.rang < 4 %} <a href="?etape=5#etape-5">Mettre fin au mandat dès maintenant</a>{% endif %}</p>
+  {% endif %}
+  {% endif %}
+</section>
+{% endwith %}{% endfor %}
+</div>
+
+<section class="carte" id="historique">
+  <h2>Historique</h2>
+  <ul class="historique">
+  {% for version in historique %}
+    <li>{{ version.history_date|date:"d/m/Y H:i" }} · {{ version.get_history_type_display }} par {{ version.history_user|default:"système" }}</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endblock %}

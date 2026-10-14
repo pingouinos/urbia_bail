@@ -198,6 +198,15 @@ class Mandat(Contrat):
         return self.date_fin is None
 
     @property
+    def signature_retirable(self):
+        """‹ Du dossier à la signature : tant que le mandat n'est pas en
+        gestion (dossier incomplet, aucun bail signé sous ce mandat)."""
+        return (
+            self.signe and self.en_cours and bool(self.pieces_manquantes)
+            and not self.baux.filter(date_signature__isnull=False).exists()
+        )
+
+    @property
     def parties(self):
         return self.mandant
 

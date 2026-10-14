@@ -1,41 +1,45 @@
 {% extends "base.html" %}
-{% block titre %}Modifier le bail · {{ bail.propriete.adresse }} · {{ nom_application }}{% endblock %}
+{% block titre %}Bail · {{ bail.propriete.adresse }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 {% comment %}
-Le bail étape par étape, comme sa frise : une section par étape, les étapes
-faites grisées, l'étape ouverte avec ses champs et ses flèches (‹ revenir,
-› enregistrer et passer à la suivante), les étapes à venir sur une ligne.
+La page d'un bail, façon PLM : la frise en haut avec ses flèches ‹ ›, puis
+une section par étape. L'étape ouverte porte ses champs ; les étapes
+atteintes sont grisées, en lecture seule, avec un crayon tant qu'elles se
+modifient et un cadenas une fois le bail signé ; les étapes à venir tiennent
+sur une ligne.
 {% endcomment %}
-<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><a href="{{ bail.get_absolute_url }}">Bail · {{ bail.propriete.adresse }}</a><span aria-hidden="true">›</span><span class="fil-ici">Modifier</span></nav>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><span class="fil-ici">Bail · {{ bail.propriete.adresse }}</span></nav>
+{% if vient_d_etre_cree %}{% include "contrats/_etapes.html" with etape=3 %}{% endif %}
 
-<section class="carte carte-frise etapes-entete">
-  <div class="titre-actions">
-    <h1 class="titre-etapes">Bail · {{ bail.propriete.adresse }}</h1>
-    {% with etat=bail.etat %}<span class="pastille pastille-{{ etat.0 }}">{{ etat.1 }}</span>{% endwith %}
+<section class="carte etapes-entete">
+  <div class="entete-haut">
+    <div class="entete-titre">
+      <div class="titre-pastille">
+        <h1 class="titre-etapes">Bail · {{ bail.propriete.adresse }}</h1>
+        {% with etat=bail.etat %}<span class="pastille pastille-{{ etat.0 }}">{{ etat.1 }}</span>{% endwith %}
+      </div>
+      <p class="discret">{{ bail.noms_locataires|default:"Locataire à renseigner" }} · {{ bail.get_type_display }} · du {{ bail.date_effet|date:"d/m/Y" }} au {{ bail.date_fin|date:"d/m/Y" }}</p>
+    </div>
+    <nav class="actions-document" aria-label="Documents du bail">
+      <a href="{% url 'contrats:word' bail.pk %}">Word</a>
+      <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a>
+      {% if bail.fichier_signe %}<a href="{% url 'contrats:fichier_signe' bail.pk %}" target="_blank" rel="noopener">Bail signé</a>{% endif %}
+      <a href="#historique">Historique</a>
+    </nav>
   </div>
-  <p class="discret">{{ bail.noms_locataires|default:"Locataire à renseigner" }} · {{ bail.get_type_display }} · du {{ bail.date_effet|date:"d/m/Y" }} au {{ bail.date_fin|date:"d/m/Y" }}</p>
-  {% include "_frise.html" with processus=processus %}
-  <p class="etape-ici">{% if processus.courante %}Étape {{ processus.rang }} sur {{ processus.etapes|length }} · {{ processus.courante.libelle }}{% else %}Location terminée{% endif %}</p>
+  {% include "_frise_fleches.html" %}
 </section>
+{% if vient_d_etre_cree %}<p class="message">Bail enregistré : il se télécharge en <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> ou en <a href="{% url 'contrats:word' bail.pk %}">Word</a> pour le faire signer.</p>{% endif %}
 {% if correction %}<p class="message message-erreur">Correction d'un bail signé, réservée aux administrateurs : le PDF téléchargé ne sera plus tout à fait celui qui a été signé.</p>{% endif %}
 
 <div class="etapes-bail">
 {% for section in sections %}{% with etape=section.etape numero=section.numero mode=section.mode %}
-<section class="etape-bail {{ mode }}{% if etape.etat == 'sautee' %} sans-objet{% endif %}" id="etape-{{ numero }}" aria-labelledby="titre-etape-{{ numero }}">
-  <header>
-    <span class="etape-bail-numero" aria-hidden="true">{% if etape.etat == "sautee" %}–{% elif mode == "grisee" and etape.etat == "faite" %}<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>{% else %}{{ numero }}{% endif %}</span>
-    <h2 id="titre-etape-{{ numero }}">{{ numero }} · {{ etape.libelle }}</h2>
-    {% if numero == 3 and bail.signe and mode == "grisee" %}
-    <span class="verrou"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>verrouillé, bail signé</span>
-    {% if est_administrateur and processus.rang >= 6 %}<a class="bouton-petit secondaire" href="?etape=3#etape-3">Corriger</a>{% endif %}
-    {% else %}
-    <span class="pastille etat-{{ section.etat }}">{{ section.libelle_etat }}</span>
-    {% endif %}
-  </header>
+<section class="etape-bail {{ mode }}{% if etape.etat == 'sautee' %} sans-objet{% elif mode == 'grisee' and numero == processus.rang %} en-cours{% endif %}" id="etape-{{ numero }}" aria-labelledby="titre-etape-{{ numero }}">
+  {% include "_etape_entete.html" with section=section signee="bail signé" %}
 
   {% if numero == 1 %}
   <p class="ligne-etape">{% if etape.etat == "sautee" %}Sans objet : bail rédigé sans mise en location dans l'application.{% elif etape.date %}Mis en location le {{ etape.date|date:"d/m/Y" }}.{% else %}Faite avant le bail.{% endif %} Ses champs sont sur la <a href="{{ bail.propriete.get_absolute_url }}">fiche du logement</a>.</p>
-  {% with manquants=bail.propriete.champs_manquants_pour_bail %}{% if manquants %}<p class="alerte">Fiche du logement incomplète, le bail aura des blancs : {{ manquants|join:", " }}. <a href="{% url 'proprietes:propriete_modifier' bail.propriete.pk %}">Compléter la fiche</a></p>{% endif %}{% endwith %}
+  {% with manquants=bail.propriete.champs_manquants_pour_bail %}{% if manquants and not bail.signe %}<p class="alerte">Fiche du logement incomplète, le bail aura des blancs : {{ manquants|join:", " }}. <a href="{% url 'proprietes:propriete_modifier' bail.propriete.pk %}">Compléter la fiche</a></p>{% endif %}{% endwith %}
 
   {% elif numero == 2 %}
   <p class="ligne-etape">{% if candidature %}Candidature retenue : <a href="{{ candidature.get_absolute_url }}">{{ candidature.noms|default:"voir la candidature" }}</a>.{% else %}Sans objet : aucune candidature enregistrée pour ce bail.{% endif %}</p>
@@ -48,51 +52,56 @@ faites grisées, l'étape ouverte avec ses champs et ses flèches (‹ revenir,
     <ul>{% for alerte in alertes %}<li>{{ alerte }}</li>{% endfor %}</ul>
   </div>
   {% endif %}{% endwith %}{% endif %}
-  <form method="post" action="{% url 'contrats:modifier' bail.pk %}" class="formulaire">
+  <form method="post" action="{{ bail.get_absolute_url }}" class="formulaire">
     {% csrf_token %}
     {% for champ in form.hidden_fields %}{{ champ }}{% for erreur in champ.errors %}<p class="erreur">{{ erreur }}</p>{% endfor %}{% endfor %}
     {% if form.errors or locataires.total_error_count %}<p class="message message-erreur">Certains champs sont à corriger : ils sont signalés en rouge.</p>{% endif %}
     {{ form.non_field_errors }}
     {% include "contrats/_champs_bail.html" %}
-    <div class="fleches">
-      {% if correction %}
-      <div><a class="bouton secondaire" href="{% url 'contrats:modifier' bail.pk %}">‹ Annuler la correction</a></div>
-      {% else %}
-      <div class="fleche-inactive"><span class="bouton secondaire" aria-disabled="true">‹ Étape précédente</span><small>La mise en location et les candidatures se remplissent sur la fiche du logement.</small></div>
-      {% endif %}
-      <div class="fleche-suivante"><button type="submit">{% if correction %}Enregistrer la correction{% else %}Enregistrer et passer à la signature ›{% endif %}</button></div>
+    <div class="boutons-etape">
+      {% if correction or processus.rang != 3 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
+      <button type="submit" class="pousse">{% if correction %}Enregistrer la correction{% elif processus.rang == 3 %}Enregistrer et passer à la signature ›{% else %}Enregistrer{% endif %}</button>
     </div>
   </form>
   {% else %}
   <dl class="valeurs-etape">
-    <dt>Locataires</dt><dd>{% for locataire in bail.locataires.all %}{{ locataire.designation }}{{ locataire.naissance }}{% if not forloop.last %}<br>{% endif %}{% empty %}à renseigner{% endfor %}</dd>
-    <dt>Bail</dt><dd>{{ bail.get_type_display }}, du {{ bail.date_effet|date:"d/m/Y" }} au {{ bail.date_fin|date:"d/m/Y" }}{% if bail.colocation %} · colocation{% endif %}</dd>
-    <dt>Loyer</dt><dd>{{ bail.loyer }} € hors charges + {{ bail.charges }} € de charges, payable le {{ bail.jour_paiement }}{% if bail.jour_paiement == 1 %}er{% endif %} du mois</dd>
+    <dt>Logement</dt><dd><a href="{{ bail.propriete.get_absolute_url }}">{{ bail.propriete }}</a><br>Bailleur : {{ bail.propriete.bailleur.designation }}</dd>
+    <dt>Mandat</dt><dd>{% if bail.mandat %}<a href="{{ bail.mandat.get_absolute_url }}">n° {{ bail.mandat.numero }}</a>{% else %}aucun{% endif %}</dd>
+    <dt>Locataires</dt><dd>{% for locataire in bail.locataires.all %}{% if not forloop.first %}<br>{% endif %}{{ locataire.designation }}{{ locataire.naissance }}{% if locataire.email or locataire.telephone %}<br><span class="discret">{{ locataire.email }} {{ locataire.telephone }}</span>{% endif %}{% for garant in locataire.liste_garants %}<br>Garant : {{ garant }}{% endfor %}{% empty %}à renseigner{% endfor %}{% if bail.colocation %}<br><span class="discret">Colocation, bail unique</span>{% endif %}</dd>
+    {% with garants=bail.liste_garants %}{% if garants %}<dt>Garants communs</dt><dd>{% for garant in garants %}{{ garant }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</dd>{% endif %}{% endwith %}
+    <dt>Bail</dt><dd>{{ bail.get_type_display }}, du {{ bail.date_effet|date:"d/m/Y" }} au {{ bail.date_fin|date:"d/m/Y" }}</dd>
+    <dt>Loyer</dt><dd>{{ bail.loyer }} € hors charges + {{ bail.charges }} € de charges ({{ bail.get_mode_charges_display|lower }}), soit {{ bail.total_mensuel }} € par mois, payable le {{ bail.jour_paiement }}{% if bail.jour_paiement == 1 %}er{% endif %} du mois</dd>
     <dt>Dépôt de garantie</dt><dd>{{ bail.depot_garantie }} €</dd>
     <dt>IRL</dt><dd>{{ bail.irl_trimestre }} ({{ bail.irl_valeur }})</dd>
-    <dt>Mandat</dt><dd>{% if bail.mandat %}n° {{ bail.mandat.numero }}{% else %}aucun{% endif %}</dd>
+    <dt>Honoraires</dt><dd>Visite, dossier, bail : {{ bail.honoraires_bail_bailleur }} € bailleur, {{ bail.honoraires_bail_locataire }} € locataire<br>État des lieux : {{ bail.honoraires_edl_bailleur }} € bailleur, {{ bail.honoraires_edl_locataire }} € locataire</dd>
   </dl>
   {% endif %}
 
   {% elif numero == 4 %}
   {% if mode == "ouverte" %}
   <p class="ligne-etape">Le bail à faire signer : <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> ou <a href="{% url 'contrats:word' bail.pk %}">Word</a>. La date s'enregistre une fois le bail signé par les parties ; le scan peut attendre.</p>
+  <div class="annexes-etape">
+    <p><strong>Annexes à joindre</strong></p>
+    <ul>{% for annexe in bail.annexes %}<li>{{ annexe }}</li>{% endfor %}</ul>
+  </div>
   <form method="post" enctype="multipart/form-data" action="{% url 'contrats:deposer_signe' bail.pk %}" id="form-signature">
-    {% csrf_token %}<input type="hidden" name="etapes" value="1">
+    {% csrf_token %}
     <div class="champs-etape">
       {% include "proprietes/_champ.html" with champ=form_signe.date_signature %}
       {% include "proprietes/_champ.html" with champ=form_signe.fichier_signe %}
     </div>
   </form>
-  <div class="fleches">
-    <div><a class="bouton secondaire" href="?etape=3#etape-3">‹ Revenir au bail</a><small>Pour le corriger avant de le faire signer.</small></div>
-    <div class="fleche-suivante"><button type="submit" form="form-signature">Enregistrer et passer à l'entrée ›</button></div>
+  {% if bail.signe %}<form method="post" action="{% url 'contrats:retirer_signature' bail.pk %}" id="form-retirer" onsubmit="return confirm('Retirer la signature de ce bail ? Il redevient modifiable, et il faudra le faire signer à nouveau. Le scan reste.');">{% csrf_token %}</form>{% endif %}
+  <div class="boutons-etape">
+    {% if bail.signe %}<button type="submit" form="form-retirer" class="secondaire bouton-danger">Retirer la signature…</button>{% endif %}
+    {% if processus.rang != 4 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
+    <button type="submit" form="form-signature" class="pousse">{% if bail.signe %}Enregistrer{% else %}Enregistrer et passer à l'entrée ›{% endif %}</button>
   </div>
   {% elif mode == "grisee" %}
   <p class="ligne-etape">{% if bail.date_signature %}Signé le {{ bail.date_signature|date:"d/m/Y" }}{% else %}Pas de date de signature{% endif %}{% if bail.fichier_signe %} · <a href="{% url 'contrats:fichier_signe' bail.pk %}" target="_blank" rel="noopener">ouvrir le bail signé</a>{% elif bail.signe %} · scan à déposer{% endif %}</p>
   {% if bail.signe and not bail.fichier_signe %}
   <form method="post" enctype="multipart/form-data" action="{% url 'contrats:deposer_signe' bail.pk %}" class="en-ligne">
-    {% csrf_token %}<input type="hidden" name="etapes" value="1"><input type="hidden" name="date_signature" value="{{ bail.date_signature|date:'Y-m-d' }}">
+    {% csrf_token %}<input type="hidden" name="date_signature" value="{{ bail.date_signature|date:'Y-m-d' }}">
     <label>{{ form_signe.fichier_signe.label }} {{ form_signe.fichier_signe }}</label>
     <button type="submit" class="bouton-petit secondaire">Déposer le scan</button>
   </form>
@@ -104,13 +113,8 @@ faites grisées, l'étape ouverte avec ses champs et ses flèches (‹ revenir,
   {% elif numero == 5 %}
   {% if mode == "ouverte" %}
   <p class="ligne-etape">Entrée prévue le {{ bail.date_effet|date:"d/m/Y" }}, date d'effet du bail. Rien à saisir : l'étape se clôt d'elle-même ce jour-là.</p>
-  <div class="fleches">
-    <form method="post" action="{% url 'contrats:retirer_signature' bail.pk %}" onsubmit="return confirm('Retirer la signature de ce bail ? Il redevient modifiable, et il faudra le faire signer à nouveau.');">
-      {% csrf_token %}<button type="submit" class="secondaire">‹ Revenir à la signature</button><small>Retire la date de signature ; le scan reste.</small>
-    </form>
-  </div>
   {% elif mode == "grisee" %}
-  <p class="ligne-etape">Entrée le {{ bail.date_effet|date:"d/m/Y" }}</p>
+  <p class="ligne-etape">Entrée {% if numero == processus.rang %}prévue {% endif %}le {{ bail.date_effet|date:"d/m/Y" }}</p>
   {% else %}
   <p class="ligne-etape">Entrée prévue le {{ bail.date_effet|date:"d/m/Y" }}, date d'effet du bail.</p>
   {% endif %}
@@ -118,9 +122,8 @@ faites grisées, l'étape ouverte avec ses champs et ses flèches (‹ revenir,
   {% elif numero == 6 %}
   {% if mode == "ouverte" %}
   <p class="ligne-etape">Depuis le {{ bail.date_effet|date:"d/m/Y" }} · {{ bail.total_mensuel }} € par mois.</p>
-  <div class="fleches">
-    <div class="fleche-inactive"><span class="bouton secondaire" aria-disabled="true">‹ Revenir à l'entrée</span><small>Le locataire est entré : on ne revient plus en arrière.</small></div>
-    <div class="fleche-suivante"><a class="bouton" href="?etape=7#etape-7">Un congé est arrivé ›</a></div>
+  <div class="boutons-etape">
+    <a class="bouton pousse" href="?etape=7#etape-7">Un congé est arrivé ›</a>
   </div>
   {% elif mode == "grisee" %}
   <p class="ligne-etape">Depuis le {{ bail.date_effet|date:"d/m/Y" }} · {{ bail.total_mensuel }} € par mois</p>
@@ -144,15 +147,11 @@ faites grisées, l'étape ouverte avec ses champs et ses flèches (‹ revenir,
       {% include "proprietes/_champ.html" with champ=form_fin.date_fin_effective %}
     </div>
   </form>
-  <div class="fleches">
-    {% if bail.conge_annulable %}
-    <form method="post" action="{% url 'contrats:annuler_conge' bail.pk %}" onsubmit="return confirm('Annuler le congé ? La location continue.');">
-      {% csrf_token %}<button type="submit" class="secondaire">‹ Annuler le congé</button><small>Tant que le locataire n'est pas parti.</small>
-    </form>
-    {% else %}
-    <div><a class="bouton secondaire" href="{% url 'contrats:modifier' bail.pk %}#etape-6">‹ Revenir à la location en cours</a></div>
-    {% endif %}
-    <div class="fleche-suivante"><button type="submit" form="form-fin">Enregistrer</button></div>
+  {% if bail.conge_annulable %}<form method="post" action="{% url 'contrats:annuler_conge' bail.pk %}" id="form-annuler-conge" onsubmit="return confirm('Annuler le congé ? La location continue.');">{% csrf_token %}</form>{% endif %}
+  <div class="boutons-etape">
+    {% if bail.conge_annulable %}<button type="submit" form="form-annuler-conge" class="secondaire bouton-danger">Annuler le congé…</button>{% endif %}
+    {% if processus.rang != 7 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
+    <button type="submit" form="form-fin" class="pousse">Enregistrer</button>
   </div>
   {% elif mode == "grisee" %}
   <p class="ligne-etape">{% if bail.conge_recu_le %}Congé {% if bail.conge_origine == "bailleur" %}du bailleur{% else %}du locataire{% endif %} reçu le {{ bail.conge_recu_le|date:"d/m/Y" }} · {% endif %}{% if bail.date_fin_effective %}parti le {{ bail.date_fin_effective|date:"d/m/Y" }}{% else %}départ prévu le {{ bail.date_depart_prevue|date:"d/m/Y" }}{% endif %}</p>
@@ -163,6 +162,15 @@ faites grisées, l'étape ouverte avec ses champs et ses flèches (‹ revenir,
 </section>
 {% endwith %}{% endfor %}
 </div>
+
+<section class="carte" id="historique">
+  <h2>Historique</h2>
+  <ul class="historique">
+  {% for version in historique %}
+    <li>{{ version.history_date|date:"d/m/Y H:i" }} · {{ version.get_history_type_display }} par {{ version.history_user|default:"système" }}</li>
+  {% endfor %}
+  </ul>
+</section>
 
 {% if not bail.signe or est_administrateur %}
 <form method="post" action="{% url 'contrats:supprimer' bail.pk %}" class="en-ligne supprimer-bail" onsubmit="return confirm('{% if bail.signe %}Ce bail est signé. Le supprimer définitivement, avec son exemplaire signé ?{% else %}Supprimer définitivement ce bail ?{% endif %}');">

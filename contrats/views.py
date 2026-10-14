@@ -13,7 +13,7 @@ from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from contacts.models import Contact
 from core.journal import noter
-from core.processus import A_VENIR, ALERTE, COURANTE, FAITE, SAUTEE, processus_bail
+from core.processus import navigation, processus_bail, sections_etapes
 from mandats.models import Mandat
 from documents import views as documents
 
@@ -64,20 +64,6 @@ def liste(request):
     parametres.pop("page", None)
     return render(request, "contrats/liste.html", {
         "page": page, "parametres": parametres.urlencode(), "types": TYPES,
-    })
-
-
-def bail(request, pk):
-    objet = get_object_or_404(Bail.objects.select_related("propriete__bailleur", "mandat"), pk=pk)
-    return render(request, "contrats/bail.html", {
-        "bail": objet, "processus": processus_bail(objet),
-        # Bannière de fin de parcours, une seule fois après la création.
-        "vient_d_etre_cree": request.session.pop("bail_cree", None) == objet.pk,
-        "historique": objet.history.select_related("history_user")[:10],
-        "form_signe": SignatureForm(instance=objet),
-        "echeances": _echeances(objet),
-        "mois_propose": max(objet.date_effet, timezone.localdate()).strftime("%Y-%m"),
-        "aujourd_hui": timezone.localdate().isoformat(),
     })
 
 
@@ -242,45 +228,40 @@ def bail_editer(request):
     })
 
 
-# L'état d'une étape, en tête de sa section.
-ETATS_ETAPE = {FAITE: "Fait", SAUTEE: "Sans objet", COURANTE: "En cours", ALERTE: "À vérifier", A_VENIR: "À venir"}
-
-
 def vers_etapes(bail, etape=None):
-    """La page des étapes du bail, à l'étape demandée ou à l'étape en cours."""
-    url = reverse("contrats:modifier", args=[bail.pk])
+    """La page du bail, à l'étape demandée ou à l'étape en cours."""
+    url = bail.get_absolute_url()
     if etape:
         return f"{url}?etape={etape}#etape-{etape}"
     return f"{url}#etape-{min(processus_bail(bail).rang, 7)}"
 
 
-def etape_ouverte(bail, rang, demandee, administrateur):
-    """L'étape dont les champs s'ouvrent : l'étape en cours, ou une étape où
-    l'on peut revenir. Un bail non signé se reprend à tout moment ; signé, il
-    est verrouillé, sauf pour un administrateur une fois le locataire entré
-    (la signature ne se retire plus). Un congé s'enregistre depuis la
-    location en cours. None : bail terminé, plus rien à remplir."""
-    possibles = set()
+def etapes_ouvrables(bail, rang):
+    """Les étapes qui se rouvrent d'un crayon ou d'une flèche de la frise :
+    l'étape en cours ; le bail tant qu'il n'est pas signé ; la signature
+    tant que le locataire n'est pas entré (on peut alors la retirer) ; la
+    sortie dès la location en cours, quand un congé arrive. Terminé, plus rien."""
+    if bail.date_fin_effective:
+        return set()
+    ouvrables = {rang}
     if not bail.signe:
-        possibles.add(3)
+        ouvrables.add(3)
         if rang <= 4:
-            possibles.add(4)
-    elif administrateur and rang >= 6:
-        possibles.add(3)
+            ouvrables.add(4)
+    elif bail.signature_retirable:
+        ouvrables.add(4)
     if rang == 6:
-        possibles.add(7)
-    demandee = int(demandee) if str(demandee).isdigit() else None
-    if demandee in possibles:
-        return demandee
-    return rang if rang <= 7 else None
+        ouvrables.add(7)
+    return ouvrables
 
 
 def etapes(request, pk):
-    """Le bail étape par étape, comme sa frise : une section par étape, les
-    étapes faites grisées, l'étape ouverte avec ses champs et ses flèches
-    (‹ revenir à l'étape précédente quand c'est possible, › enregistrer et
-    passer à la suivante). Les champs du bail lui-même s'enregistrent ici ;
-    la signature et le départ ont leur propre vue."""
+    """La page d'un bail, façon PLM : la frise en haut avec ses flèches, une
+    section par étape dessous. L'étape en cours est ouverte avec ses champs,
+    les étapes atteintes sont grisées en lecture seule, avec un crayon tant
+    qu'elles se modifient et un cadenas une fois le bail signé. Les champs
+    du bail lui-même s'enregistrent ici ; la signature et le départ ont leur
+    propre vue."""
     objet = get_object_or_404(Bail.objects.select_related("propriete__bailleur", "mandat"), pk=pk)
     administrateur = est_administrateur(request.user)
     form = BailForm(request.POST or None, instance=objet)
@@ -294,28 +275,32 @@ def etapes(request, pk):
                 form.save()
                 locataires.save()
             messages.success(request, "Bail enregistré.")
-            # › Étape suivante : la signature, si le bail l'attend encore.
-            return redirect(vers_etapes(objet, 4 if processus_bail(objet).rang <= 4 else None))
+            return redirect(vers_etapes(objet))
     processus = processus_bail(objet)
-    ouverte = 3 if form.is_bound else etape_ouverte(objet, processus.rang, request.GET.get("etape"), administrateur)
-    # Revenir sur le bail (avant signature) le fait repasser « à venir » ;
-    # le corriger (administrateur, bail signé) laisse les étapes comme elles sont.
-    correction = ouverte == 3 and objet.signe
-    sections = []
-    for numero, etape in enumerate(processus.etapes, 1):
-        if numero == ouverte:
-            mode, etat = "ouverte", "alerte" if etape.etat == ALERTE else "courante"
-        elif numero < (processus.rang + 1 if correction else ouverte or 8):
-            mode, etat = "grisee", etape.etat
-        else:
-            mode, etat = "a-venir", A_VENIR
-        sections.append({"numero": numero, "etape": etape, "mode": mode, "etat": etat, "libelle_etat": ETATS_ETAPE[etat]})
+    ouvrables = etapes_ouvrables(objet, processus.rang)
+    # Une fois le locataire entré, seul un administrateur corrige le bail signé.
+    corrigeables = {3} if administrateur and objet.signe and processus.rang >= 6 else set()
+    demandee = request.GET.get("etape", "")
+    demandee = int(demandee) if demandee.isdigit() else None
+    if form.is_bound:
+        ouverte = 3
+    elif demandee in ouvrables or demandee in corrigeables:
+        ouverte = demandee
+    else:
+        ouverte = processus.rang if processus.rang <= 7 else None
+    precedente, suivante = navigation(processus, ouverte, ouvrables)
     return render(request, "contrats/etapes.html", {
-        "bail": objet, "processus": processus, "sections": sections, "ouverte": ouverte, "correction": correction,
+        "bail": objet, "processus": processus, "ouverte": ouverte,
+        "sections": sections_etapes(processus, ouverte, ouvrables, {3, 4} if objet.signe else (), corrigeables),
+        "correction": ouverte == 3 and objet.signe, "precedente": precedente, "suivante": suivante,
+        "annuler": vers_etapes(objet),
         "form": form, "locataires": locataires,
         "form_signe": SignatureForm(instance=objet),
         "form_fin": FinBailForm(instance=objet, initial=initial_fin(objet)),
         "candidature": Candidature.objects.filter(bail=objet).prefetch_related("candidats").first(),
+        # Message de fin de parcours, une seule fois après la création.
+        "vient_d_etre_cree": request.session.pop("bail_cree", None) == objet.pk,
+        "historique": objet.history.select_related("history_user")[:10],
     })
 
 
@@ -331,6 +316,7 @@ def retirer_signature(request, pk):
         objet.date_signature = None
         objet.save(update_fields=["date_signature", "modifie_le"])
         messages.success(request, "Signature retirée : le bail est de nouveau modifiable.")
+        return redirect(vers_etapes(objet, 3))
     return redirect(vers_etapes(objet))
 
 
@@ -459,7 +445,7 @@ def deposer_signe(request, pk):
         for erreurs in form.errors.values():
             for erreur in erreurs:
                 messages.error(request, erreur)
-    return redirect(vers_etapes(objet) if request.POST.get("etapes") else f"{objet.get_absolute_url()}#signature")
+    return redirect(vers_etapes(objet))
 
 
 def fichier_signe(request, pk):

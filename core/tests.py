@@ -433,9 +433,9 @@ class ProcessusTests(TestCase):
         self.assertContains(accueil, "Signature · 4/7")
         self.assertEqual(self.client.get(self.propriete.get_absolute_url()).context["location"].rang, etape.rang)
         self.assertEqual(rubriques["Mises en location"][0].processus.rang, etape.rang)
-        self.assertContains(page, "Avancement du bail")
+        self.assertContains(page, 'aria-label="Location : étapes"')
         self.assertContains(page, 'aria-current="step"')
-        self.assertContains(self.client.get(mandat.get_absolute_url()), "Avancement du mandat")
+        self.assertContains(self.client.get(mandat.get_absolute_url()), 'aria-label="Mandat : étapes"')
         self.assertContains(self.client.get(self.propriete.get_absolute_url()), 'aria-label="Location : étapes"')
         # Logement loué : la fiche montre la frise du bail en cours.
         import datetime as dt

@@ -1,0 +1,14 @@
+{% comment %}
+Frise d'un bail ou d'un mandat sur sa page, façon PLM : la flèche ‹ rouvre
+l'étape précédente si elle se modifie encore, › revient vers l'étape en
+cours ; grisées sinon. Paramètres : processus, ouverte, precedente, suivante
+(précédente et suivante : {numero, libelle} ou rien, voir core.processus.navigation).
+{% endcomment %}
+<div class="frise-zone">
+  {% if precedente %}<a class="fleche-frise" href="?etape={{ precedente.numero }}#etape-{{ precedente.numero }}" title="Rouvrir l'étape « {{ precedente.libelle }} »" aria-label="Étape précédente : {{ precedente.libelle }}">‹</a>
+  {% else %}<span class="fleche-frise" aria-disabled="true" title="L'étape précédente ne se modifie plus">‹</span>{% endif %}
+  {% include "_frise.html" with processus=processus choisie=ouverte %}
+  {% if suivante %}<a class="fleche-frise" href="?etape={{ suivante.numero }}#etape-{{ suivante.numero }}" title="Aller à l'étape « {{ suivante.libelle }} »" aria-label="Étape suivante : {{ suivante.libelle }}">›</a>
+  {% else %}<span class="fleche-frise" aria-disabled="true" title="Pas d'étape suivante à rouvrir">›</span>{% endif %}
+</div>
+<p class="etape-ici">{% if processus.courante %}Étape {{ processus.rang }} sur {{ processus.etapes|length }} · {{ processus.courante.libelle }}{% elif processus.termine %}Terminé{% endif %}</p>

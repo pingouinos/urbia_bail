@@ -1,0 +1,9 @@
+{% comment %}Champs du mandat par sections : création, et étape « Rédaction » de la page des étapes.{% endcomment %}
+  {% for titre, champs in form.sections %}
+  <fieldset>
+    <legend>{{ titre }}</legend>
+    {% if titre == "Honoraires de location" and form.base_honoraires %}<p class="pleine-largeur">{% if form.instance.pk %}Plafonds légaux pour ce logement{% else %}Calculés automatiquement au plafond légal, à parts égales entre le bailleur et le locataire{% endif %} :{% for calcul in form.base_honoraires %}<br>{{ calcul }}{% endfor %}</p>{% endif %}
+    {% if titre == "Honoraires de location" %}<p class="discret pleine-largeur">La part du locataire ne peut dépasser ni celle du bailleur ni le plafond légal : 10 €/m² en zone tendue (8 €/m² ailleurs) pour la visite, le dossier et le bail, 3 €/m² pour l'état des lieux.</p>{% endif %}
+    {% for champ in champs %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  {% endfor %}

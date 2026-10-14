@@ -146,8 +146,8 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
     ]
     if bail:
         # Depuis un bail, chaque point de la frise ouvre son étape sur la page
-        # des étapes du bail.
-        page = reverse("contrats:modifier", args=[bail.pk])
+        # du bail.
+        page = bail.get_absolute_url()
         for numero, etape in enumerate(etapes, 1):
             etape.lien = f"{page}?etape={numero}#etape-{numero}"
     if bail and not candidature:
@@ -189,15 +189,17 @@ def processus_mandat(mandat, manquantes=None):
     fin. `manquantes` évite de recalculer le dossier quand on l'a déjà."""
     if manquantes is None:
         manquantes = mandat.pieces_manquantes
-    url = mandat.get_absolute_url()
     etapes = [
-        Etape("Rédaction", date=_date_redaction(mandat), detail=f"n° {mandat.numero}", lien=url),
-        Etape("Signature", date=mandat.date_signature, lien=f"{url}#signature"),
-        Etape("Dossier du mandant", detail=_pluriel(len(manquantes), "pièce") + " à fournir" if manquantes else "complet",
-              lien=f"{url}#dossier"),
+        Etape("Rédaction", date=_date_redaction(mandat), detail=f"n° {mandat.numero}"),
+        Etape("Signature", date=mandat.date_signature),
+        Etape("Dossier du mandant", detail=_pluriel(len(manquantes), "pièce") + " à fournir" if manquantes else "complet"),
         Etape("Gestion"),
         Etape("Fin du mandat", date=mandat.date_fin),
     ]
+    # Chaque point de la frise ouvre sa section sur la page du mandat.
+    page = mandat.get_absolute_url()
+    for numero, etape in enumerate(etapes, 1):
+        etape.lien = f"{page}?etape={numero}#etape-{numero}"
     if mandat.date_fin:
         rang = 6
         # Terminé sans signature ou dossier enregistrés : rien à relancer.
@@ -213,3 +215,47 @@ def processus_mandat(mandat, manquantes=None):
         rang = 4
     _marquer(etapes, rang)
     return Processus("Mandat", etapes, rang, termine=bool(mandat.date_fin))
+
+
+# Pastille d'une étape sur la page d'un bail ou d'un mandat.
+LIBELLES_ETATS = {FAITE: "Fait", SAUTEE: "Sans objet", COURANTE: "En cours", ALERTE: "À vérifier", A_VENIR: "À venir"}
+
+
+def sections_etapes(processus, ouverte, ouvrables, verrouillees=(), corrigeables=()):
+    """Une section par étape, pour la page d'un bail ou d'un mandat, façon
+    PLM : l'étape ouverte avec ses champs, les étapes atteintes grisées et en
+    lecture seule, les suivantes à venir. Une étape atteinte qui se rouvre
+    (`ouvrables`) porte un crayon ; une étape signée porte un cadenas
+    (`verrouillees`), et « Corriger » pour un administrateur (`corrigeables`).
+    `ouverte` à None : rien d'ouvert, tout est grisé."""
+    sections = []
+    for numero, etape in enumerate(processus.etapes, 1):
+        if numero == ouverte:
+            mode, etat = "ouverte", ALERTE if etape.etat == ALERTE else COURANTE
+            libelle = LIBELLES_ETATS[etat] if numero == processus.rang else "Modification"
+        else:
+            mode, etat = ("grisee", etape.etat) if numero <= processus.rang else ("a-venir", A_VENIR)
+            libelle = LIBELLES_ETATS[etat]
+        grisee = mode == "grisee" and etape.etat != SAUTEE
+        sections.append({
+            "numero": numero, "etape": etape, "mode": mode, "etat": etat, "libelle_etat": libelle,
+            "crayon": grisee and numero in ouvrables,
+            "verrou": grisee and numero in verrouillees and numero not in ouvrables,
+            "corriger": mode != "ouverte" and numero in corrigeables,
+        })
+    return sections
+
+
+def navigation(processus, ouverte, ouvrables):
+    """Les flèches de la frise : ‹ rouvre l'étape précédente si elle se
+    rouvre encore (une étape « sans objet » est sautée), › revient vers
+    l'étape en cours. Chacune : {numero, libelle}, ou None (flèche grisée)."""
+    nombre = len(processus.etapes)
+    position = ouverte or nombre + 1
+    precedente = next((n for n in range(position - 1, 0, -1) if processus.etapes[n - 1].etat != SAUTEE), None)
+    suivante = next((n for n in range(position + 1, min(processus.rang, nombre) + 1) if n in ouvrables), None)
+    precedente = precedente if precedente in ouvrables else None
+    return tuple(
+        {"numero": numero, "libelle": processus.etapes[numero - 1].libelle} if numero else None
+        for numero in (precedente, suivante)
+    )
