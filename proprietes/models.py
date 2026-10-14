@@ -453,6 +453,16 @@ class Propriete(Horodatage):
         return reverse("proprietes:propriete", args=[self.pk])
 
     @classmethod
+    def choix_pour(cls, contrat):
+        """Les biens proposés dans un mandat ou un bail : ceux que l'agence
+        gère, plus celui du contrat lui-même, même décoché « Actif » depuis,
+        pour qu'il s'affiche toujours et que le contrat s'enregistre."""
+        filtre = models.Q(actif=True)
+        if contrat.propriete_id:
+            filtre |= models.Q(pk=contrat.propriete_id)
+        return cls.objects.filter(filtre).select_related("bailleur")
+
+    @classmethod
     def a_l_adresse(cls, adresse, code_postal, sauf=None):
         """Propriétés déjà enregistrées à cette adresse, quel que soit le lot."""
         cle = cle_adresse(adresse)

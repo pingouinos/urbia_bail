@@ -36,7 +36,7 @@ class MandatForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["propriete"].queryset = Propriete.objects.filter(actif=True).select_related("bailleur")
+        self.fields["propriete"].queryset = Propriete.choix_pour(self.instance)
         if self.instance.pk:
             # Le bien d'un mandat enregistré ne change plus.
             self.fields["propriete"].disabled = True
