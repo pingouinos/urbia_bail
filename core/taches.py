@@ -16,7 +16,7 @@ from contrats.models import Bail
 from mandats.models import Mandat
 from proprietes.models import Bailleur, Piece, Propriete
 
-from .processus import processus_mandat
+from .processus import processus_bail, processus_mandat
 
 # Rubriques, dans l'ordre d'affichage.
 RUBRIQUES = ["Mises en location", "Loyers", "Mandats", "Candidatures", "Baux", "Documents", "Fiches à compléter"]
@@ -34,6 +34,7 @@ class Tache:
     urgent: bool = False
     detail: str = ""
     processus: object = None  # core.processus.Processus : l'étape où attend le dossier
+    alerte: str = ""  # signalée à côté du titre (« Sans mandat »)
 
 
 def de(nom):
@@ -54,10 +55,13 @@ def taches(locations):
     location déjà calculé pour le tableau de bord."""
     aujourd_hui = timezone.localdate()
     # Les mises en location les plus avancées d'abord : ce sont les plus
-    # proches d'un loyer.
+    # proches d'un loyer. Le repère d'étape suit la fiche que la ligne ouvre :
+    # un bail à faire signer montre les étapes du bail, comme sa fiche.
     liste = [
         Tache("Mises en location", ligne["etape"], _adresse(ligne["propriete"]), ligne["lien"], ligne["action"],
-              detail=ligne["detail"], processus=ligne.get("processus"))
+              detail=ligne["detail"],
+              processus=processus_bail(ligne["a_signer"]) if ligne.get("a_signer") else ligne.get("processus"),
+              alerte="Sans mandat" if ligne.get("processus") and ligne["processus"].en_alerte else "")
         for ligne in sorted(locations, key=lambda ligne: -ligne["processus"].rang if ligne.get("processus") else 0)
     ]
 
