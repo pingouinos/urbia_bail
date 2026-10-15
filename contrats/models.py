@@ -303,28 +303,43 @@ class Bail(Contrat):
         return (self.loyer or 0) + (self.charges or 0)
 
     @property
-    def alertes(self):
-        """Points à corriger avant de faire signer le bail."""
+    def interdictions(self):
+        """Ce que la loi interdit : le bail ne peut être ni préparé, ni
+        téléchargé, ni signé tant que ces points ne sont pas corrigés."""
         from documents.generation import montant
 
         propriete = self.propriete
-        alertes = []
+        interdictions = []
         if propriete.location_interdite:
-            alertes.append("Logement classé G : il ne peut plus faire l'objet d'un nouveau bail depuis le 1er janvier 2025.")
+            interdictions.append(
+                "Logement classé G : il ne peut plus faire l'objet d'un nouveau bail depuis le 1er janvier 2025 "
+                "(article 6 de la loi du 6 juillet 1989)."
+            )
+        if not propriete.est_habitation:
+            interdictions.append(
+                f"Ce bien est un {propriete.get_usage_display().lower()} : le bail d'habitation ne lui "
+                "convient pas, et l'application n'a pas encore de modèle pour ce type de bail."
+            )
+        if self.loyer and self.depot_garantie > self.loyer * self.mois_depot_max:
+            interdictions.append(
+                f"Dépôt de garantie supérieur à {self.mois_depot_max} mois de loyer hors charges "
+                f"({montant(self.loyer * self.mois_depot_max)} €, article 22 de la loi du 6 juillet 1989)."
+            )
+        return interdictions
+
+    @property
+    def alertes(self):
+        """Points à corriger avant de faire signer le bail ; les premiers
+        (``interdictions``) bloquent la préparation et la signature."""
+        propriete = self.propriete
+        alertes = list(self.interdictions)
         manquants = propriete.champs_manquants_pour_bail()
         if manquants:
             alertes.append("Fiche du bien incomplète : " + ", ".join(manquants) + ".")
-        if not propriete.est_habitation:
-            alertes.append("Ce bien n'est pas à usage d'habitation : ce modèle de bail ne convient pas.")
         if self.mandat is None:
             alertes.append("Aucun mandat de gestion n'est rattaché à ce bail.")
         if self.colocation and self.pk and self.locataires.count() < 2:
             alertes.append("Colocation cochée avec un seul locataire : la clause de colocation ne s'appliquera pas.")
-        if self.loyer and self.depot_garantie > self.loyer * self.mois_depot_max:
-            alertes.append(
-                f"Dépôt de garantie supérieur à {self.mois_depot_max} mois de loyer hors charges "
-                f"({montant(self.loyer * self.mois_depot_max)} €)."
-            )
         if self.precedent_loyer and self.loyer and self.loyer > self.precedent_loyer:
             if propriete.classe_dpe in ("F", "G"):
                 alertes.append(

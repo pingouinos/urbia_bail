@@ -24,8 +24,10 @@ from core.journal import noter
 
 from . import google
 from .generation import (
-    DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, convertir_pdf, generer_docx, remplir,
+    DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, clauses_perimees, convertir_pdf,
+    generer_docx, remplir,
 )
+from .archives import interdictions
 from .models import Modele
 
 # Modèles remplaçables : libellé, et objet dont le dernier modifié sert au
@@ -50,6 +52,11 @@ def document(request, objet, modele, format_):
             return reponse_version(request, version, format_)
         if objet.signe:
             messages.error(request, "Contrat historique sans archive : utilisez l’exemplaire signé ou demandez une reprise historique à un administrateur.")
+            return redirect(objet)
+        obstacles = interdictions(objet)
+        if obstacles:
+            for obstacle in obstacles:
+                messages.error(request, obstacle)
             return redirect(objet)
     contenu = generer_docx(modele, objet.contexte_document())
     type_, extension = DOCX, "docx"
@@ -109,6 +116,9 @@ def verifier_modele(nom, contenu):
     inconnues = variables - _variables(MODELES_PAR_DEFAUT / nom)
     if inconnues:
         return "Balises inconnues : " + ", ".join(sorted(inconnues)) + "."
+    perimees = clauses_perimees(nom, contenu)
+    if perimees:
+        return perimees[0]
     objet = _objet_essai(nom)
     if objet is not None:
         # Remplissage d'essai avec le dernier document de ce type.

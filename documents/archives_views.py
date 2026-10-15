@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 
 from comptes.roles import est_administrateur
 from core.journal import noter
-from .archives import assurer_historique, creer
+from .archives import assurer_historique, creer, interdictions
 from .generation import DOCX, ConversionImpossible, convertir_pdf
 from .models import PdfArchive, VersionContrat
 
@@ -32,6 +32,10 @@ def preparer(request, type_, pk):
         messages.success(request, "Reprise historique conservée ; le document initial reste inconnu.")
     elif not objet.en_cours:
         raise PermissionDenied
+    elif interdictions(objet):
+        for obstacle in interdictions(objet):
+            messages.error(request, obstacle)
+        return redirect(objet)
     else:
         creer(objet, request.user, "preparation", "Version à transmettre aux parties pour signature.")
         messages.success(request, "Version à signer archivée. Téléchargez cette version pour la transmettre.")

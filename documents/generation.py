@@ -39,6 +39,41 @@ def chemin_modele(nom):
     return depose if depose.exists() else MODELES_PAR_DEFAUT / nom
 
 
+# Clauses que la loi a rendues fausses : un modèle qui les contient encore ne
+# sert plus à produire un contrat.
+CLAUSES_PERIMEES = {
+    "bail_habitation.docx": {
+        "deux mois après un commandement de payer": (
+            "La clause résolutoire du modèle de bail prévoit encore « deux mois après un commandement de "
+            "payer » : c'est six semaines depuis la loi du 27 juillet 2023 (article 24 de la loi du "
+            "6 juillet 1989). Corriger le modèle dans « Modèles des documents »."
+        ),
+    },
+}
+
+
+def texte_docx(contenu):
+    """Texte brut du corps d'un .docx, paragraphe par paragraphe."""
+    with zipfile.ZipFile(io.BytesIO(contenu)) as archive:
+        xml = archive.read("word/document.xml").decode("utf-8")
+    paragraphes = re.findall(r"<w:p[ >].*?</w:p>", xml, flags=re.S)
+    return "\n".join("".join(re.findall(r"<w:t(?: [^>]*)?>([^<]*)</w:t>", p)) for p in paragraphes)
+
+
+def clauses_perimees(nom, contenu=None):
+    """Messages des clauses périmées que contient le modèle (en service par défaut)."""
+    clauses = CLAUSES_PERIMEES.get(nom)
+    if not clauses:
+        return []
+    if contenu is None:
+        contenu = chemin_modele(nom).read_bytes()
+    try:
+        texte = " ".join(texte_docx(contenu).split())
+    except (KeyError, zipfile.BadZipFile):
+        return []
+    return [message for extrait, message in clauses.items() if extrait in texte]
+
+
 def montant(valeur):
     """1234.5 → « 1 234,50 » ; 390.00 → « 390 »."""
     if valeur is None:
