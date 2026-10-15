@@ -36,6 +36,7 @@ urlpatterns = [
     re_path(r"^baux/(?P<suite>.*)$", RedirectView.as_view(url="/contrats/%(suite)s", query_string=True)),
     # Formulaire du candidat, seule partie ouverte sans connexion.
     path("locataire/merci/", candidatures_views.formulaire_locataire_merci, name="formulaire_locataire_merci"),
+    path("locataire/confidentialite/", candidatures_views.confidentialite, name="confidentialite"),
     path("locataire/<str:jeton>/", candidatures_views.formulaire_locataire, name="formulaire_locataire"),
     path(
         "connexion/",

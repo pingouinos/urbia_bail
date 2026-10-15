@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block titre %}Vos données personnelles · {{ agence.designation }}{% endblock %}
+{% block contenu %}
+<h1>Vos données personnelles</h1>
+<p>Cette page explique comment {{ agence.designation }} utilise les informations que vous saisissez pour une candidature à la location, et celles de vos garants.</p>
+
+<h2>Qui en est responsable</h2>
+<p>{{ agence.raison_sociale|default:agence.designation }}{% if agence.adresse %}, {{ agence.adresse }}, {{ agence.code_postal }} {{ agence.ville }}{% endif %}{% if agence.siren %} (SIREN {{ agence.siren }}){% endif %}, agissant pour le propriétaire du logement qui lui a confié sa location.</p>
+
+<h2>Pourquoi</h2>
+<ul>
+  <li><strong>Étudier votre candidature</strong> et vérifier que le logement correspond à votre situation : nous agissons à votre demande, avant un éventuel contrat (article 6.1.b du RGPD).</li>
+  <li><strong>Rédiger et gérer votre bail</strong> si votre candidature est retenue : c'est l'exécution du contrat, et le respect de nos obligations légales de gestionnaire.</li>
+</ul>
+<p>Nous ne demandons que les informations prévues par la loi. Vos justificatifs restent sur DossierFacile : nous les consultons par le lien que vous nous donnez, sans les copier. Votre date et votre lieu de naissance ne sont demandés qu'une fois la candidature retenue, parce qu'ils figurent sur le bail.</p>
+
+<h2>Qui y a accès</h2>
+<ul>
+  <li>Les collaborateurs de l'agence, et le propriétaire du logement pour la décision et le bail.</li>
+  <li>Nos prestataires techniques, qui ne peuvent pas s'en servir pour eux-mêmes : l'hébergement de l'application, Cloudflare qui achemine ce formulaire de façon sécurisée, et Google Workspace pour notre messagerie. Cloudflare et Google sont des sociétés américaines : les transferts éventuels hors de l'Union européenne sont encadrés par le cadre de protection des données UE–États-Unis et les clauses contractuelles types de la Commission européenne.</li>
+</ul>
+<p>Vos données ne sont ni vendues ni utilisées pour de la publicité.</p>
+
+<h2>Combien de temps</h2>
+<ul>
+  <li><strong>Candidature non retenue, ou sans bail</strong> : effacée dans les trois mois. Vous pouvez demander son effacement immédiat.</li>
+  <li><strong>Candidature retenue</strong> : vos informations deviennent celles du bail. Elles sont conservées pendant la location, puis le temps nécessaire aux obligations légales et aux délais de recours.</li>
+</ul>
+
+<h2>Vos garants</h2>
+<p>Si vous indiquez des garants, transmettez-leur cette page : leurs nom, adresse et coordonnées servent uniquement à étudier votre dossier et, si le bail est signé, à établir leur engagement de caution. Ils ont les mêmes droits que vous.</p>
+
+<h2>Vos droits</h2>
+<p>Vous pouvez demander l'accès à vos données, leur rectification, leur effacement ou la limitation de leur utilisation, et vous opposer à leur traitement quand la loi le permet. Écrivez-nous{% if agence.email %} à <a href="mailto:{{ agence.email }}">{{ agence.email }}</a>{% endif %}{% if agence.adresse %}{% if agence.email %} ou{% endif %} par courrier à {{ agence.designation }}, {{ agence.adresse }}, {{ agence.code_postal }} {{ agence.ville }}{% endif %}{% if not agence.email and not agence.adresse %} en répondant au message qui vous a transmis votre lien{% endif %}. Nous répondons dans un délai d'un mois.</p>
+<p>Si vous estimez que vos droits ne sont pas respectés, vous pouvez saisir la CNIL : <a href="https://www.cnil.fr/fr/plaintes" target="_blank" rel="noopener noreferrer">www.cnil.fr/fr/plaintes</a>.</p>
+{% endblock %}

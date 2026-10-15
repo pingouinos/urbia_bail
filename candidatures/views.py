@@ -226,3 +226,8 @@ def formulaire_locataire_valide(form, candidats):
 
 def formulaire_locataire_merci(request):
     return render(request, "candidatures/locataire_merci.html")
+
+
+def confidentialite(request):
+    """Information des candidats et de leurs garants (RGPD, articles 13 et 14)."""
+    return render(request, "candidatures/confidentialite.html")

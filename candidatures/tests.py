@@ -475,6 +475,37 @@ class LienLocataireTests(Donnees, TestCase):
         # Au bureau, l'application reste entière.
         self.assertEqual(self.client.get(self.candidature.get_absolute_url()).status_code, 200)
 
+    @override_settings(URL_LOCATAIRES="https://locataire.urbia.example", HOTE_LOCATAIRES="locataire.urbia.example",
+                       ALLOWED_HOSTS=["locataire.urbia.example", "testserver"])
+    def test_information_sur_les_donnees(self):
+        """RGPD articles 13 et 14 : le formulaire et le message renvoient à une
+        page publique qui informe le candidat et ses garants."""
+        formulaire = self.creer_lien()
+        texte = self.client.get(reverse("candidatures:lien", args=[self.candidature.pk])).context["form"].initial["texte"]
+        self.assertIn("https://locataire.urbia.example/locataire/confidentialite/", texte)
+        self.client.logout()
+        self.assertContains(self.client.get(formulaire, HTTP_HOST="locataire.urbia.example"),
+                            'href="/locataire/confidentialite/"')
+        page = self.client.get("/locataire/confidentialite/", HTTP_HOST="locataire.urbia.example")
+        for mention in ["Qui en est responsable", "Vos garants", "trois mois", "www.cnil.fr/fr/plaintes", "Cloudflare"]:
+            self.assertContains(page, mention)
+
+    def test_identite_du_bail_seulement_pour_le_candidat_retenu(self):
+        """Civilité, date et lieu de naissance ne servent qu'au bail : ils ne
+        sont pas demandés pour étudier un dossier."""
+        self.candidature.decider(Candidature.Statut.A_ETUDIER, None)
+        formulaire = self.creer_lien()
+        self.client.logout()
+        page = self.client.get(formulaire)
+        self.assertNotContains(page, "candidats-0-date_naissance")
+        self.assertNotContains(page, "candidats-0-lieu_naissance")
+        candidat = self.candidature.candidats.get()
+        reponse = self.client.post(formulaire, self.donnees(**{
+            "candidats-0-civilite": "", "candidats-0-date_naissance": "", "candidats-0-lieu_naissance": ""}))
+        self.assertRedirects(reponse, reverse("formulaire_locataire_merci"))
+        candidat.refresh_from_db()
+        self.assertEqual(candidat.nom, "Martin-Roux")
+
     def test_garants(self):
         formulaire = self.creer_lien()
         self.client.logout()

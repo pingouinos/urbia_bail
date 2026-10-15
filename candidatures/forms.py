@@ -95,6 +95,8 @@ class CandidatLocataireForm(forms.ModelForm):
     OBLIGATOIRES = (
         "civilite", "date_naissance", "lieu_naissance", "email", "telephone", "situation", "revenus_mensuels",
     )
+    # Demandés seulement au candidat retenu : ils servent à rédiger le bail.
+    IDENTITE_BAIL = ("civilite", "date_naissance", "lieu_naissance")
 
     class Meta:
         model = Candidat
@@ -127,6 +129,11 @@ def candidat_locataire_formset(candidature, data=None):
     )
     formset = classe(data, instance=candidature)
     formset.nombre = nombre
+    if candidature.statut != Candidature.Statut.RETENUE:
+        # Données du bail seulement : inutiles pour étudier un dossier (minimisation).
+        for form in formset.forms:
+            for nom in CandidatLocataireForm.IDENTITE_BAIL:
+                form.fields.pop(nom)
     for i, form in enumerate(formset.forms):
         # Une ligne annoncée ne peut pas rester vide.
         form.facultatif = i >= nombre
@@ -135,7 +142,8 @@ def candidat_locataire_formset(candidature, data=None):
     # Le navigateur du candidat peut remplir sa propre ligne, pas celle d'un autre.
     for nom, valeur in [("nom", "family-name"), ("prenom", "given-name"), ("date_naissance", "bday"),
                         ("email", "email"), ("telephone", "tel")]:
-        formset.forms[0].fields[nom].widget.attrs["autocomplete"] = valeur
+        if nom in formset.forms[0].fields:
+            formset.forms[0].fields[nom].widget.attrs["autocomplete"] = valeur
     # Les garants de chaque locataire, deux au plus.
     for i, form in enumerate(formset.forms):
         garants = GarantFormSet(data, instance=form.instance, prefix=f"garants-{i}")
