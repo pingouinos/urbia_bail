@@ -55,8 +55,8 @@ def remplir(document, contexte):
     document.render(contexte, jinja_env=SandboxedEnvironment(), autoescape=True)
 
 
-def generer_docx(nom_modele, contexte):
-    document = DocxTemplate(chemin_modele(nom_modele))
+def generer_docx(nom_modele, contexte, source=None):
+    document = DocxTemplate(io.BytesIO(source) if source is not None else chemin_modele(nom_modele))
     remplir(document, contexte)
     flux = io.BytesIO()
     document.save(flux)

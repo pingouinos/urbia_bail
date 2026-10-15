@@ -1,10 +1,11 @@
 from django.conf import settings
 from django.contrib.auth import BACKEND_SESSION_KEY
-from django.http import Http404
+from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import redirect
 from django.urls import reverse
 
 from .google import BACKEND
+from .roles import acces_metier
 
 # Formulaire du candidat, accessible par son lien personnel. Seules
 # pages servies sur l'adresse publique URL_LOCATAIRES.
@@ -33,6 +34,8 @@ class ConnexionObligatoireMiddleware:
             return self.get_response(request)
         if not request.user.is_authenticated:
             return redirect(f"{reverse(settings.LOGIN_URL)}?next={chemin}")
+        if not chemin.startswith(CHEMINS_MFA) and not acces_metier(request.user):
+            return HttpResponseForbidden("Aucun rôle métier attribué. Contactez un administrateur.")
         if (
             settings.MFA_OBLIGATOIRE
             and request.session.get(BACKEND_SESSION_KEY) != BACKEND

@@ -2,6 +2,8 @@ import datetime as dt
 import io
 from decimal import Decimal
 
+from core.testing import creer_gestionnaire
+
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.exceptions import ValidationError
@@ -68,7 +70,7 @@ class CandidatureTests(Donnees, TestCase):
         self.assertEqual(candidature.alertes, [])
 
     def test_decision(self):
-        utilisateur = User.objects.create_user("gestion")
+        utilisateur = creer_gestionnaire("gestion")
         candidature = self.creer_candidature()
         candidature.decider(Candidature.Statut.NON_RETENUE, utilisateur)
         self.assertEqual((candidature.decide_par, candidature.decidee), (utilisateur, True))
@@ -115,7 +117,7 @@ class CandidatureTests(Donnees, TestCase):
 @override_settings(MFA_OBLIGATOIRE=False)
 class VuesTests(Donnees, TestCase):
     def setUp(self):
-        self.utilisateur = User.objects.create_user("gestion", first_name="Elodie", last_name="Durand")
+        self.utilisateur = creer_gestionnaire("gestion", first_name="Elodie", last_name="Durand")
         self.client.force_login(self.utilisateur)
 
     def donnees_formulaire(self, propriete, candidats):
@@ -264,7 +266,7 @@ class LienLocataireTests(Donnees, TestCase):
     informations."""
 
     def setUp(self):
-        self.client.force_login(User.objects.create_user("gestion", first_name="Elodie", last_name="Durand"))
+        self.client.force_login(creer_gestionnaire("gestion", first_name="Elodie", last_name="Durand"))
         self.candidature = self.creer_candidature(
             candidats=(("Martin", 1500),), statut=Candidature.Statut.RETENUE, decide_le=timezone.now(),
             dossier_verifie=True,

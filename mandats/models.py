@@ -299,6 +299,12 @@ class Mandat(Contrat):
         )
 
     def contexte_document(self):
+        from documents.archives import derniere_version
+
+        version = derniere_version(self) if self.signe else None
+        return version.contexte if version else self.contexte_courant()
+
+    def contexte_courant(self):
         """Valeurs à placer dans le modèle Word du mandat."""
         from documents.generation import montant
 

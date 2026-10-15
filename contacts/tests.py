@@ -1,5 +1,7 @@
 import datetime as dt
 
+from core.testing import creer_gestionnaire
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -18,7 +20,7 @@ class ContactsTests(Donnees, TestCase):
     s'y rattachent, et ses catégories se déduisent de ces liens."""
 
     def setUp(self):
-        self.client.force_login(User.objects.create_user("gestion"))
+        self.client.force_login(creer_gestionnaire("gestion"))
         self.bailleur = Bailleur.objects.create(civilite="Mme", nom="Durand", prenom="Anne", email="anne@exemple.fr")
 
     def propriete(self, adresse):

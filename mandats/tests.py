@@ -4,6 +4,8 @@ import tempfile
 from decimal import Decimal
 from unittest import mock
 
+from core.testing import creer_gestionnaire
+
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -132,7 +134,7 @@ class VuesTests(Donnees, TestCase):
         reglage = override_settings(MEDIA_ROOT=self.dossier)
         reglage.enable()
         self.addCleanup(reglage.disable)
-        self.client.force_login(User.objects.create_user("gestion"))
+        self.client.force_login(creer_gestionnaire("gestion"))
 
     def test_creation_depuis_le_propriete(self):
         propriete = self.creer_propriete()
@@ -232,6 +234,7 @@ class VuesTests(Donnees, TestCase):
         reponse = self.client.post(deposer, {"date_signature": demain.isoformat()}, follow=True)
         self.assertContains(reponse, "ne peut pas être dans le futur")
         # La date seule suffit ; le scan suit quand il est disponible.
+        self.client.post(reverse("documents:preparer", args=["mandat", mandat.pk]))
         reponse = self.client.post(deposer, {"date_signature": "2026-09-15"}, follow=True)
         self.assertContains(reponse, "Signé le 15/09/2026")
         mandat.refresh_from_db()
@@ -418,7 +421,7 @@ class EtapesTests(Donnees, TestCase):
     et les flèches ‹ › de la frise."""
 
     def setUp(self):
-        self.client.force_login(User.objects.create_user("gestion"))
+        self.client.force_login(creer_gestionnaire("gestion"))
         self.signe_le = timezone.localdate() - timezone.timedelta(days=30)
 
     def etapes(self, mandat, **parametres):

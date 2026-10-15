@@ -1,6 +1,8 @@
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
+from core.testing import creer_gestionnaire
+
 from django.contrib.auth.models import Group, User
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -40,7 +42,7 @@ class ConnexionTests(TestCase):
 
     @override_settings(MFA_OBLIGATOIRE=False)
     def test_connexion_puis_accueil_sans_mfa(self):
-        User.objects.create_user("gestion", password="mot-de-passe-solide")
+        creer_gestionnaire("gestion", password="mot-de-passe-solide")
         reponse = self.client.post(
             reverse("connexion"), {"username": "gestion", "password": "mot-de-passe-solide"}
         )
@@ -54,7 +56,7 @@ def code_courant(appareil):
 
 class DoubleAuthentificationTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user("gestion", password="mot-de-passe-solide")
+        self.user = creer_gestionnaire("gestion", password="mot-de-passe-solide")
         self.client.post(
             reverse("connexion"), {"username": "gestion", "password": "mot-de-passe-solide"}
         )
@@ -107,7 +109,7 @@ def code_courant(appareil):
 
 class DoubleAuthentificationTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user("gestion", password="mot-de-passe-solide")
+        self.user = creer_gestionnaire("gestion", password="mot-de-passe-solide")
         self.client.post(
             reverse("connexion"), {"username": "gestion", "password": "mot-de-passe-solide"}
         )
@@ -156,7 +158,7 @@ class DoubleAuthentificationTests(TestCase):
 
 class VerrouillageTests(TestCase):
     def test_identifiant_bloque_apres_cinq_echecs(self):
-        User.objects.create_user("gestion", password="mot-de-passe-solide")
+        creer_gestionnaire("gestion", password="mot-de-passe-solide")
         for _ in range(5):
             self.client.post(reverse("connexion"), {"username": "gestion", "password": "faux"})
         reponse = self.client.post(
@@ -201,7 +203,7 @@ class GoogleWorkspaceTests(TestCase):
             return self.client.get(reverse("oidc_authentication_callback"), {"code": "c", "state": etat})
 
     def test_compte_existant_connecte_sans_totp(self):
-        user = User.objects.create_user("elodie", email="Elodie@agence.fr")
+        user = creer_gestionnaire("elodie", email="Elodie@agence.fr")
         reponse = self.connexion_google(claims())
         self.assertRedirects(reponse, "/", fetch_redirect_response=False)
         self.assertEqual(self.client.get(reverse("accueil")).status_code, 200)
@@ -236,7 +238,7 @@ class GoogleWorkspaceTests(TestCase):
         self.assertEqual(reponse.url, "/connexion/?echec=google")
 
     def test_compte_desactive_perd_l_acces_en_cours_de_session(self):
-        user = User.objects.create_user("elodie", email="elodie@agence.fr")
+        user = creer_gestionnaire("elodie", email="elodie@agence.fr")
         self.connexion_google(claims())
         self.assertEqual(self.client.get(reverse("accueil")).status_code, 200)
         user.is_active = False
