@@ -25,7 +25,12 @@ def ranger_logo(organisation, nom):
 
 class Organisation(Horodatage):
     # Mentions sans lesquelles un mandat ou un bail n'est pas conforme.
-    MENTIONS = ("nom", "adresse", "code_postal", "ville", "carte_pro", "carte_delivree_par", "garant")
+    MENTIONS = (
+        "nom", "adresse", "code_postal", "ville", "carte_pro", "carte_delivree_par", "garant", "garantie_montant",
+        "rcp", "mediateur", "mediateur_site",
+    )
+    # Exigées seulement quand l'agence propose l'assurance loyers impayés.
+    MENTIONS_ASSURANCE = ("orias", "assurance_gli", "assurance_gli_contrat")
 
     nom = models.CharField(
         "nom commercial", max_length=120, blank=True,
@@ -58,6 +63,23 @@ class Organisation(Horodatage):
     garant = models.CharField("garant financier", max_length=120, blank=True)
     garant_adresse = models.CharField("adresse du garant", max_length=200, blank=True)
     garantie_montant = models.PositiveIntegerField("montant de la garantie (€)", null=True, blank=True)
+    rcp = models.CharField(
+        "assurance responsabilité civile professionnelle", max_length=200, blank=True,
+        help_text="Assureur et numéro de contrat, par exemple : MMA, contrat n° 123456 (loi Hoguet, article 3).",
+    )
+    mediateur = models.CharField(
+        "médiateur de la consommation", max_length=200, blank=True,
+        help_text="Nom et adresse du médiateur auquel l'agence adhère (code de la consommation, L612-1).",
+    )
+    mediateur_site = models.URLField("site du médiateur", blank=True)
+    orias = models.CharField(
+        "numéro ORIAS", max_length=20, blank=True,
+        help_text="Obligatoire pour proposer l'assurance loyers impayés aux propriétaires.",
+    )
+    assurance_gli = models.CharField(
+        "assureur loyers impayés", max_length=120, blank=True, help_text="Par exemple : SADA Assurances.",
+    )
+    assurance_gli_contrat = models.CharField("numéro du contrat loyers impayés", max_length=60, blank=True)
 
     taux_gestion = models.DecimalField(
         "honoraires de gestion proposés (% TTC)", max_digits=5, decimal_places=2, default=Decimal("7"),
@@ -84,7 +106,14 @@ class Organisation(Horodatage):
     @property
     def manquants(self):
         """Libellés des mentions légales qui restent à renseigner."""
-        return [str(self._meta.get_field(champ).verbose_name) for champ in self.MENTIONS if not getattr(self, champ)]
+        return self._libelles_vides(self.MENTIONS)
+
+    @property
+    def manquants_assurance(self):
+        return self._libelles_vides(self.MENTIONS_ASSURANCE)
+
+    def _libelles_vides(self, champs):
+        return [str(self._meta.get_field(champ).verbose_name) for champ in champs if not getattr(self, champ)]
 
     def contexte_document(self):
         """Valeurs de l'agence pour les modèles Word, sous {{ agence.… }}."""
@@ -108,6 +137,12 @@ class Organisation(Horodatage):
             "garant": self.garant,
             "garant_adresse": self.garant_adresse,
             "garantie_montant": montant(self.garantie_montant),
+            "rcp": self.rcp,
+            "mediateur": self.mediateur,
+            "mediateur_site": self.mediateur_site,
+            "orias": self.orias,
+            "assurance_gli": self.assurance_gli,
+            "assurance_gli_contrat": self.assurance_gli_contrat,
         }
 
 

@@ -11,7 +11,7 @@ from django.db import transaction
 
 from comptes.roles import acces_metier, est_administrateur
 from core.journal import noter
-from .generation import chemin_modele, clauses_perimees, generer_docx
+from .generation import chemin_modele, defauts_modele, generer_docx
 from .models import PdfArchive, VersionContrat
 
 
@@ -38,7 +38,7 @@ def nom_modele(objet):
 def interdictions(objet):
     """Raisons légales d'empêcher la préparation et la signature du contrat :
     celles du contrat lui-même et les clauses périmées du modèle en service."""
-    return list(getattr(objet, "interdictions", [])) + clauses_perimees(nom_modele(objet))
+    return list(getattr(objet, "interdictions", [])) + defauts_modele(nom_modele(objet))
 
 
 def derniere_version(objet):

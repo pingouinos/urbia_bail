@@ -903,7 +903,7 @@ class InterdictionsTests(Donnees, TestCase):
     def test_clause_resolutoire_a_six_semaines(self):
         texte = generation.texte_docx(generation.chemin_modele("bail_habitation.docx").read_bytes())
         self.assertIn("six semaines après un commandement de payer", texte)
-        self.assertEqual(generation.clauses_perimees("bail_habitation.docx"), [])
+        self.assertEqual(generation.defauts_modele("bail_habitation.docx"), [])
 
     def test_modele_avec_l_ancienne_clause(self):
         """Un modèle déposé qui garde « deux mois » est refusé, et s'il est

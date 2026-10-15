@@ -25,6 +25,7 @@ class MandatForm(forms.ModelForm):
             "propriete", "mandant", "mandant_adresse", "mandant_code_postal_ville",
             "designation", "adresse_bien", "loyer_cc", "charges",
         ]),
+        ("Signature", ["conclusion", "lieu_signature"]),
         ("Durée", ["duree_ans", "reconductions"]),
         ("Gestion", ["taux_gestion", "base_gestion", "assurance_loyers_impayes", "taux_assurance"]),
         ("Honoraires de location", [
@@ -47,6 +48,7 @@ class MandatForm(forms.ModelForm):
             + (f" Le plus grand numéro déjà saisi ici est le {dernier}." if dernier else "")
         )
         self.fields["numero"].widget.attrs["min"] = 1
+        self.fields["conclusion"].required = True
 
     def clean_numero(self):
         numero = self.cleaned_data["numero"]

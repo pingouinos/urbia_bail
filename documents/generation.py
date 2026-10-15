@@ -60,10 +60,22 @@ def texte_docx(contenu):
     return "\n".join("".join(re.findall(r"<w:t(?: [^>]*)?>([^<]*)</w:t>", p)) for p in paragraphes)
 
 
-def clauses_perimees(nom, contenu=None):
-    """Messages des clauses périmées que contient le modèle (en service par défaut)."""
-    clauses = CLAUSES_PERIMEES.get(nom)
-    if not clauses:
+# Balises sans lesquelles le document omet une mention obligatoire.
+BALISES_REQUISES = {
+    "mandat_gestion.docx": {
+        "retractation": "le droit de rétractation du mandant particulier",
+        "formulaire_retractation": "le formulaire de rétractation",
+        "agence.mediateur": "le médiateur de la consommation",
+        "agence.rcp": "l'assurance responsabilité civile professionnelle",
+    },
+}
+
+
+def defauts_modele(nom, contenu=None):
+    """Clauses périmées ou mentions obligatoires absentes du modèle (celui en
+    service par défaut), en messages à afficher."""
+    clauses, balises = CLAUSES_PERIMEES.get(nom, {}), BALISES_REQUISES.get(nom, {})
+    if not clauses and not balises:
         return []
     if contenu is None:
         contenu = chemin_modele(nom).read_bytes()
@@ -71,7 +83,15 @@ def clauses_perimees(nom, contenu=None):
         texte = " ".join(texte_docx(contenu).split())
     except (KeyError, zipfile.BadZipFile):
         return []
-    return [message for extrait, message in clauses.items() if extrait in texte]
+    defauts = [message for extrait, message in clauses.items() if extrait in texte]
+    absentes = [libelle for balise, libelle in balises.items()
+                if not re.search(r"[{%]\s*p?\s*(if|for \w+ in)?\s*" + re.escape(balise) + r"\b", texte)]
+    if absentes:
+        defauts.append(
+            "Le modèle ne contient pas " + ", ni ".join(absentes) + " : reprendre ces balises du modèle "
+            "d'origine dans « Modèles des documents »."
+        )
+    return defauts
 
 
 def montant(valeur):

@@ -22,6 +22,37 @@ PLAFOND_BAIL_ZONE_TENDUE = Decimal("10")
 PLAFOND_BAIL_HORS_ZONE_TENDUE = Decimal("8")
 PLAFOND_ETAT_DES_LIEUX = Decimal("3")
 
+# Information sur le droit de rétractation (code de la consommation, L221-5,
+# L221-18 et L221-25), pour un particulier qui signe hors de l'agence ou à distance.
+RETRACTATION = [
+    "Le mandant dispose d'un délai de quatorze jours à compter de la signature du présent mandat pour se "
+    "rétracter, sans avoir à motiver sa décision (articles L221-18 et suivants du code de la consommation).",
+    "Pour exercer ce droit, il notifie sa décision au mandataire, à l'adresse indiquée en tête du présent mandat, "
+    "par une déclaration dénuée d'ambiguïté (lettre recommandée avec avis de réception ou courrier électronique). "
+    "Il peut utiliser le formulaire de rétractation ci-dessous, sans que ce soit obligatoire.",
+    "En cas de rétractation, le mandataire rembourse tous les paiements reçus au plus tard quatorze jours après "
+    "en avoir été informé.",
+    "Si le mandant demande expressément que l'exécution du mandat commence avant la fin du délai de "
+    "rétractation, il reste redevable, s'il se rétracte, d'un montant proportionnel aux prestations fournies "
+    "jusqu'à la communication de sa rétractation (article L221-25).",
+    "☐ Le mandant demande expressément que l'exécution du mandat commence avant la fin du délai de "
+    "rétractation.",
+]
+# Formulaire type de l'annexe à l'article R221-1 du code de la consommation.
+FORMULAIRE_RETRACTATION = [
+    "FORMULAIRE DE RÉTRACTATION",
+    "(Veuillez compléter et renvoyer le présent formulaire uniquement si vous souhaitez vous rétracter du contrat.)",
+    "À l'attention du mandataire désigné en tête du présent mandat :",
+    "Je/nous (*) vous notifie/notifions (*) par la présente ma/notre (*) rétractation du contrat pour la "
+    "prestation de services ci-dessous : mandat de gestion n° ……",
+    "Conclu le : ……",
+    "Nom du (des) consommateur(s) : ……",
+    "Adresse du (des) consommateur(s) : ……",
+    "Signature du (des) consommateur(s) (uniquement en cas de notification du présent formulaire sur papier) :",
+    "Date : ……",
+    "(*) Rayez la mention inutile.",
+]
+
 NOMBRES = {1: "un", 2: "deux", 3: "trois", 4: "quatre", 5: "cinq", 6: "six"}
 
 
@@ -85,6 +116,12 @@ class Mandat(Contrat):
         HORS_CHARGES = "hors_charges", "Encaissements hors charges"
         CHARGES_COMPRISES = "charges_comprises", "Encaissements charges comprises"
 
+    class Conclusion(models.TextChoices):
+        AGENCE = "agence", "Mandant particulier, signature dans les locaux de l'agence"
+        HORS_ETABLISSEMENT = "hors_etablissement", "Mandant particulier, signature chez lui ou ailleurs qu'à l'agence"
+        DISTANCE = "distance", "Mandant particulier, signature à distance (courrier, e-mail, signature électronique)"
+        PROFESSIONNEL = "professionnel", "Mandant professionnel (société, SCI non familiale)"
+
     numero = models.PositiveIntegerField(
         "numéro au registre", unique=True,
         error_messages={"unique": "Ce numéro est déjà porté par un autre mandat."},
@@ -132,6 +169,15 @@ class Mandat(Contrat):
     )
     honoraires_edl_bailleur = _montant(verbose_name="état des lieux : part bailleur (€ TTC)", default=0)
     honoraires_edl_locataire = _montant(verbose_name="état des lieux : part locataire (€ TTC)", default=0)
+
+    # Signature : un particulier qui signe hors de l'agence peut se rétracter
+    # pendant 14 jours (code de la consommation, L221-18).
+    conclusion = models.CharField(
+        "mandant et lieu de signature", max_length=20, choices=Conclusion.choices, blank=True,
+        help_text="Un particulier qui signe ailleurs qu'à l'agence ou à distance dispose de 14 jours pour se "
+                  "rétracter : le mandat l'en informe et joint le formulaire.",
+    )
+    lieu_signature = models.CharField("lieu de signature", max_length=100, default="Toulouse")
 
     fichier_signe = models.FileField("mandat signé (scan)", upload_to=ranger_mandat_signe, blank=True)
     observations = models.TextField(blank=True)
@@ -191,6 +237,7 @@ class Mandat(Contrat):
             adresse_bien=f"{propriete.adresse} {propriete.code_postal} {propriete.ville.upper()}",
             loyer_cc=loyer or None,
             charges=propriete.charges or 0,
+            conclusion=cls.Conclusion.PROFESSIONNEL if bailleur.type == bailleur.Type.PERSONNE_MORALE else "",
         )
 
     @property
@@ -292,8 +339,38 @@ class Mandat(Contrat):
         return self.honoraires_edl_bailleur + self.honoraires_edl_locataire
 
     @property
+    def retractation_possible(self):
+        return self.conclusion in (self.Conclusion.HORS_ETABLISSEMENT, self.Conclusion.DISTANCE)
+
+    @property
+    def interdictions(self):
+        """Ce qui empêche de préparer ou de signer le mandat : mentions légales
+        de l'agence (loi Hoguet, code de la consommation) et lieu de signature."""
+        from core.models import Organisation
+
+        agence = Organisation.courante()
+        interdictions = []
+        if agence.manquants:
+            interdictions.append(
+                "Mentions légales de l'agence à compléter dans Administration › Agence : "
+                + ", ".join(agence.manquants) + "."
+            )
+        if self.assurance_loyers_impayes and agence.manquants_assurance:
+            interdictions.append(
+                "Assurance loyers impayés proposée : renseigner dans Administration › Agence "
+                + ", ".join(agence.manquants_assurance) + "."
+            )
+        if not self.conclusion:
+            interdictions.append(
+                "Indiquer qui est le mandant et où il signe : un particulier qui signe hors de l'agence ou à "
+                "distance a 14 jours pour se rétracter, et le mandat doit l'en informer."
+            )
+        return interdictions
+
+    @property
     def alertes(self):
-        return controler_honoraires(
+        # Un mandat signé n'a plus à être préparé : seuls les honoraires restent à vérifier.
+        return ([] if self.signe else self.interdictions) + controler_honoraires(
             self.propriete, self.honoraires_bail_bailleur, self.honoraires_bail_locataire,
             self.honoraires_edl_bailleur, self.honoraires_edl_locataire,
         )
@@ -337,6 +414,9 @@ class Mandat(Contrat):
             "honoraires_edl_bailleur": montant(self.honoraires_edl_bailleur),
             "honoraires_edl_locataire": montant(self.honoraires_edl_locataire),
             "date_signature": self.date_signature.strftime("%d/%m/%Y") if self.date_signature else "",
+            "lieu_signature": self.lieu_signature,
+            "retractation": RETRACTATION if self.retractation_possible else [],
+            "formulaire_retractation": FORMULAIRE_RETRACTATION if self.retractation_possible else [],
         }
 
     @property

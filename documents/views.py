@@ -24,7 +24,7 @@ from core.journal import noter
 
 from . import google
 from .generation import (
-    DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, clauses_perimees, convertir_pdf,
+    DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, defauts_modele, convertir_pdf,
     generer_docx, remplir,
 )
 from .archives import interdictions
@@ -116,7 +116,7 @@ def verifier_modele(nom, contenu):
     inconnues = variables - _variables(MODELES_PAR_DEFAUT / nom)
     if inconnues:
         return "Balises inconnues : " + ", ".join(sorted(inconnues)) + "."
-    perimees = clauses_perimees(nom, contenu)
+    perimees = defauts_modele(nom, contenu)
     if perimees:
         return perimees[0]
     objet = _objet_essai(nom)

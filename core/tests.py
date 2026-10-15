@@ -60,7 +60,8 @@ class OrganisationTests(TestCase):
         "ville": "Toulouse", "telephone": "05 00 00 00 00", "email": "contact@canal.example", "site": "",
         "carte_pro": "CPI 3101 2020 000 000 001", "carte_delivree_par": "la CCI de Toulouse",
         "garant": "GARANTIE SA", "garant_adresse": "2 rue de la Paix, 75002 Paris", "garantie_montant": "120000",
-        "taux_gestion": "6.5",
+        "taux_gestion": "6.5", "rcp": "MMA, contrat n° 123456", "mediateur": "Médiateur de l'immobilier",
+        "mediateur_site": "https://mediateur.example",
     }
 
     def connecter(self, role):
