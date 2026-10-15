@@ -42,6 +42,15 @@ TAILLE_MAX = 10 * 1024 * 1024
 def document(request, objet, modele, format_):
     """Réponse de téléchargement du document d'un objet (mandat, bail) en
     Word ou en PDF ; sans PDF disponible, retour à la fiche avec un message."""
+    if hasattr(objet, "versions_document"):
+        from .archives import derniere_version
+        from .archives_views import reponse_version
+        version = derniere_version(objet)
+        if version and (objet.signe or version.nature == "preparation"):
+            return reponse_version(request, version, format_)
+        if objet.signe:
+            messages.error(request, "Contrat historique sans archive : utilisez l’exemplaire signé ou demandez une reprise historique à un administrateur.")
+            return redirect(objet)
     contenu = generer_docx(modele, objet.contexte_document())
     type_, extension = DOCX, "docx"
     if format_ == "pdf":

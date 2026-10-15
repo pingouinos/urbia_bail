@@ -384,6 +384,12 @@ class Bail(Contrat):
         return liste
 
     def contexte_document(self):
+        from documents.archives import derniere_version
+
+        version = derniere_version(self) if self.signe else None
+        return version.contexte if version else self.contexte_courant()
+
+    def contexte_courant(self):
         from documents.generation import montant
 
         propriete, bailleur = self.propriete, self.propriete.bailleur

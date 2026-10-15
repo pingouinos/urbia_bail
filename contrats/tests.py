@@ -3,6 +3,9 @@ import io
 from decimal import Decimal
 from unittest import mock
 
+from core.testing import creer_gestionnaire
+from comptes.roles import ADMINISTRATEURS, attribuer_role
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -175,7 +178,7 @@ class BailTests(Donnees, TestCase):
 @override_settings(MFA_OBLIGATOIRE=False)
 class VuesTests(Donnees, TestCase):
     def setUp(self):
-        self.client.force_login(User.objects.create_user("gestion"))
+        self.client.force_login(creer_gestionnaire("gestion"))
 
     def test_suivi_des_loyers(self):
         """Échéancier d'un bail, pointage d'un paiement, avis d'échéance et quittance."""
@@ -257,6 +260,7 @@ class VuesTests(Donnees, TestCase):
         deposer = reverse("contrats:deposer_signe", args=[bail.pk])
         with tempfile.TemporaryDirectory() as dossier, self.settings(MEDIA_ROOT=dossier):
             scan = SimpleUploadedFile("bail.pdf", b"%PDF-1.7 signe", content_type="application/pdf")
+            self.client.post(reverse("documents:preparer", args=["bail", bail.pk]))
             reponse = self.client.post(deposer, {"date_signature": "2026-10-10", "fichier_signe": scan}, follow=True)
             self.assertContains(reponse, "Signé le 10/10/2026")
             bail.refresh_from_db()
@@ -282,7 +286,7 @@ class VuesTests(Donnees, TestCase):
         self.assertEqual((str(bail.date_signature), bail.lieu_signature), ("2026-10-10", "Muret"))
 
     def test_supprimer_un_bail(self):
-        """Un bail non signé se supprime ; un bail signé, par un administrateur seulement."""
+        """Un bail sans signature ni archive se supprime ; un bail signé est conservé."""
         from candidatures.models import Candidat, Candidature
         from comptes.roles import ADMINISTRATEURS, attribuer_role
 
@@ -306,18 +310,18 @@ class VuesTests(Donnees, TestCase):
         self.assertContains(reponse, "La candidature retenue est conservée")
         candidature.refresh_from_db()
         self.assertEqual((candidature.bail, candidature.statut), (None, "retenue"))
-        # Signé : refusé au gestionnaire, qui n'en voit pas le bouton ; permis à l'administrateur.
+        # Signé : suppression refusée à tous les rôles pour conserver les archives.
         signe = self.creer_bail(propriete, date_signature=dt.date(2026, 10, 1))
         self.assertNotContains(self.client.get(signe.get_absolute_url()), reverse("contrats:supprimer", args=[signe.pk]))
         reponse = self.client.post(reverse("contrats:supprimer", args=[signe.pk]), follow=True)
-        self.assertContains(reponse, "seul un administrateur peut le supprimer")
+        self.assertContains(reponse, "conservez-le et utilisez la fin du bail")
         self.assertTrue(Bail.objects.filter(pk=signe.pk).exists())
         admin = User.objects.create_user("admin")
         attribuer_role(admin, ADMINISTRATEURS)
         self.client.force_login(admin)
-        self.assertContains(self.client.get(signe.get_absolute_url()), reverse("contrats:supprimer", args=[signe.pk]))
+        self.assertNotContains(self.client.get(signe.get_absolute_url()), reverse("contrats:supprimer", args=[signe.pk]))
         self.client.post(reverse("contrats:supprimer", args=[signe.pk]))
-        self.assertFalse(Bail.objects.exists())
+        self.assertTrue(Bail.objects.filter(pk=signe.pk).exists())
 
     def test_nouveau_contrat_laisse_le_choix(self):
         page = self.client.get(reverse("contrats:choisir"))
@@ -520,10 +524,13 @@ class VuesTests(Donnees, TestCase):
             "date_depart_prevue": hier.isoformat(), "date_fin_effective": hier.isoformat()}, follow=True)
         self.assertContains(reponse, "logement libre depuis le")
         self.assertEqual(Propriete.objects.get(pk=propriete.pk).situation.code, "libre")
-        # Dates incohérentes refusées.
-        reponse = self.client.post(reverse("contrats:fin", args=[bail.pk]), {"conge_recu_le": aujourd_hui.isoformat()})
+        # Un contrat terminé est réservé à un administrateur ; les règles de dates restent vérifiées.
+        admin = User.objects.create_user("admin-fin")
+        attribuer_role(admin, ADMINISTRATEURS)
+        self.client.force_login(admin)
+        reponse = self.client.post(reverse("contrats:fin", args=[bail.pk]), {"conge_recu_le": aujourd_hui.isoformat(), "motif": "Vérification des dates"})
         self.assertIn("date_depart_prevue", reponse.context["form"].errors)
-        reponse = self.client.post(reverse("contrats:fin", args=[bail.pk]), {"date_fin_effective": "2020-01-01"})
+        reponse = self.client.post(reverse("contrats:fin", args=[bail.pk]), {"date_fin_effective": "2020-01-01", "motif": "Vérification des dates"})
         self.assertIn("date_fin_effective", reponse.context["form"].errors)
 
     def test_preavis_d_un_mois_en_meuble_ou_zone_tendue(self):
@@ -684,7 +691,7 @@ class EtapesTests(Donnees, TestCase):
     une fois le bail signé."""
 
     def setUp(self):
-        self.client.force_login(User.objects.create_user("gestion"))
+        self.client.force_login(creer_gestionnaire("gestion"))
         self.aujourd_hui = timezone.localdate()
 
     def bail_avec_mandat(self, **autres):
@@ -745,6 +752,7 @@ class EtapesTests(Donnees, TestCase):
         bail.refresh_from_db()
         self.assertEqual(bail.loyer, Decimal("720"))
         # La signature enregistrée, l'entrée s'ouvre.
+        self.client.post(reverse("documents:preparer", args=["bail", bail.pk]))
         reponse = self.client.post(reverse("contrats:deposer_signe", args=[bail.pk]),
                                    {"date_signature": self.aujourd_hui.isoformat()})
         self.assertRedirects(reponse, self.url_etapes(bail, "#etape-5"))
@@ -803,7 +811,7 @@ class EtapesTests(Donnees, TestCase):
         page, modes = self.etapes(bail, etape=3)
         self.assertEqual(modes, {1: "grisee", 2: "grisee", 3: "ouverte", 4: "grisee", 5: "grisee", 6: "grisee", 7: "a-venir"})
         self.assertContains(page, "Enregistrer la correction")
-        reponse = self.client.post(self.url_etapes(bail), self.donnees_modifiees(bail, lieu_signature="Muret"))
+        reponse = self.client.post(self.url_etapes(bail), {**self.donnees_modifiees(bail, lieu_signature="Muret"), "motif": "Correction du lieu de signature"})
         self.assertRedirects(reponse, self.url_etapes(bail, "#etape-6"))
         bail.refresh_from_db()
         self.assertEqual((bail.lieu_signature, bail.signe), ("Muret", True))

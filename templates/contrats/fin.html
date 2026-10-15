@@ -22,6 +22,7 @@
     <legend>Départ effectif</legend>
     {% include "proprietes/_champ.html" with champ=form.date_fin_effective %}
   </fieldset>
+  {% if bail.date_fin_effective %}<label>Motif de la correction <input name="motif" required></label>{% endif %}
   <button type="submit">Enregistrer</button>
 </form>
 {% endblock %}

@@ -1,6 +1,7 @@
 import datetime as dt
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
@@ -16,6 +17,7 @@ from core.journal import noter
 from core.processus import navigation, processus_bail, sections_etapes
 from mandats.models import Mandat
 from documents import views as documents
+from documents.archives import verrouiller, assurer_historique, creer, motif_correction, signer
 
 from django.utils import timezone
 
@@ -255,6 +257,7 @@ def etapes_ouvrables(bail, rang):
     return ouvrables
 
 
+@verrouiller(Bail)
 def etapes(request, pk):
     """La page d'un bail, façon PLM : la frise en haut avec ses flèches, une
     section par étape dessous. L'étape en cours est ouverte avec ses champs,
@@ -267,19 +270,32 @@ def etapes(request, pk):
     form = BailForm(request.POST or None, instance=objet)
     locataires = LocataireFormSet(request.POST or None, instance=objet)
     if request.method == "POST":
-        if objet.signe and not administrateur:
+        if (objet.signe or not objet.en_cours) and not administrateur:
             messages.error(request, "Ce bail est signé : pour le corriger, revenir d'abord à la signature.")
             return redirect(vers_etapes(objet))
+        motif = ""
+        if objet.signe or not objet.en_cours:
+            try:
+                motif = motif_correction(request)
+            except ValidationError as erreur:
+                messages.error(request, " ".join(erreur.messages))
+                return redirect(vers_etapes(objet))
+            assurer_historique(objet, request.user)
         if form.is_valid() and locataires.is_valid():
             with transaction.atomic():
                 form.save()
                 locataires.save()
+                if motif:
+                    creer(objet, request.user, "correction", motif)
+                    noter(request, "correction contrat", objet, motif)
             messages.success(request, "Bail enregistré.")
             return redirect(vers_etapes(objet))
     processus = processus_bail(objet)
     ouvrables = etapes_ouvrables(objet, processus.rang)
     # Une fois le locataire entré, seul un administrateur corrige le bail signé.
     corrigeables = {3} if administrateur and objet.signe and processus.rang >= 6 else set()
+    if administrateur and objet.date_fin_effective:
+        corrigeables.add(7)
     demandee = request.GET.get("etape", "")
     demandee = int(demandee) if demandee.isdigit() else None
     if form.is_bound:
@@ -300,27 +316,32 @@ def etapes(request, pk):
         "candidature": Candidature.objects.filter(bail=objet).prefetch_related("candidats").first(),
         # Message de fin de parcours, une seule fois après la création.
         "vient_d_etre_cree": request.session.pop("bail_cree", None) == objet.pk,
-        "historique": objet.history.select_related("history_user")[:10],
+        "administrateur": administrateur, "historique": objet.history.select_related("history_user")[:10],
     })
 
 
 @require_POST
+@verrouiller(Bail)
 def retirer_signature(request, pk):
-    """‹ De l'entrée à la signature : la date de signature est retirée (le
-    scan reste), et le bail redevient modifiable. Plus possible une fois le
+    """‹ De l'entrée à la signature : la date de signature est retirée (les
+    archives restent), et le bail redevient modifiable. Plus possible une fois le
     locataire entré."""
     objet = get_object_or_404(Bail, pk=pk)
     if not objet.signature_retirable:
         messages.error(request, "Le locataire est entré dans les lieux : la signature ne se retire plus.")
     else:
+        assurer_historique(objet, request.user)
+        noter(request, "signature retirée", objet, "Retour à la rédaction ; archives conservées.")
         objet.date_signature = None
-        objet.save(update_fields=["date_signature", "modifie_le"])
+        objet.fichier_signe = ""
+        objet.save(update_fields=["date_signature", "fichier_signe", "modifie_le"])
         messages.success(request, "Signature retirée : le bail est de nouveau modifiable.")
         return redirect(vers_etapes(objet, 3))
     return redirect(vers_etapes(objet))
 
 
 @require_POST
+@verrouiller(Bail)
 def annuler_conge(request, pk):
     """‹ De la sortie à la location en cours : le congé est annulé, tant que
     le locataire n'est pas parti."""
@@ -377,13 +398,28 @@ def nouveau_logement(request):
     return render(request, "contrats/nouveau_logement.html", {"logement": logement, "proprietaire": proprietaire})
 
 
+@verrouiller(Bail)
 def fin(request, pk):
     """Départ du locataire en une page : le congé reçu et la fin du préavis
     sont proposés d'avance, puis le départ effectif une fois le préavis fini."""
     objet = get_object_or_404(Bail.objects.select_related("propriete"), pk=pk)
+    if request.method == "POST" and objet.date_fin_effective and not est_administrateur(request.user):
+        messages.error(request, "Ce bail est terminé : seul un administrateur peut corriger sa fin.")
+        return redirect(vers_etapes(objet))
+    motif = ""
+    if request.method == "POST" and objet.date_fin_effective:
+        try:
+            motif = motif_correction(request)
+        except ValidationError as erreur:
+            messages.error(request, " ".join(erreur.messages))
+            return redirect(vers_etapes(objet))
+    source = assurer_historique(objet, request.user) if motif else None
     form = FinBailForm(request.POST or None, instance=objet, initial=initial_fin(objet))
     if request.method == "POST" and form.is_valid():
         objet = form.save()
+        if motif:
+            creer(objet, request.user, "correction_fin", motif, source=source)
+        noter(request, "fin contrat", objet, motif or "Fin enregistrée")
         if objet.date_fin_effective:
             messages.success(request, f"Départ enregistré : logement libre depuis le {objet.date_fin_effective:%d/%m/%Y}.")
         elif objet.conge_recu_le:
@@ -399,14 +435,14 @@ def fin(request, pk):
 
 
 @require_POST
+@verrouiller(Bail)
 def supprimer(request, pk):
     """Supprime un bail rédigé par erreur ou resté sans suite. Un bail signé
-    engage les parties : il se termine par le départ du locataire, et seul un
-    administrateur peut le supprimer."""
+    engage les parties : il se termine par le départ du locataire. Un contrat
+    signé ou archivé est conservé, y compris pour les administrateurs."""
     objet = get_object_or_404(Bail.objects.select_related("propriete"), pk=pk)
-    if objet.signe and not est_administrateur(request.user):
-        messages.error(request, "Ce bail est signé : seul un administrateur peut le supprimer. "
-                                "Pour y mettre fin, utilisez « Départ du locataire ».")
+    if objet.signe or objet.versions_document.exists():
+        messages.error(request, "Ce bail possède des archives contractuelles : conservez-le et utilisez la fin du bail.")
         return redirect(objet)
     propriete, signe = objet.propriete, objet.signe
     candidature = Candidature.objects.filter(bail=objet).first()
@@ -435,11 +471,16 @@ def telecharger(request, pk, format_):
 
 
 @require_POST
+@verrouiller(Bail)
 def deposer_signe(request, pk):
     objet = get_object_or_404(Bail, pk=pk)
-    form = SignatureForm(request.POST, request.FILES, instance=objet)
+    form = SignatureForm(request.POST, request.FILES, instance=Bail.objects.get(pk=pk))
     if form.is_valid():
-        form.save()
+        try:
+            signer(request, objet, form)
+        except ValidationError as erreur:
+            messages.error(request, " ".join(erreur.messages))
+            return redirect(vers_etapes(objet))
         messages.success(request, f"Signature du bail enregistrée au {objet.date_signature:%d/%m/%Y}.")
     else:
         for erreurs in form.errors.values():

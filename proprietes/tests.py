@@ -1,6 +1,8 @@
 import io
 from decimal import Decimal
 
+from core.testing import creer_gestionnaire
+
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -153,7 +155,7 @@ class ProprieteTests(TestCase):
 @override_settings(MFA_OBLIGATOIRE=False)
 class VuesTests(TestCase):
     def setUp(self):
-        self.client.force_login(User.objects.create_user("gestion"))
+        self.client.force_login(creer_gestionnaire("gestion"))
 
     def test_parcours_import_verification_puis_confirmation(self):
         fichier = SimpleUploadedFile("proprietes.xlsx", xlsx(ligne("L001"), ligne("L002", **{"Classe DPE": "Z"})))

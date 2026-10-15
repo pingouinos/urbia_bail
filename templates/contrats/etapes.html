@@ -30,8 +30,9 @@ sur une ligne.
   {% include "_frise_fleches.html" %}
 </section>
 {% if vient_d_etre_cree %}<p class="message">Bail enregistré : il se télécharge en <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> ou en <a href="{% url 'contrats:word' bail.pk %}">Word</a> pour le faire signer.</p>{% endif %}
-{% if correction %}<p class="message message-erreur">Correction d'un bail signé, réservée aux administrateurs : le PDF téléchargé ne sera plus tout à fait celui qui a été signé.</p>{% endif %}
+{% if correction %}<p class="message message-erreur">Correction administrative : une nouvelle version sera créée. Les archives et l’exemplaire signé sont conservés.</p>{% endif %}
 
+{% include "documents/_archives_contrat.html" with objet=bail %}
 <div class="etapes-bail">
 {% for section in sections %}{% with etape=section.etape numero=section.numero mode=section.mode %}
 <section class="etape-bail {{ mode }}{% if etape.etat == 'sautee' %} sans-objet{% elif mode == 'grisee' and numero == processus.rang %} en-cours{% endif %}" id="etape-{{ numero }}" aria-labelledby="titre-etape-{{ numero }}">
@@ -58,6 +59,7 @@ sur une ligne.
     {% if form.errors or locataires.total_error_count %}<p class="message message-erreur">Certains champs sont à corriger : ils sont signalés en rouge.</p>{% endif %}
     {{ form.non_field_errors }}
     {% include "contrats/_champs_bail.html" %}
+    {% if correction %}<label>Motif de la correction <input type="text" name="motif" required maxlength="1000"></label>{% endif %}
     <div class="boutons-etape">
       {% if correction or processus.rang != 3 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
       <button type="submit" class="pousse">{% if correction %}Enregistrer la correction{% elif processus.rang == 3 %}Enregistrer et passer à la signature ›{% else %}Enregistrer{% endif %}</button>
@@ -91,7 +93,7 @@ sur une ligne.
       {% include "proprietes/_champ.html" with champ=form_signe.fichier_signe %}
     </div>
   </form>
-  {% if bail.signe %}<form method="post" action="{% url 'contrats:retirer_signature' bail.pk %}" id="form-retirer" onsubmit="return confirm('Retirer la signature de ce bail ? Il redevient modifiable, et il faudra le faire signer à nouveau. Le scan reste.');">{% csrf_token %}</form>{% endif %}
+  {% if bail.signe %}<form method="post" action="{% url 'contrats:retirer_signature' bail.pk %}" id="form-retirer" onsubmit="return confirm('Retirer la signature de ce bail ? Il redevient modifiable, et il faudra le faire signer à nouveau. Les archives sont conservées.');">{% csrf_token %}</form>{% endif %}
   <div class="boutons-etape">
     {% if bail.signe %}<button type="submit" form="form-retirer" class="secondaire bouton-danger">Retirer la signature…</button>{% endif %}
     {% if processus.rang != 4 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
@@ -145,6 +147,7 @@ sur une ligne.
       {% include "proprietes/_champ.html" with champ=form_fin.conge_recu_le %}
       {% include "proprietes/_champ.html" with champ=form_fin.date_depart_prevue %}
       {% include "proprietes/_champ.html" with champ=form_fin.date_fin_effective %}
+      {% if bail.date_fin_effective %}<label>Motif de la correction <input name="motif" required></label>{% endif %}
     </div>
   </form>
   {% if bail.conge_annulable %}<form method="post" action="{% url 'contrats:annuler_conge' bail.pk %}" id="form-annuler-conge" onsubmit="return confirm('Annuler le congé ? La location continue.');">{% csrf_token %}</form>{% endif %}
@@ -172,7 +175,7 @@ sur une ligne.
   </ul>
 </section>
 
-{% if not bail.signe or est_administrateur %}
+{% if not bail.signe and not bail.versions_document.exists %}
 <form method="post" action="{% url 'contrats:supprimer' bail.pk %}" class="en-ligne supprimer-bail" onsubmit="return confirm('{% if bail.signe %}Ce bail est signé. Le supprimer définitivement, avec son exemplaire signé ?{% else %}Supprimer définitivement ce bail ?{% endif %}');">
   {% csrf_token %}
   <button type="submit" class="bouton-petit bouton-supprimer">Supprimer ce bail</button>

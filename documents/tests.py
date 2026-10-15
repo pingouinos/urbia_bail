@@ -5,6 +5,8 @@ import urllib.error
 from pathlib import Path
 from unittest import mock
 
+from core.testing import creer_gestionnaire
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -148,6 +150,6 @@ class ModelesTests(Donnees, TestCase):
         self.assertContains(reponse, "Aucun bail d&#x27;habitation (nu ou meublé) enregistré")
 
     def test_reserve_aux_administrateurs(self):
-        self.client.force_login(User.objects.create_user("gestion"))
+        self.client.force_login(creer_gestionnaire("gestion"))
         self.assertEqual(self.reprendre(modele_mandat()).status_code, 403)
         self.assertEqual(self.client.get(reverse("documents:essai", args=["mandat_gestion.docx"])).status_code, 403)

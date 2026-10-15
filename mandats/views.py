@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse
@@ -14,6 +15,7 @@ from core.processus import navigation, processus_mandat, sections_etapes
 from proprietes.models import Propriete
 from proprietes.tableur import sans_formule
 from documents import views as documents
+from documents.archives import verrouiller, assurer_historique, creer, motif_correction, signer
 
 from .forms import FinMandatForm, MandatForm, SignatureForm
 from .models import Mandat
@@ -127,6 +129,7 @@ def etapes_ouvrables(mandat, rang):
     return ouvrables
 
 
+@verrouiller(Mandat)
 def etapes(request, pk):
     """La page d'un mandat, façon PLM et comme celle du bail : la frise en
     haut avec ses flèches, une section par étape dessous, un crayon sur les
@@ -137,11 +140,22 @@ def etapes(request, pk):
     administrateur = est_administrateur(request.user)
     form = MandatForm(request.POST or None, instance=objet)
     if request.method == "POST":
-        if objet.signe and not administrateur:
+        if (objet.signe or not objet.en_cours) and not administrateur:
             messages.error(request, "Ce mandat est signé : pour le corriger, revenir d'abord à la signature.")
             return redirect(vers_etapes(objet))
+        motif = ""
+        if objet.signe or not objet.en_cours:
+            try:
+                motif = motif_correction(request)
+            except ValidationError as erreur:
+                messages.error(request, " ".join(erreur.messages))
+                return redirect(vers_etapes(objet))
+            assurer_historique(objet, request.user)
         if form.is_valid():
             form.save()
+            if motif:
+                creer(objet, request.user, "correction", motif)
+                noter(request, "correction contrat", objet, motif)
             messages.success(request, f"Mandat n° {objet.numero} enregistré.")
             return redirect(vers_etapes(objet))
     dossier = objet.dossier
@@ -171,27 +185,32 @@ def etapes(request, pk):
         "annuler": vers_etapes(objet),
         "form": form, "form_signe": SignatureForm(instance=objet), "form_fin": FinMandatForm(instance=objet),
         "dossier": dossier, "nb_manquantes": len(manquantes),
-        "historique": objet.history.select_related("history_user")[:10],
+        "administrateur": administrateur, "historique": objet.history.select_related("history_user")[:10],
     })
 
 
 @require_POST
+@verrouiller(Mandat)
 def retirer_signature(request, pk):
-    """‹ Du dossier à la signature : la date de signature est retirée (le
-    scan reste), et le mandat redevient modifiable. Plus possible une fois
+    """‹ Du dossier à la signature : la date de signature est retirée (les
+    archives restent), et le mandat redevient modifiable. Plus possible une fois
     le mandat en gestion."""
     objet = get_object_or_404(Mandat, pk=pk)
     if not objet.signature_retirable:
         messages.error(request, "Le mandat est en gestion : la signature ne se retire plus.")
     else:
+        assurer_historique(objet, request.user)
+        noter(request, "signature retirée", objet, "Retour à la rédaction ; archives conservées.")
         objet.date_signature = None
-        objet.save(update_fields=["date_signature", "modifie_le"])
+        objet.fichier_signe = ""
+        objet.save(update_fields=["date_signature", "fichier_signe", "modifie_le"])
         messages.success(request, "Signature retirée : le mandat est de nouveau modifiable.")
         return redirect(vers_etapes(objet, 1))
     return redirect(vers_etapes(objet))
 
 
 @require_POST
+@verrouiller(Mandat)
 def fin(request, pk):
     """Fin du mandat (résiliation ou échéance). Une fois terminé, seul un
     administrateur en corrige la date."""
@@ -199,9 +218,20 @@ def fin(request, pk):
     if objet.date_fin and not est_administrateur(request.user):
         messages.error(request, "Ce mandat est terminé : seul un administrateur peut corriger sa date de fin.")
         return redirect(vers_etapes(objet))
+    motif = ""
+    if request.method == "POST" and objet.date_fin:
+        try:
+            motif = motif_correction(request)
+        except ValidationError as erreur:
+            messages.error(request, " ".join(erreur.messages))
+            return redirect(vers_etapes(objet))
+    source = assurer_historique(objet, request.user) if motif else None
     form = FinMandatForm(request.POST, instance=objet)
     if form.is_valid():
         form.save()
+        if motif:
+            creer(objet, request.user, "correction_fin", motif, source=source)
+        noter(request, "fin contrat", objet, motif or "Fin enregistrée")
         messages.success(request, f"Fin du mandat enregistrée au {objet.date_fin:%d/%m/%Y}.")
     else:
         for erreurs in form.errors.values():
@@ -215,11 +245,16 @@ def telecharger(request, pk, format_):
 
 
 @require_POST
+@verrouiller(Mandat)
 def deposer_signe(request, pk):
     objet = get_object_or_404(Mandat, pk=pk)
-    form = SignatureForm(request.POST, request.FILES, instance=objet)
+    form = SignatureForm(request.POST, request.FILES, instance=Mandat.objects.get(pk=pk))
     if form.is_valid():
-        form.save()
+        try:
+            signer(request, objet, form)
+        except ValidationError as erreur:
+            messages.error(request, " ".join(erreur.messages))
+            return redirect(vers_etapes(objet))
         messages.success(request, f"Signature du mandat enregistrée au {objet.date_signature:%d/%m/%Y}.")
     else:
         for erreurs in form.errors.values():

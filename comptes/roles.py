@@ -9,6 +9,12 @@ def est_administrateur(user):
     return user.is_superuser or user.groups.filter(name=ADMINISTRATEURS).exists()
 
 
+def acces_metier(user):
+    return user.is_authenticated and user.is_active and (
+        est_administrateur(user) or user.groups.filter(name=GESTIONNAIRES).exists()
+    )
+
+
 def attribuer_role(user, role):
     """Place l'utilisateur dans un seul rôle et aligne l'accès à l'administration."""
     from django.contrib.auth.models import Group

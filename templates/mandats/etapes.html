@@ -28,8 +28,9 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
   {% include "_frise_fleches.html" %}
 </section>
 {% for alerte in mandat.alertes %}<p class="message alerte-fond">{{ alerte }}</p>{% endfor %}
-{% if correction %}<p class="message message-erreur">Correction d'un mandat signé, réservée aux administrateurs : le PDF téléchargé ne sera plus tout à fait celui qui a été signé.</p>{% endif %}
+{% if correction %}<p class="message message-erreur">Correction d'un mandat signé, réservée aux administrateurs : une nouvelle version sera créée ; les archives et l’exemplaire signé sont conservés.</p>{% endif %}
 
+{% include "documents/_archives_contrat.html" with objet=mandat %}
 <div class="etapes-bail">
 {% for section in sections %}{% with etape=section.etape numero=section.numero mode=section.mode %}
 <section class="etape-bail {{ mode }}{% if etape.etat == 'sautee' %} sans-objet{% elif mode == 'grisee' and numero == processus.rang %} en-cours{% endif %}" id="etape-{{ numero }}" aria-labelledby="titre-etape-{{ numero }}">
@@ -43,6 +44,7 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
     {{ form.non_field_errors }}
     <p class="discret">Corriger le numéro n'est utile que s'il a été mal recopié du registre papier ; la modification est gardée dans l'historique.</p>
     {% include "mandats/_champs_mandat.html" %}
+    {% if correction %}<label>Motif de la correction <input type="text" name="motif" required maxlength="1000"></label>{% endif %}
     <div class="boutons-etape">
       <a class="bouton secondaire" href="{{ annuler }}">Annuler</a>
       <button type="submit" class="pousse">{% if correction %}Enregistrer la correction{% elif mandat.signe %}Enregistrer{% else %}Enregistrer et passer à la signature ›{% endif %}</button>
@@ -72,7 +74,7 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
       {% include "proprietes/_champ.html" with champ=form_signe.fichier_signe %}
     </div>
   </form>
-  {% if mandat.signe %}<form method="post" action="{% url 'mandats:retirer_signature' mandat.pk %}" id="form-retirer" onsubmit="return confirm('Retirer la signature de ce mandat ? Il redevient modifiable, et il faudra le faire signer à nouveau. Le scan reste.');">{% csrf_token %}</form>{% endif %}
+  {% if mandat.signe %}<form method="post" action="{% url 'mandats:retirer_signature' mandat.pk %}" id="form-retirer" onsubmit="return confirm('Retirer la signature de ce mandat ? Il redevient modifiable, et il faudra le faire signer à nouveau. Les archives sont conservées.');">{% csrf_token %}</form>{% endif %}
   <div class="boutons-etape">
     {% if mandat.signe %}<button type="submit" form="form-retirer" class="secondaire bouton-danger">Retirer la signature…</button>{% endif %}
     {% if processus.rang != 2 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
@@ -129,6 +131,7 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
     {% csrf_token %}
     <div class="champs-etape">
       {% include "proprietes/_champ.html" with champ=form_fin.date_fin %}
+      {% if mandat.date_fin %}<label>Motif de la correction <input name="motif" required></label>{% endif %}
     </div>
   </form>
   <div class="boutons-etape">
