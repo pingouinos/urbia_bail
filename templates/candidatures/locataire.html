@@ -3,7 +3,7 @@
 {% block contenu %}
 <h1>{% if candidature.statut == "retenue" %}Vos informations pour le bail{% else %}Votre candidature{% endif %}</h1>
 <p>Logement : <strong>{{ candidature.propriete.adresse }}{% if candidature.propriete.complement %}, {{ candidature.propriete.complement }}{% endif %}, {{ candidature.propriete.code_postal }} {{ candidature.propriete.ville }}</strong></p>
-<p class="discret">{% if candidature.statut == "retenue" %}Votre identité figurera sur votre bail.{% else %}Si votre candidature est retenue, votre identité figurera sur votre bail.{% endif %} Vérifiez l'orthographe de vos noms, et indiquez votre lieu de naissance comme sur votre pièce d'identité.</p>
+<p class="discret">{% if candidature.statut == "retenue" %}Votre identité figurera sur votre bail. Vérifiez l'orthographe de vos noms, et indiquez votre lieu de naissance comme sur votre pièce d'identité.{% else %}Si votre candidature est retenue, votre identité figurera sur votre bail : vérifiez l'orthographe de vos noms.{% endif %}</p>
 {% if candidats.nombre > 1 %}<p>Le bail sera signé par {{ candidats.nombre }} locataires : renseignez les informations de chacun.</p>{% endif %}
 <p class="message">Avant de commencer, munissez-vous du lien de votre dossier DossierFacile : il est demandé en fin de formulaire, et rien n'est enregistré avant l'envoi. <a href="#dossierfacile">Comment l'obtenir</a></p>
 <p class="discret">Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
@@ -47,7 +47,7 @@
     <p class="discret pleine-largeur">Une question sur les pièces ou sur le partage ? Consultez l'<a href="https://aide.dossierfacile.logement.gouv.fr/fr/" target="_blank" rel="noopener noreferrer">aide de DossierFacile</a>.</p>
     {% include "proprietes/_champ.html" with champ=form.lien_dossierfacile %}
   </fieldset>
-  <p class="discret">Vos informations servent uniquement à {% if candidature.statut == "retenue" %}préparer votre bail{% else %}étudier votre candidature et, si elle est retenue, à préparer votre bail{% endif %} avec {{ agence.designation }}. Si aucun bail n'est signé, elles sont effacées dans les trois mois.</p>
+  <p class="discret">Vos informations servent uniquement à {% if candidature.statut == "retenue" %}préparer votre bail{% else %}étudier votre candidature et, si elle est retenue, à préparer votre bail{% endif %} avec {{ agence.designation }}. Si aucun bail n'est signé, elles sont effacées dans les trois mois. <a href="{% url 'confidentialite' %}" target="_blank" rel="noopener">Vos données et vos droits</a>, à transmettre aussi à vos garants.</p>
   <div class="barre-actions">
     <button type="submit">Envoyer mes informations</button>
   </div>

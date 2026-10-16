@@ -39,6 +39,61 @@ def chemin_modele(nom):
     return depose if depose.exists() else MODELES_PAR_DEFAUT / nom
 
 
+# Clauses que la loi a rendues fausses : un modèle qui les contient encore ne
+# sert plus à produire un contrat.
+CLAUSES_PERIMEES = {
+    "bail_habitation.docx": {
+        "deux mois après un commandement de payer": (
+            "La clause résolutoire du modèle de bail prévoit encore « deux mois après un commandement de "
+            "payer » : c'est six semaines depuis la loi du 27 juillet 2023 (article 24 de la loi du "
+            "6 juillet 1989). Corriger le modèle dans « Modèles des documents »."
+        ),
+    },
+}
+
+
+def texte_docx(contenu):
+    """Texte brut du corps d'un .docx, paragraphe par paragraphe."""
+    with zipfile.ZipFile(io.BytesIO(contenu)) as archive:
+        xml = archive.read("word/document.xml").decode("utf-8")
+    paragraphes = re.findall(r"<w:p[ >].*?</w:p>", xml, flags=re.S)
+    return "\n".join("".join(re.findall(r"<w:t(?: [^>]*)?>([^<]*)</w:t>", p)) for p in paragraphes)
+
+
+# Balises sans lesquelles le document omet une mention obligatoire.
+BALISES_REQUISES = {
+    "mandat_gestion.docx": {
+        "retractation": "le droit de rétractation du mandant particulier",
+        "formulaire_retractation": "le formulaire de rétractation",
+        "agence.mediateur": "le médiateur de la consommation",
+        "agence.rcp": "l'assurance responsabilité civile professionnelle",
+    },
+}
+
+
+def defauts_modele(nom, contenu=None):
+    """Clauses périmées ou mentions obligatoires absentes du modèle (celui en
+    service par défaut), en messages à afficher."""
+    clauses, balises = CLAUSES_PERIMEES.get(nom, {}), BALISES_REQUISES.get(nom, {})
+    if not clauses and not balises:
+        return []
+    if contenu is None:
+        contenu = chemin_modele(nom).read_bytes()
+    try:
+        texte = " ".join(texte_docx(contenu).split())
+    except (KeyError, zipfile.BadZipFile):
+        return []
+    defauts = [message for extrait, message in clauses.items() if extrait in texte]
+    absentes = [libelle for balise, libelle in balises.items()
+                if not re.search(r"[{%]\s*p?\s*(if|for \w+ in)?\s*" + re.escape(balise) + r"\b", texte)]
+    if absentes:
+        defauts.append(
+            "Le modèle ne contient pas " + ", ni ".join(absentes) + " : reprendre ces balises du modèle "
+            "d'origine dans « Modèles des documents »."
+        )
+    return defauts
+
+
 def montant(valeur):
     """1234.5 → « 1 234,50 » ; 390.00 → « 390 »."""
     if valeur is None:

@@ -26,8 +26,10 @@ SECTIONS = [
     ("Identité", ["nom", "raison_sociale", "forme_juridique", "capital", "siren", "rcs_ville", "logo"]),
     ("Coordonnées", ["adresse", "code_postal", "ville", "telephone", "email", "site"]),
     ("Carte professionnelle et garantie", [
-        "carte_pro", "carte_delivree_par", "garant", "garant_adresse", "garantie_montant",
+        "carte_pro", "carte_delivree_par", "garant", "garant_adresse", "garantie_montant", "rcp",
     ]),
+    ("Médiation de la consommation", ["mediateur", "mediateur_site"]),
+    ("Assurance loyers impayés proposée aux propriétaires", ["assurance_gli", "assurance_gli_contrat", "orias"]),
     ("Valeurs proposées", ["taux_gestion"]),
 ]
 

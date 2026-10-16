@@ -217,6 +217,8 @@ class Candidature(Horodatage):
                if self.locataires_attendus > 1 else "")
             + f"Ce lien vous est personnel et reste valable jusqu'au "
             f"{timezone.localtime(self.lien_expire_le):%d/%m/%Y}.\n\n"
+            "Comment nous utilisons vos données et celles de vos garants, et vos droits : "
+            f"{lien.split('/locataire/')[0]}{reverse('confidentialite')}\n\n"
             "Cordialement,\n"
             + (f"{signataire}\n" if signataire else "")
             + Organisation.courante().designation

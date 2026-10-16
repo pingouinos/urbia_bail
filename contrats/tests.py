@@ -860,3 +860,77 @@ class EtapesTests(Donnees, TestCase):
         self.assertRedirects(reponse, self.url_etapes(bail, "#etape-4"))
         bail.refresh_from_db()
         self.assertEqual(bail.loyer, Decimal("710"))
+
+
+class InterdictionsTests(Donnees, TestCase):
+    """Ce que la loi interdit bloque la préparation, le téléchargement et la
+    signature du bail, au lieu d'un simple bandeau."""
+
+    def setUp(self):
+        self.client.force_login(creer_gestionnaire("gestion"))
+
+    def verifier_bloque(self, bail, message):
+        preparer = self.client.post(reverse("documents:preparer", args=["bail", bail.pk]), follow=True)
+        self.assertContains(preparer, message)
+        self.assertFalse(bail.versions_document.exists())
+        brouillon = self.client.get(reverse("contrats:word", args=[bail.pk]), follow=True)
+        self.assertContains(brouillon, message)
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        scan = SimpleUploadedFile("bail.pdf", b"%PDF-1.7", content_type="application/pdf")
+        self.client.post(reverse("contrats:deposer_signe", args=[bail.pk]),
+                         {"date_signature": "2026-10-10", "fichier_signe": scan})
+        bail.refresh_from_db()
+        self.assertFalse(bail.signe)
+
+    def test_logement_classe_g(self):
+        bail = self.creer_bail(self.creer_propriete(classe_dpe="G"))
+        self.verifier_bloque(bail, "Logement classé G")
+
+    def test_bien_qui_n_est_pas_d_habitation(self):
+        bail = self.creer_bail(self.creer_propriete(usage="commercial"))
+        self.verifier_bloque(bail, "Ce bien est un local commercial")
+
+    def test_depot_de_garantie_au_dela_du_plafond(self):
+        bail = self.creer_bail(loyer=Decimal("700"), depot_garantie=Decimal("1400"))
+        self.verifier_bloque(bail, "Dépôt de garantie supérieur à 1 mois")
+
+    def test_bail_conforme_se_prepare(self):
+        bail = self.creer_bail(loyer=Decimal("700"), depot_garantie=Decimal("700"))
+        self.assertEqual(bail.interdictions, [])
+        self.client.post(reverse("documents:preparer", args=["bail", bail.pk]))
+        self.assertTrue(bail.versions_document.filter(nature="preparation").exists())
+
+    def test_clause_resolutoire_a_six_semaines(self):
+        texte = generation.texte_docx(generation.chemin_modele("bail_habitation.docx").read_bytes())
+        self.assertIn("six semaines après un commandement de payer", texte)
+        self.assertEqual(generation.defauts_modele("bail_habitation.docx"), [])
+
+    def test_modele_avec_l_ancienne_clause(self):
+        """Un modèle déposé qui garde « deux mois » est refusé, et s'il est
+        déjà en service, il bloque la préparation."""
+        import shutil
+        import tempfile
+        import zipfile
+
+        from documents.views import verifier_modele
+
+        source = generation.chemin_modele("bail_habitation.docx").read_bytes()
+        sortie = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(source)) as entree, zipfile.ZipFile(sortie, "w") as archive:
+            for element in entree.infolist():
+                contenu = entree.read(element.filename)
+                if element.filename == "word/document.xml":
+                    contenu = contenu.replace("six semaines après un commandement".encode(),
+                                              "deux mois après un commandement".encode())
+                archive.writestr(element, contenu)
+        ancien = sortie.getvalue()
+        self.assertIn("six semaines", verifier_modele("bail_habitation.docx", ancien))
+        dossier = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, dossier)
+        with self.settings(MEDIA_ROOT=dossier):
+            (generation.Path(dossier) / "modeles").mkdir()
+            (generation.Path(dossier) / "modeles" / "bail_habitation.docx").write_bytes(ancien)
+            bail = self.creer_bail(loyer=Decimal("700"), depot_garantie=Decimal("700"))
+            reponse = self.client.post(reverse("documents:preparer", args=["bail", bail.pk]), follow=True)
+            self.assertContains(reponse, "c&#x27;est six semaines")
+            self.assertFalse(bail.versions_document.exists())

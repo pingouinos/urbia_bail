@@ -4,7 +4,7 @@ import tempfile
 from decimal import Decimal
 from unittest import mock
 
-from core.testing import creer_gestionnaire
+from core.testing import creer_gestionnaire, remplir_agence
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -42,6 +42,8 @@ class Donnees:
         return Propriete.objects.create(**valeurs)
 
     def creer_mandat(self, propriete=None, **autres):
+        remplir_agence()
+        autres.setdefault("conclusion", Mandat.Conclusion.AGENCE)
         mandat = Mandat.depuis_propriete(propriete or self.creer_propriete())
         for champ, valeur in autres.items():
             setattr(mandat, champ, valeur)
@@ -119,7 +121,7 @@ class MandatTests(Donnees, TestCase):
         self.assertIn("encaissements mensuels (hors charges)", texte)
         self.assertIn("la somme de 780 euros TTC, soit 390 euros TTC à la charge du bailleur et 390 euros", texte)
         self.assertIn("la somme de 117 euros TTC, soit 58,50 euros TTC", texte)
-        self.assertIn("Fait à Toulouse le : 20/07/2026", texte)
+        self.assertIn("Fait à Toulouse, en deux exemplaires originaux dont un remis au mandant, le : 20/07/2026", texte)
 
     def test_montant(self):
         self.assertEqual(generation.montant(Decimal("1234.5")), "1 234,50")
@@ -149,6 +151,7 @@ class VuesTests(Donnees, TestCase):
             "duree_ans": 3, "reconductions": 0, "taux_gestion": "7", "base_gestion": "charges_comprises",
             "taux_assurance": "2.90", "honoraires_bail_bailleur": "0", "honoraires_bail_locataire": "390",
             "honoraires_edl_bailleur": "0", "honoraires_edl_locataire": "0",
+            "conclusion": "agence", "lieu_signature": "Toulouse",
         }
         reponse = self.client.post(reverse("mandats:creer"), donnees, follow=True)
         mandat = Mandat.objects.get()
@@ -267,7 +270,7 @@ class VuesTests(Donnees, TestCase):
         # L'état des lieux : 3 €/m² quelle que soit la zone.
         self.assertEqual((tendue.honoraires_edl_bailleur, tendue.honoraires_edl_locataire), (Decimal("117.00"), Decimal("117.00")))
         self.assertEqual((ailleurs.honoraires_edl_bailleur, ailleurs.honoraires_edl_locataire), (Decimal("157.50"), Decimal("157.50")))
-        self.assertEqual(ailleurs.alertes, [])
+        self.assertEqual(ailleurs.alertes, ailleurs.interdictions)
         # Sans surface, ou pour un parking, rien n'est proposé.
         self.assertEqual(Mandat.depuis_propriete(self.creer_propriete(surface=None)).honoraires_bail_locataire, 0)
         page = self.client.get(reverse("mandats:creer"), {"propriete": tendue.propriete.pk})
@@ -517,3 +520,75 @@ class EtapesTests(Donnees, TestCase):
         donnees = {nom: "" if valeur is None else valeur for nom, valeur in donnees.items() if valeur is not False}
         donnees["mandant"] = "Monsieur DURAND Paul"
         self.assertRedirects(self.client.post(mandat.get_absolute_url(), donnees), mandat.get_absolute_url() + "#etape-2")
+
+
+class ConformiteTests(Donnees, TestCase):
+    """Loi Hoguet et code de la consommation : ce qui manque bloque la
+    préparation du mandat, et le particulier qui signe hors de l'agence est
+    informé de son droit de rétractation."""
+
+    def setUp(self):
+        self.client.force_login(creer_gestionnaire("gestion"))
+
+    def preparer(self, mandat):
+        return self.client.post(reverse("documents:preparer", args=["mandat", mandat.pk]), follow=True)
+
+    def test_mentions_de_l_agence_manquantes(self):
+        mandat = self.creer_mandat()
+        remplir_agence(mediateur="", rcp="")
+        reponse = self.preparer(mandat)
+        self.assertContains(reponse, "Mentions légales de l&#x27;agence à compléter")
+        self.assertContains(reponse, "médiateur de la consommation")
+        self.assertFalse(mandat.versions_document.exists())
+        self.assertEqual(self.client.get(reverse("mandats:word", args=[mandat.pk])).status_code, 302)
+
+    def test_assurance_loyers_impayes_sans_orias(self):
+        mandat = self.creer_mandat(assurance_loyers_impayes=True)
+        remplir_agence(orias="")
+        self.assertContains(self.preparer(mandat), "numéro ORIAS")
+        mandat.assurance_loyers_impayes = False
+        mandat.save()
+        self.preparer(mandat)
+        self.assertTrue(mandat.versions_document.exists())
+
+    def test_lieu_de_signature_a_indiquer(self):
+        mandat = self.creer_mandat(conclusion="")
+        self.assertContains(self.preparer(mandat), "Indiquer qui est le mandant et où il signe")
+        # Une société est un mandant professionnel : pas de rétractation.
+        societe = Bailleur.objects.create(type=Bailleur.Type.PERSONNE_MORALE, nom="Foncière du Canal")
+        propriete = self.creer_propriete(adresse="4 rue du Taur")
+        propriete.bailleur = societe
+        propriete.save()
+        self.assertEqual(Mandat.depuis_propriete(propriete).conclusion, Mandat.Conclusion.PROFESSIONNEL)
+
+    def test_retractation_hors_agence(self):
+        en_agence = texte_docx(self.client.get(reverse("mandats:word", args=[self.creer_mandat().pk])).content)
+        self.assertNotIn("Droit de rétractation", en_agence)
+        self.assertNotIn("FORMULAIRE DE RÉTRACTATION", en_agence)
+        self.assertIn("médiateur de la consommation", en_agence)
+        self.assertIn("article 78 du décret", en_agence)
+        mandat = self.creer_mandat(self.creer_propriete(adresse="4 rue du Taur"),
+                                   conclusion=Mandat.Conclusion.HORS_ETABLISSEMENT, lieu_signature="Frouzins")
+        texte = texte_docx(self.client.get(reverse("mandats:word", args=[mandat.pk])).content)
+        self.assertIn("Droit de rétractation", texte)
+        self.assertIn("quatorze jours à compter de la signature", texte)
+        self.assertIn("FORMULAIRE DE RÉTRACTATION", texte)
+        self.assertIn("Fait à Frouzins", texte)
+
+    def test_modele_sans_les_mentions_obligatoires(self):
+        from documents.views import verifier_modele
+
+        document = Document(generation.MODELES_PAR_DEFAUT / "mandat_gestion.docx")
+        # Ancien modèle de l'agence : les blocs de rétractation n'existent pas.
+        dans_bloc = False
+        for paragraphe in document.paragraphs:
+            dans_bloc = dans_bloc or "if retractation" in paragraphe.text or "if formulaire_retractation" in paragraphe.text
+            if dans_bloc:
+                fin = "endif" in paragraphe.text
+                paragraphe.text = ""
+                dans_bloc = not fin
+        flux = io.BytesIO()
+        document.save(flux)
+        message = verifier_modele("mandat_gestion.docx", flux.getvalue())
+        self.assertIn("le droit de rétractation du mandant particulier", message)
+        self.assertEqual(generation.defauts_modele("mandat_gestion.docx"), [])

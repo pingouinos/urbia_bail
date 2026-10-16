@@ -14,7 +14,7 @@ from docx import Document
 
 from comptes.roles import ADMINISTRATEURS, attribuer_role
 from core.models import Evenement, Organisation
-from core.testing import creer_gestionnaire
+from core.testing import creer_gestionnaire, remplir_agence
 from contrats.tests import Donnees
 from mandats.models import Mandat
 from .archives import creer
@@ -34,7 +34,9 @@ class ArchivesTests(Donnees, TestCase):
         attribuer_role(self.admin, ADMINISTRATEURS)
         self.client.force_login(self.gestion)
         self.bail = self.creer_bail()
+        remplir_agence()
         self.mandat = Mandat.depuis_propriete(self.creer_propriete())
+        self.mandat.conclusion = Mandat.Conclusion.AGENCE
         self.mandat.save()
         self.jour = timezone.localdate()
 

@@ -11,7 +11,7 @@ from django.db import transaction
 
 from comptes.roles import acces_metier, est_administrateur
 from core.journal import noter
-from .generation import chemin_modele, generer_docx
+from .generation import chemin_modele, defauts_modele, generer_docx
 from .models import PdfArchive, VersionContrat
 
 
@@ -31,12 +31,22 @@ def verrouiller(model):
     return decorer
 
 
+def nom_modele(objet):
+    return "bail_habitation.docx" if objet.code_type == "bail" else "mandat_gestion.docx"
+
+
+def interdictions(objet):
+    """Raisons légales d'empêcher la préparation et la signature du contrat :
+    celles du contrat lui-même et les clauses périmées du modèle en service."""
+    return list(getattr(objet, "interdictions", [])) + defauts_modele(nom_modele(objet))
+
+
 def derniere_version(objet):
     return objet.versions_document.first()
 
 
 def creer(objet, user, nature, motif, source=None, scan=None):
-    nom = "bail_habitation.docx" if objet.code_type == "bail" else "mandat_gestion.docx"
+    nom = nom_modele(objet)
     contexte = source.contexte if source else objet.contexte_courant()
     modele = bytes(source.modele) if source else chemin_modele(nom).read_bytes()
     docx = bytes(source.docx) if source else generer_docx(nom, contexte, source=modele)
@@ -93,6 +103,8 @@ def signer(request, objet, form):
     else:
         if not objet.en_cours:
             raise ValidationError("Un contrat terminé ne peut plus être signé.")
+        if interdictions(objet):
+            raise ValidationError(interdictions(objet))
         source = derniere_version(objet)
         source = source if source and source.nature == "preparation" else None
         if source is None:
