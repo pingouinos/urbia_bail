@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "contrats",
     "candidatures",
     "contacts",
+    "veille",
 ]
 
 MIDDLEWARE = [

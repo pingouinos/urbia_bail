@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block titre %}Examiner un changement · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><a href="{% url 'veille:tableau' %}">Veille juridique</a></nav>
+<h1>Examiner le changement</h1>
+<p><a href="{{ alerte.apres.url }}" target="_blank" rel="noopener noreferrer">{{ reference.nom|default:alerte.apres.source }}</a> · détecté le {{ alerte.apres.cree_le|date:"d/m/Y H:i" }} · {{ alerte.get_statut_display }}</p>
+<p class="message alerte-fond">Date d'effet et impact juridique à déterminer. Les modèles ci-dessous sont des pistes d'examen, sans analyse automatique des clauses. Enregistrer une décision ne valide ni n'active un modèle et ne modifie aucun contrat signé.</p>
+<p>Modèles potentiellement concernés : {{ alerte.modeles_potentiels|join:", " }}. Périmètre : {{ reference.perimetre|default:"À qualifier" }}.</p>
+<h2>Différences du texte collecté</h2>
+<p class="discret">Comparaison avec la collecte du {{ alerte.avant.cree_le|date:"d/m/Y H:i" }}. « − » : texte retiré ; « + » : texte ajouté. Les changements éditoriaux peuvent aussi apparaître.</p>
+<pre style="white-space:pre-wrap; overflow-wrap:anywhere; max-height:32rem; overflow:auto">{{ alerte.differences }}</pre>
+<details><summary>Texte précédent conservé</summary><pre style="white-space:pre-wrap; overflow-wrap:anywhere; max-height:24rem; overflow:auto">{{ alerte.avant.texte }}</pre></details>
+<details><summary>Texte collecté conservé</summary><pre style="white-space:pre-wrap; overflow-wrap:anywhere; max-height:24rem; overflow:auto">{{ alerte.apres.texte }}</pre></details>
+<h2>Consigner l'examen</h2>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Enregistrer la décision</button></form>
+<h2>Historique des décisions</h2>
+{% for decision in decisions %}<div class="carte"><p>{{ decision.cree_le|date:"d/m/Y H:i" }} · {{ decision.auteur_nom }} · {{ decision.get_statut_display }}</p>{{ decision.commentaire|linebreaks }}</div>{% empty %}<p>Aucun examen enregistré.</p>{% endfor %}
+{% endblock %}

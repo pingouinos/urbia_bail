@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titre %}Veille juridique · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><span class="fil-ici">Veille juridique</span></nav>
+<h1>Veille juridique</h1>
+<p class="message alerte-fond">Surveillance partielle de pages publiques. Un changement de page n'est pas nécessairement une évolution du droit. Les dates d'effet et les modèles concernés restent à vérifier ; cette veille ne valide pas les contrats.</p>
+<h2>Sources surveillées</h2>
+<table>
+  <thead><tr><th>Source et périmètre</th><th>Dernière tentative</th><th>Dernier contrôle réussi</th><th>État de la collecte</th></tr></thead>
+  <tbody>{% for source in sources %}
+    <tr><td><a href="{{ source.reference.url }}" target="_blank" rel="noopener noreferrer">{{ source.reference.nom }}</a><br><span class="discret">{{ source.reference.perimetre }}</span></td>
+      <td>{{ source.etat.dernier_essai|date:"d/m/Y H:i"|default:"Jamais" }}</td>
+      <td>{{ source.etat.dernier_succes|date:"d/m/Y H:i"|default:"Jamais" }}</td>
+      <td>{% if source.etat.erreur %}<strong>Échec du dernier contrôle</strong><br>{{ source.etat.erreur }}{% elif source.etat.dernier_succes %}Dernier contrôle réussi{% else %}Pas encore contrôlée{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table>
+<h2>Changements à examiner</h2>
+<p>{{ a_analyser }} alerte{{ a_analyser|pluralize }} à analyser. La première collecte constitue seulement la référence initiale.</p>
+<form class="filtres" method="get"><select name="statut" aria-label="Statut"><option value="">Tous les statuts</option>{% for valeur, libelle in statuts %}<option value="{{ valeur }}"{% if request.GET.statut == valeur %} selected{% endif %}>{{ libelle }}</option>{% endfor %}</select><button type="submit">Filtrer</button></form>
+<table><thead><tr><th>Détecté le</th><th>Source</th><th>Statut</th><th>Examen</th></tr></thead>
+<tbody>{% for alerte in page %}<tr><td>{{ alerte.apres.cree_le|date:"d/m/Y H:i" }}</td><td>{{ alerte.apres.source }}</td><td>{{ alerte.get_statut_display }}</td><td><a href="{% url 'veille:detail' alerte.pk %}">Examiner le changement</a></td></tr>{% empty %}<tr><td colspan="4">Aucune alerte pour ce filtre. Cela ne garantit pas l'absence d'évolution juridique.</td></tr>{% endfor %}</tbody></table>
+{% include "proprietes/_pagination.html" %}
+{% endblock %}

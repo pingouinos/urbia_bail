@@ -15,6 +15,7 @@ urlpatterns = [
     path("", views.accueil, name="accueil"),
     path("sante/", views.sante, name="sante"),
     path("administration/", views.administration, name="administration"),
+    path("administration/veille/", include("veille.urls")),
     path("administration/agence/", views.agence, name="agence"),
     path("administration/journal/", views.journal, name="journal"),
     path("administration/utilisateurs/", views.utilisateurs, name="utilisateurs"),

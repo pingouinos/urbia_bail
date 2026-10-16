@@ -123,3 +123,10 @@ docker compose exec -T db pg_restore -U urbiabail -d urbiabail --clean < base-AA
 ## Test sur le NAS de l'agence
 
 Une version allégée tourne sur le NAS Synology pour un essai sur le réseau local : voir [deploy/nas/README.md](deploy/nas/README.md). Pour un essai sur un seul ordinateur avec Docker Desktop : [deploy/poste/README.md](deploy/poste/README.md).
+
+### Veille juridique (prototype)
+
+L'administration propose une surveillance partielle de pages Service Public et
+ANIL, avec différences à examiner et historique des décisions. La collecte doit
+être planifiée explicitement ; elle ne valide ni ne modifie les contrats.
+Voir [le périmètre, les limites et la planification](veille/README.md).

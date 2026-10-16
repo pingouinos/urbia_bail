@@ -7,6 +7,7 @@
 <div class="grille raccourcis">
   <a class="carte" href="{% url 'agence' %}"><strong>Agence</strong><span class="discret">{{ organisation.nom|default:"Coordonnées à renseigner" }} · carte professionnelle, garantie financière, logo</span></a>
   <a class="carte" href="{% url 'utilisateurs' %}"><strong>Utilisateurs</strong><span class="discret">{{ nb_utilisateurs }} compte{{ nb_utilisateurs|pluralize }} actif{{ nb_utilisateurs|pluralize }} · rôles, accès, double authentification</span></a>
+  <a class="carte" href="{% url 'veille:tableau' %}"><strong>Veille juridique</strong><span class="discret">Sources surveillées et changements à examiner</span></a>
   <a class="carte" href="{% url 'journal' %}"><strong>Journal de sécurité</strong><span class="discret">Connexions, documents ouverts, exports, suppressions</span></a>
   <a class="carte" href="{% url 'documents:modeles' %}"><strong>Modèles des documents</strong><span class="discret">Bail et mandat, depuis Google Docs ou un fichier Word</span></a>
   <a class="carte" href="{% url 'proprietes:importer' %}"><strong>Importer des propriétés</strong><span class="discret">Depuis un fichier Excel</span></a>
