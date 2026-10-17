@@ -10,7 +10,7 @@ Les conteneurs utilisent directement le réseau du NAS (`network_mode: host`) pl
 
 ## Mise en place dans Container Manager
 
-Prérequis : DSM 7.2 ou plus récent et le paquet **Container Manager** installé depuis le Centre de paquets.
+Prérequis : DSM 7.2 ou plus récent et le paquet **Container Manager** installé depuis le Centre de paquets, puis le NAS connecté au registre de GitHub (section « Connecter le NAS au registre de GitHub » plus bas).
 
 1. **Trouver l'IP du NAS.** *Panneau de configuration* > *Réseau* > *Interface réseau* (par exemple `192.168.1.10`).
 2. **Préparer le fichier.** Sur GitHub, ouvrir `deploy/nas/docker-compose.yml`, le copier (bouton *Copy raw file*) dans un éditeur de texte et remplacer :
@@ -38,7 +38,24 @@ Si le pare-feu de DSM est activé : *Panneau de configuration* > *Sécurité* > 
 - **Le journal parle de `Address already in use` ou `Address in use`** : un autre service du NAS occupe déjà le port (c'est le cas du 5433 sur le DS220+). Pour l'application, remplacer `8080` par un port libre (par exemple `8090`) dans la ligne `command` et dans `CSRF_TRUSTED_ORIGINS` ; pour la base, `25432` aux trois endroits (`DATABASE_URL`, `command` et test de santé de `db`) ; pour Gotenberg, `23300` dans `GOTENBERG_URL` et dans sa `command`.
 - **La page reste vide (« réponse vide », `NS_ERROR_NET_EMPTY_RESPONSE`)** : l'application n'écoute pas encore. Au premier démarrage, la préparation de la base prend jusqu'à une minute ; sinon, lire *Conteneur* > `urbia-web-1` > *Détails* > *Journal*. Un mot de passe différent entre `DATABASE_URL` et `POSTGRES_PASSWORD` fait redémarrer l'application en boucle. La base garde le mot de passe de sa création : pour en changer, supprimer le projet puis le recréer sous un autre nom, ce qui repart d'une base neuve.
 - **`Bind mount failed: '/volume1/docker/urbia/sauvegardes' does not exist`** : créer le dossier `sauvegardes` dans `docker/urbia` avec File Station, puis *Action* > *Créer*. Les trois autres conteneurs tournent déjà, seul `urbia-sauvegarde-1` attend ce dossier.
-- **Le téléchargement de `ghcr.io/pingouinos/clefaria-loc` est refusé (`denied` ou `unauthorized`)** : sur GitHub, ouvrir le paquet `clefaria-loc` du compte, puis *Package settings* > *Change visibility* > *Public*.
+- **Le téléchargement de `ghcr.io/pingouinos/clefaria-loc` est refusé (`denied` ou `unauthorized`)** : l'image est privée et le NAS n'est pas connecté au registre de GitHub, ou son jeton a expiré. Refaire la section « Connecter le NAS au registre de GitHub » ci-dessous avec un nouveau jeton.
+
+## Connecter le NAS au registre de GitHub
+
+L'image de l'application est privée : le NAS doit s'identifier auprès de GitHub pour la télécharger. C'est à faire une fois, avant la première création du projet ou la prochaine mise à jour, puis à refaire quand le jeton expire.
+
+1. **Créer un jeton en lecture seule.** Sur GitHub : photo du compte > *Settings* > *Developer settings* > *Personal access tokens* > *Tokens (classic)* > *Generate new token (classic)*. Nom : `NAS urbia` ; expiration : un an (noter la date) ; cocher **seulement** `read:packages`. *Generate token*, puis copier le jeton (il commence par `ghp_`) : GitHub ne le montre qu'une fois. Il permet seulement de télécharger les images, pas de lire ni de modifier le code.
+2. **Le donner au NAS.** *Panneau de configuration* > *Planificateur de tâches* > *Créer* > *Tâche déclenchée* > *Script défini par l'utilisateur*. Onglet *Général* : nom `connexion ghcr`, utilisateur **root**, événement *Démarrage*, décocher *Activé*. Onglet *Paramètres de tâche*, dans *Script défini par l'utilisateur*, coller en remplaçant `JETON` par le jeton :
+
+   ```
+   echo JETON | /usr/local/bin/docker login ghcr.io -u pingouinos --password-stdin
+   ```
+
+   *OK*.
+3. **L'exécuter une fois.** Sélectionner la tâche > *Exécuter* et confirmer. Pour vérifier : *Projet* > `urbia` > *Action* > *Arrêt* puis *Action* > *Créer* doit télécharger l'image sans `unauthorized`.
+4. **Supprimer la tâche**, qui contient le jeton en clair : sélectionner `connexion ghcr` > *Supprimer*. Le NAS garde la connexion (dans `/root/.docker/config.json`), y compris après un redémarrage.
+
+Le projet `urbia` se crée ou se met à jour ensuite comme d'habitude. Le serveur OVH se connecte de la même façon, en lançant la commande de l'étape 2 dans son terminal.
 
 ## Sauvegardes
 
