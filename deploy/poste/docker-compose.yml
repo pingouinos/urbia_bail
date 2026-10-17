@@ -9,7 +9,7 @@
 #   docker compose down         arrête (les données restent)
 services:
   web:
-    image: ghcr.io/pingouinos/urbia_bail:main
+    image: ghcr.io/pingouinos/clefaria-loc:main
     # L'image est construite pour les processeurs Intel/AMD ; les Mac récents
     # la font tourner en émulation.
     platform: linux/amd64

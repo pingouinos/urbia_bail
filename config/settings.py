@@ -12,12 +12,12 @@ import environ
 from django.core.exceptions import ImproperlyConfigured
 
 # Nom affiché dans les pages, l'administration et les applications
-# d'authentification. Les noms techniques (base urbiabail, image urbia_bail)
+# d'authentification. Les noms techniques (base urbiabail, projet urbia)
 # ne changent pas.
 NOM_APPLICATION = "Urbia Gestion"
 # Dépôt GitHub du backlog : un ticket y devient une issue préremplie que
 # l'exploitant relit. Vide, le bouton disparaît.
-TICKETS_DEPOT_GITHUB = "pingouinos/urbia_bail"
+TICKETS_DEPOT_GITHUB = "pingouinos/clefaria-loc"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

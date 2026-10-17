@@ -26,6 +26,6 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/pingouinos/urbia_bail:main
-            ghcr.io/pingouinos/urbia_bail:${{ github.sha }}
-          labels: org.opencontainers.image.source=https://github.com/pingouinos/urbia_bail
+            ghcr.io/pingouinos/clefaria-loc:main
+            ghcr.io/pingouinos/clefaria-loc:${{ github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/pingouinos/clefaria-loc
