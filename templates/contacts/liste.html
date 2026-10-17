@@ -3,7 +3,7 @@
 {% block contenu %}
 <div class="titre-actions">
   <h1>Contacts</h1>
-  <div class="actions"><a class="bouton-petit bouton-corail" href="{% url 'contacts:nouveau' %}">+ Nouveau contact</a></div>
+  <div class="actions"><a class="bouton-petit bouton-action" href="{% url 'contacts:nouveau' %}">+ Nouveau contact</a></div>
 </div>
 {% if propriete %}<p>Personnes liées à <a href="{{ propriete.get_absolute_url }}">{{ propriete }}</a> · <a href="{% url 'contacts:liste' %}">tous les contacts</a></p>{% endif %}
 <form class="filtres" method="get">

@@ -114,7 +114,14 @@ class Organisation(Horodatage):
 
     @property
     def designation(self):
-        return self.nom or settings.NOM_APPLICATION
+        # Jamais le nom du logiciel : l'éditeur ne doit pas passer pour l'agence.
+        return self.nom or "Agence sans nom"
+
+    @property
+    def logo_par_defaut(self):
+        """Logo livré avec l'application pour l'agence URBIA, sa première
+        cliente, tant qu'elle n'en a pas déposé : chemin statique ou ""."""
+        return "img/logo-urbia-gestion.png" if "urbia" in (self.nom or "").lower() else ""
 
     @property
     def manquants(self):
