@@ -215,6 +215,9 @@ def processus_mandat(mandat, manquantes=None):
             etapes[1].etat = SAUTEE
         if manquantes:
             etapes[2].etat = SAUTEE
+    elif not mandat.signe and mandat.a_completer:
+        # Créé en version courte : la rédaction attend la fiche du propriétaire.
+        rang = 1
     elif not mandat.signe:
         rang = 2
     elif manquantes:

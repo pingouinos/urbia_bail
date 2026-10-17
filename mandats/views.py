@@ -3,6 +3,7 @@ import datetime as dt
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -20,7 +21,7 @@ from proprietes.tableur import sans_formule
 from documents import views as documents
 from documents.archives import verrouiller, assurer_historique, creer, motif_correction, signer
 
-from .forms import FinMandatForm, MandatForm, SignatureForm
+from .forms import FinMandatForm, MandatCourtForm, MandatForm, SignatureForm
 from .models import Mandat
 
 MODELE = "mandat_gestion"
@@ -77,18 +78,21 @@ def registre_export(request):
     return reponse
 
 
+def _choix_proprietes():
+    sous_mandat = Mandat.objects.filter(date_fin__isnull=True).values("propriete")
+    proprietes = Propriete.objects.filter(actif=True).exclude(pk__in=sous_mandat)
+    return {"proprietes": proprietes.select_related("bailleur")}
+
+
 def mandat_editer(request):
     """Rédaction d'un mandat. Un mandat déjà rédigé se modifie sur la page
     de ses étapes (`etapes`)."""
     objet = None
     if request.method == "GET":
         if not request.GET.get("propriete"):
-            # Premier temps : choisir le bien, pour préremplir le mandat.
-            sous_mandat = Mandat.objects.filter(date_fin__isnull=True).values("propriete")
-            proprietes = Propriete.objects.filter(actif=True).exclude(pk__in=sous_mandat)
-            return render(request, "mandats/choisir_propriete.html", {
-                "proprietes": proprietes.select_related("bailleur"),
-            })
+            # Premier temps : choisir le bien, pour préremplir le mandat, ou
+            # laisser le propriétaire remplir sa fiche (mandat court).
+            return render(request, "mandats/choisir_propriete.html", {**_choix_proprietes(), "court": MandatCourtForm()})
         propriete = get_object_or_404(Propriete.objects.select_related("bailleur"), pk=request.GET["propriete"])
         form = MandatForm(instance=Mandat.depuis_propriete(propriete))
     else:
@@ -113,6 +117,19 @@ def mandat_editer(request):
             messages.success(request, f"Mandat n° {objet.numero} enregistré : il est prêt à faire signer.")
             return redirect(vers_etapes(objet))
     return render(request, "mandats/mandat_form.html", {"form": form})
+
+
+@require_POST
+def mandat_court(request):
+    """Mandat court : quelques champs, puis le lien envoyé au propriétaire."""
+    form = MandatCourtForm(request.POST)
+    if not form.is_valid():
+        return render(request, "mandats/choisir_propriete.html", {**_choix_proprietes(), "court": form})
+    with transaction.atomic():
+        mandat = form.creer()
+    messages.success(request, f"Mandat n° {mandat.numero} créé. Envoyez le lien au propriétaire : "
+                              "il complète sa fiche et dépose ses pièces, le mandat se remplit avec.")
+    return redirect("mandats:lien", pk=mandat.pk)
 
 
 def vers_etapes(mandat, etape=None):
