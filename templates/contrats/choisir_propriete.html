@@ -17,7 +17,7 @@
     <li>
       <a href="{% url 'contrats:creer' %}?propriete={{ propriete.pk }}">
         <strong>{{ propriete }}</strong>
-        <span class="discret">{{ propriete.designation }} · {{ propriete.bailleur }}{% if propriete.ref_ics %} · réf. {{ propriete.ref_ics }}{% endif %}</span>
+        <span class="discret">{{ propriete.designation }} · {{ propriete.bailleur }}{% if propriete.numero_lot %} · lot {{ propriete.numero_lot }}{% endif %}</span>
       </a>
     </li>
     {% endfor %}

@@ -31,7 +31,7 @@ def _mandats_filtres(request):
     mandats = Mandat.objects.select_related("propriete")
     q = request.GET.get("q", "").strip()
     if q:
-        filtre = Q(mandant__icontains=q) | Q(adresse_bien__icontains=q) | Q(propriete__ref_ics__icontains=q)
+        filtre = Q(mandant__icontains=q) | Q(adresse_bien__icontains=q) | Q(propriete__numero_lot__icontains=q)
         if q.isdigit():
             filtre |= Q(numero=int(q))
         mandats = mandats.filter(filtre)
@@ -56,7 +56,7 @@ def registre_export(request):
     feuille.title = "Registre des mandats"
     entetes = [
         "N°", "Date de signature", "Mandant", "Adresse du mandant", "Propriété", "Durée",
-        "Fin", "Réf. ICS lot",
+        "Fin", "N° de lot",
     ]
     feuille.append(entetes)
     for cellule in feuille[1]:
@@ -66,7 +66,7 @@ def registre_export(request):
         feuille.append([sans_formule(valeur) for valeur in (
             mandat.numero, mandat.date_signature, mandat.mandant,
             f"{mandat.mandant_adresse} {mandat.mandant_code_postal_ville}", mandat.adresse_bien,
-            mandat.duree_texte, mandat.date_fin, mandat.propriete.ref_ics,
+            mandat.duree_texte, mandat.date_fin, mandat.propriete.numero_lot,
         )])
     for colonne, largeur in zip("ABCDEFGH", [6, 14, 36, 40, 40, 30, 12, 12]):
         feuille.column_dimensions[colonne].width = largeur

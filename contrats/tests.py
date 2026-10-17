@@ -304,7 +304,7 @@ class VuesTests(Donnees, TestCase):
 
     def test_recherche_du_logement(self):
         muret = self.creer_propriete()
-        autre = self.creer_propriete(adresse="3 rue Alsace-Lorraine", ref_ics="L-0042")
+        autre = self.creer_propriete(adresse="3 rue Alsace-Lorraine", numero_lot="L-0042")
         page = self.client.get(reverse("contrats:creer"), {"q": "muret toulouse"})
         self.assertContains(page, str(muret))
         self.assertNotContains(page, str(autre))
@@ -328,7 +328,7 @@ class VuesTests(Donnees, TestCase):
         })
         propriete = Propriete.objects.get()
         self.assertRedirects(reponse, f"{reverse('contrats:creer')}?propriete={propriete.pk}")
-        self.assertEqual((propriete.bailleur.nom, propriete.dernier_loyer, propriete.ref_ics), ("Garcia", Decimal("820"), None))
+        self.assertEqual((propriete.bailleur.nom, propriete.dernier_loyer, propriete.numero_lot), ("Garcia", Decimal("820"), None))
         self.assertEqual(propriete.champs_manquants_pour_bail(), [])
         self.assertContains(self.client.get(reponse.url), 'value="820.00"')
 

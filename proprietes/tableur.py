@@ -1,6 +1,6 @@
 """Import et export du référentiel des biens au format Excel (.xlsx) ou CSV.
 
-Une ligne = un lot. Le lot est identifié par sa référence ICS : un nouvel
+Une ligne = un lot. Le lot est identifié par son numéro et son adresse : un nouvel
 import met à jour les lots existants et crée les autres. Une cellule vide ne
 remplace jamais une valeur déjà saisie dans l'application.
 """
@@ -36,7 +36,7 @@ class Colonne:
 
 
 COLONNES = [
-    Colonne("Réf. ICS lot", "ref_ics", largeur=14),
+    Colonne("N° de lot", "numero_lot", largeur=12),
     Colonne("Réf. ICS bailleur", "ref_ics", modele=Bailleur, largeur=14),
     Colonne("Type de bailleur", "type", "choix", modele=Bailleur, largeur=20),
     Colonne("Bailleur (nom ou raison sociale)", "nom", modele=Bailleur, obligatoire=True, largeur=28),
@@ -86,7 +86,7 @@ FAUX = {"non", "n", "0", "faux", "false", "no"}
 
 
 def normaliser(texte):
-    """« Réf. ICS lot » et « ref ics lot » désignent la même colonne."""
+    """« N° de lot » et « n de lot » désignent la même colonne."""
     texte = unicodedata.normalize("NFKD", str(texte)).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", " ", texte.lower()).strip()
 
@@ -232,6 +232,8 @@ def importer(nom_fichier, contenu, simulation=False):
         return rapport
 
     par_entete = {normaliser(c.entete): c for c in COLONNES}
+    # Les fichiers préparés avant le renommage gardent leur colonne.
+    par_entete[normaliser("Réf. ICS lot")] = par_entete[normaliser("N° de lot")]
     index = {}
     for position, entete in enumerate(lignes[0]):
         if entete is None or not str(entete).strip():
@@ -311,17 +313,15 @@ def _importer_ligne(cellules, index, rapport):
 
 
 def _trouver_propriete(valeurs):
-    """Lot déjà présent : même référence ICS, sinon même adresse, complément
-    et code postal. Une ligne qui porte une référence nouvelle ne rejoint par
-    l'adresse qu'un lot encore sans référence : deux lots référencés à la même
-    adresse restent distincts."""
-    memes_lieux = Propriete.objects.filter(
-        adresse__iexact=valeurs["adresse"], complement__iexact=valeurs.get("complement", ""),
-        code_postal=valeurs["code_postal"],
-    )
-    if valeurs.get("ref_ics"):
-        trouve = Propriete.objects.filter(ref_ics=valeurs["ref_ics"]).first()
-        return trouve or memes_lieux.filter(ref_ics__isnull=True).first()
+    """Lot déjà présent : même numéro de lot à la même adresse, sinon même
+    adresse, complément et code postal. Une ligne qui porte un numéro nouveau
+    ne rejoint par l'adresse qu'un lot encore sans numéro : deux lots numérotés
+    à la même adresse restent distincts."""
+    meme_adresse = Propriete.objects.filter(adresse__iexact=valeurs["adresse"], code_postal=valeurs["code_postal"])
+    memes_lieux = meme_adresse.filter(complement__iexact=valeurs.get("complement", ""))
+    if valeurs.get("numero_lot"):
+        trouve = meme_adresse.filter(numero_lot=valeurs["numero_lot"]).first()
+        return trouve or memes_lieux.filter(numero_lot__isnull=True).first()
     return memes_lieux.first()
 
 
@@ -395,7 +395,7 @@ def classeur(proprietes=()):
     aide.append(["Obligatoire", "Colonnes surlignées : " + ", ".join(
         c.entete for c in COLONNES if c.obligatoire
     )])
-    aide.append(["Mise à jour", "Un lot déjà connu (même Réf. ICS lot ou, sans référence, même adresse, complément et "
+    aide.append(["Mise à jour", "Un lot déjà connu (même N° de lot à la même adresse ou, sans numéro, même adresse, complément et "
                  "code postal) est mis à jour ; "
                  "une cellule vide ne remplace pas la valeur existante."])
 
