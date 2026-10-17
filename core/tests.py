@@ -316,6 +316,17 @@ class OrganisationTests(TestCase):
         candidature.decider(Candidature.Statut.A_ETUDIER, None)
         Candidature.objects.create(propriete=propriete)
         self.assertEqual(ligne()["etape"], "Étudier 2 candidatures")
+        # Le bail d'un des candidats signé, les autres candidatures ne font plus revenir le logement.
+        import datetime as dt
+
+        from contrats.models import Bail
+
+        bail = Bail.depuis_propriete(propriete)
+        bail.date_effet, bail.date_signature = dt.date(2026, 11, 1), dt.date(2026, 10, 15)
+        bail.irl_trimestre, bail.irl_valeur = "2e trimestre 2023", "140.59"
+        bail.save()
+        Propriete.objects.filter(pk=propriete.pk).update(mise_en_location_le=None)
+        self.assertEqual(locations_en_cours(), [])
 
     def test_entetes_de_securite(self):
         reponse = self.client.get(reverse("connexion"))

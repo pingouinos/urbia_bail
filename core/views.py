@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import connection
-from django.db.models import Exists, Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -35,9 +35,15 @@ def locations_en_cours():
     def ligne(propriete):
         return lignes.setdefault(propriete.pk, {"propriete": propriete, "a_etudier": 0, "a_etudier_seule": None, "retenue": None, "a_signer": None, "preavis": None})
 
+    # Le logement a déjà son locataire (bail signé, sans congé) : les
+    # candidatures restées à l'étude ne relancent pas sa mise en location.
+    loue = Bail.objects.filter(
+        propriete=OuterRef("propriete"), date_signature__isnull=False,
+        date_fin_effective__isnull=True, conge_recu_le__isnull=True,
+    )
     candidatures = Candidature.objects.filter(
         bail__isnull=True, statut__in=[Candidature.Statut.A_ETUDIER, Candidature.Statut.RETENUE],
-    ).select_related("propriete").prefetch_related("candidats")
+    ).exclude(Exists(loue)).select_related("propriete").prefetch_related("candidats")
     for candidature in candidatures:
         if candidature.statut == Candidature.Statut.RETENUE:
             ligne(candidature.propriete)["retenue"] = candidature
