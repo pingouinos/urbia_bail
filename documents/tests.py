@@ -1,4 +1,5 @@
 import io
+import json
 import shutil
 import tempfile
 import urllib.error
@@ -17,7 +18,7 @@ from jinja2.exceptions import SecurityError
 from comptes.roles import ADMINISTRATEURS, attribuer_role
 from mandats.tests import Donnees, texte_docx
 
-from . import google
+from . import editeur, google
 from .generation import MODELES_PAR_DEFAUT, generer_docx
 from .models import Modele
 
@@ -101,7 +102,7 @@ class ModelesTests(Donnees, TestCase):
     def test_reprise_depuis_google_docs(self):
         reponse = self.reprendre(modele_mandat("Clause ajoutée dans Google Docs pour {{ mandant }}."))
         self.assertContains(reponse, "repris de Google Docs. Ouvrez le document d&#x27;essai")
-        self.assertContains(reponse, "Essai prêt (repris de Google Docs)")
+        self.assertContains(reponse, "Version en attente d'essai : repris de Google Docs")
         # Rien ne change tant que l'essai n'est pas ouvert puis mis en service.
         self.assertNotIn("Clause ajoutée", self.texte_mandat())
         self.assertContains(self.mettre_en_service(relu="1", reference="la loi Hoguet"), "Ouvrir d&#x27;abord le document d&#x27;essai")
@@ -304,3 +305,106 @@ class CorrectionTests(TestCase):
         self.client.force_login(creer_gestionnaire("gestion"))
         self.assertEqual(self.client.get(self.page).status_code, 403)
         self.assertEqual(self.client.get(reverse("documents:modele", args=["bail_habitation.docx"])).status_code, 403)
+
+
+@override_settings(MFA_OBLIGATOIRE=False)
+class EditeurTests(Donnees, TestCase):
+    """Éditeur intégré : le Word devient un document ProseMirror et revient
+    en Word, seuls les paragraphes modifiés changent."""
+
+    def setUp(self):
+        dossier = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, dossier)
+        reglage = override_settings(MEDIA_ROOT=dossier)
+        reglage.enable()
+        self.addCleanup(reglage.disable)
+        self.admin = User.objects.create_user("elodie", first_name="Elodie")
+        attribuer_role(self.admin, ADMINISTRATEURS)
+        self.client.force_login(self.admin)
+        self.source = (MODELES_PAR_DEFAUT / "bail_habitation.docx").read_bytes()
+        self.url = reverse("documents:texte", args=["bail_habitation.docx"])
+
+    def bloc(self, document, morceau):
+        return next(b for b in document["content"] if b["type"] == "paragraph" and morceau in json.dumps(b, ensure_ascii=False))
+
+    def test_aller_retour_sans_changement(self):
+        for nom in ["bail_habitation.docx", "mandat_gestion.docx"]:
+            with self.subTest(nom=nom):
+                source = (MODELES_PAR_DEFAUT / nom).read_bytes()
+                document = json.loads(json.dumps(editeur.lire(source)))
+                self.assertEqual(texte_docx(editeur.ecrire(source, document)), texte_docx(source))
+
+    def test_balises_en_etiquettes_et_blocs_proteges(self):
+        document = editeur.lire(self.source)
+        bailleur = self.bloc(document, "Bailleur : ")
+        self.assertEqual(bailleur["content"][1]["type"], "donnee")
+        self.assertEqual(bailleur["content"][1]["attrs"]["code"], "{{ bailleur }}")
+        libelles = [b["attrs"]["libelle"] for b in document["content"] if b["type"] == "controle"]
+        self.assertIn("Seulement si : bailleur email", libelles)
+        self.assertIn("Pour chaque locataire (locataires)", libelles)
+        sans_bloc = dict(document, content=[b for b in document["content"] if b["type"] != "controle"])
+        with self.assertRaises(editeur.TexteInvalide):
+            editeur.ecrire(self.source, sans_bloc)
+
+    def test_modifier_ajouter_supprimer(self):
+        document = editeur.lire(self.source)
+        cible = self.bloc(document, "Le présent contrat est conclu entre")
+        position = document["content"].index(cible)
+        police = Document(io.BytesIO(self.source)).paragraphs[cible["attrs"]["rang"]].runs[0].font.name
+        cible["content"] = [{"type": "text", "text": "Contrat conclu pour "},
+                            {"type": "donnee", "attrs": {"code": "{{ bailleur }}"}, "marks": [{"type": "bold"}]}]
+        document["content"].insert(position + 1, {"type": "paragraph", "attrs": {"rang": cible["attrs"]["rang"]},
+                                                  "content": [{"type": "text", "text": "Paragraphe ajouté."}]})
+        retire = self.bloc(document, "Il a été convenu ce qui suit")
+        document["content"].remove(retire)
+        contenu = editeur.ecrire(self.source, document)
+        texte = texte_docx(contenu)
+        self.assertIn("Contrat conclu pour {{ bailleur }}\nParagraphe ajouté.", texte)
+        self.assertNotIn("Il a été convenu ce qui suit", texte)
+        paragraphe = next(p for p in Document(io.BytesIO(contenu)).paragraphs if p.text.startswith("Contrat conclu"))
+        self.assertEqual([run.font.name for run in paragraphe.runs], [police, police])
+        self.assertEqual([run.bold for run in paragraphe.runs], [None, True])
+
+    def test_enregistrer_prepare_un_essai(self):
+        page = self.client.get(self.url)
+        self.assertContains(page, "data-editeur")
+        self.assertContains(page, "Seulement si : bailleur email")
+        document = editeur.lire(self.source)
+        self.bloc(document, "Il a été convenu ce qui suit")["content"] = [{"type": "text", "text": "Les parties conviennent :"}]
+        reponse = self.client.post(self.url, {"texte": json.dumps(document)}, follow=True)
+        self.assertContains(reponse, "Texte enregistré")
+        self.assertContains(reponse, "modifié dans l&#x27;application")
+        # Le modèle en service ne change qu'après l'essai et la mise en service.
+        depose = Path(settings.MEDIA_ROOT) / "modeles" / "bail_habitation.docx"
+        self.assertFalse(depose.exists())
+        self.assertContains(self.client.get(self.url), "Les parties conviennent :")
+        with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7"):
+            self.client.get(reverse("documents:essai_version", args=["bail_habitation.docx"]))
+        self.client.post(reverse("documents:mettre_en_service", args=["bail_habitation.docx"]),
+                         {"relu": "1", "reference": "la loi de 1989"})
+        self.assertIn("Les parties conviennent :", texte_docx(depose.read_bytes()))
+        self.assertEqual(Modele.objects.get(nom="bail_habitation.docx").origine, Modele.Origine.EDITEUR)
+
+    def test_texte_refuse(self):
+        document = editeur.lire(self.source)
+        self.bloc(document, "Il a été convenu")["content"] = [{"type": "text", "text": "{{ balise_inconnue }}"}]
+        reponse = self.client.post(self.url, {"texte": json.dumps(document)})
+        self.assertContains(reponse, "Balises inconnues : balise_inconnue")
+        # Le texte saisi reste à l'écran pour être corrigé.
+        self.assertContains(reponse, "balise_inconnue")
+        self.assertFalse((Path(settings.MEDIA_ROOT) / "modeles" / "essai" / "bail_habitation.docx").exists())
+        self.assertContains(self.client.post(self.url, {"texte": "pas du json"}), "illisible")
+
+    def test_paragraphe_a_corriger_signale(self):
+        document = Document(MODELES_PAR_DEFAUT / "bail_habitation.docx")
+        document.add_paragraph("Résilié deux mois après un commandement de payer resté sans effet.")
+        depose = Path(settings.MEDIA_ROOT) / "modeles" / "bail_habitation.docx"
+        depose.parent.mkdir(parents=True)
+        document.save(depose)
+        page = self.client.get(self.url)
+        self.assertContains(page, "Voir la correction proposée")
+        self.assertContains(page, "loi du 27 juillet 2023")
+
+    def test_reserve_aux_administrateurs(self):
+        self.client.force_login(creer_gestionnaire("gestion"))
+        self.assertEqual(self.client.get(self.url).status_code, 403)
