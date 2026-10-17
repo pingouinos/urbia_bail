@@ -87,7 +87,12 @@ MIDDLEWARE = [
     "axes.middleware.AxesMiddleware",
     # Enregistre l'auteur de chaque modification dans l'historique.
     "simple_history.middleware.HistoryRequestMiddleware",
+    "proprietes.middleware.ZonesTenduesMiddleware",
 ]
+
+# Téléchargement mensuel de la liste des communes en zone tendue
+# (proprietes.zones_tendues). Coupé pendant les tests.
+ZONES_TENDUES_AUTO = env.bool("ZONES_TENDUES_AUTO", default="test" not in sys.argv)
 
 ROOT_URLCONF = "config.urls"
 

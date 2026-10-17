@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
-from django.http import FileResponse, Http404, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -22,7 +22,7 @@ from core.journal import noter
 from core.processus import processus_bail, processus_location
 from mandats.models import Mandat
 
-from . import tableur
+from . import tableur, zones_tendues
 from .forms import (
     AssociesForms, BailleurForm, ImmeubleForm, ImportForm, LotFormSet, LotsCommunsForm, MiseEnLocationForm,
     NouveauBailleurForm, PieceForm, ProprieteForm,
@@ -497,3 +497,15 @@ def importer_confirmer(request):
         f"{rapport.bailleurs_crees} bailleur(s) créé(s), {len(rapport.erreurs)} ligne(s) ignorée(s).",
     )
     return redirect("proprietes:liste")
+
+
+def zone_tendue(request):
+    """Zone tendue d'une commune, pour l'afficher pendant la saisie de la
+    fiche : « oui », « non », « inconnue » ou « sans_liste » tant que la
+    liste officielle n'a jamais été téléchargée."""
+    if zones_tendues.derniere_liste() is None:
+        return JsonResponse({"statut": "sans_liste"})
+    tendue, commune = zones_tendues.statut(request.GET.get("code_postal"), request.GET.get("ville"))
+    if commune is None:
+        return JsonResponse({"statut": "inconnue"})
+    return JsonResponse({"statut": "oui" if tendue else "non", "commune": commune.nom})

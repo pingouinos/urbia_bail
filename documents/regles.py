@@ -5,7 +5,10 @@ mensuelle ou une relecture signale un changement."""
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from types import SimpleNamespace
 from urllib.parse import quote
+
+from django.utils import timezone
 
 from mandats.models import PLAFOND_BAIL_HORS_ZONE_TENDUE, PLAFOND_BAIL_ZONE_TENDUE, PLAFOND_ETAT_DES_LIEUX
 
@@ -90,6 +93,31 @@ def etat(regle, defauts, aujourdhui=None):
     return A_JOUR, ""
 
 
+def zones_tendues():
+    """Ligne du registre pour la liste des communes en zone tendue, que
+    l'application télécharge elle-même : à revérifier si le dernier
+    téléchargement réussi est trop ancien."""
+    from proprietes import zones_tendues as zones
+    from proprietes.models import ListeCommunes
+
+    liste = zones.derniere_liste()
+    publiee = liste and (liste.publiee_le or liste.le)
+    regle = SimpleNamespace(
+        libelle="Communes en zone tendue",
+        applique=(f"Liste officielle du {timezone.localtime(publiee):%d/%m/%Y}, {liste.en_zone_tendue} communes"
+                  if liste else "Liste officielle pas encore téléchargée"),
+        source="Décret n° 2013-392, art. 232 du code général des impôts", url=zones.PAGE,
+        verifiee_le=liste and timezone.localtime(liste.le).date(),
+    )
+    if liste and timezone.now() - liste.le <= zones.PEREMPTION:
+        return {"regle": regle, "etat": A_JOUR, "libelle_etat": LIBELLES_ETAT[A_JOUR], "explication": ""}
+    essai = ListeCommunes.objects.order_by("-le").first()
+    explication = (f"Dernier téléchargement en échec : {essai.erreur}" if essai and essai.erreur
+                   else "Téléchargement automatique pas encore fait.")
+    return {"regle": regle, "etat": A_REVERIFIER, "libelle_etat": LIBELLES_ETAT[A_REVERIFIER],
+            "explication": explication}
+
+
 def registre(aujourdhui=None):
     """Règles groupées par document, chacune avec son état."""
     defauts = {nom: defauts_modele(nom) for nom in {regle.modele for regle in REGLES if regle.modele}}
@@ -99,6 +127,7 @@ def registre(aujourdhui=None):
         groupes.setdefault(regle.document, []).append({
             "regle": regle, "etat": code, "libelle_etat": LIBELLES_ETAT[code], "explication": explication,
         })
+    groupes[BAIL].append(zones_tendues())
     return groupes
 
 
