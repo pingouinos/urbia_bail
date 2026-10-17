@@ -46,9 +46,9 @@ Le conteneur `urbia-sauvegarde-1` copie la base (`base-AAAA-MM-JJ.dump`) et les 
 
 Pour restaurer une base, depuis le terminal de `urbia-sauvegarde-1` : `pg_restore -h 127.0.0.1 -p 25432 -U urbiabail -d urbiabail --clean /sauvegardes/base-AAAA-MM-JJ.dump`.
 
-## Ouvrir le formulaire locataire sur Internet (Cloudflare Tunnel)
+## Ouvrir les formulaires locataire et propriétaire sur Internet (Cloudflare Tunnel)
 
-Le candidat complète ses informations par un lien personnel (`/locataire/…`). Pour qu'il l'ouvre depuis chez lui, Cloudflare Tunnel relie le NAS à l'adresse `https://locataire.urbia-immobilier.fr` sans ouvrir de port sur la box : le NAS se connecte à Cloudflare, qui ne lui transmet que les adresses `/locataire/` et `/static/`. L'application refuse de toute façon tout le reste sur cette adresse ; le reste de l'appli ne s'ouvre qu'au bureau. L'offre Free de Cloudflare et le tunnel sont gratuits ; le domaine reste payé chez OVH.
+Le candidat complète ses informations par un lien personnel (`/locataire/…`), et le propriétaire sa fiche et ses pièces (`/proprietaire/…`). Pour qu'ils l'ouvrent depuis chez eux, Cloudflare Tunnel relie le NAS à l'adresse `https://locataire.urbia-immobilier.fr` sans ouvrir de port sur la box : le NAS se connecte à Cloudflare, qui ne lui transmet que les adresses `/locataire/`, `/proprietaire/` et `/static/`. L'application refuse de toute façon tout le reste sur cette adresse ; le reste de l'appli ne s'ouvre qu'au bureau. L'offre Free de Cloudflare et le tunnel sont gratuits ; le domaine reste payé chez OVH.
 
 Le domaine doit passer chez Cloudflare (ses serveurs DNS), ce qui touche aussi la messagerie et le site : les étapes 1 et 2 sont à faire posément, en recopiant tous les enregistrements.
 
@@ -88,7 +88,7 @@ Le domaine doit passer chez Cloudflare (ses serveurs DNS), ce qui touche aussi l
 3. Laisser cette page ouverte et faire l'étape 4 ; le tunnel apparaît ensuite connecté, puis *Continue*.
 4. Onglet *Routes* > *Add route* > *Published application* :
    - *Subdomain* : `locataire` ; *Domain* : `urbia-immobilier.fr` ;
-   - *Path* : `^/(locataire|static)/` ;
+   - *Path* : `^/(locataire|proprietaire|static)/` ;
    - *Service URL* : `http://127.0.0.1:8080` (le port de l'application sur le NAS) ;
    - *Add route*.
 
@@ -101,11 +101,13 @@ C'est un projet à part : *Arrêter* `urbia-tunnel` ferme aussitôt le formulair
 
 ### 5. Application : donner l'adresse publique
 
-Projet `urbia` > *Action* > *Arrêt*, onglet *YAML* : dans le service `web`, renseigner `URL_LOCATAIRES: "https://locataire.urbia-immobilier.fr"`, enregistrer, puis *Action* > *Créer*. Les liens envoyés aux candidats utilisent alors cette adresse.
+Projet `urbia` > *Action* > *Arrêt*, onglet *YAML* : dans le service `web`, renseigner `URL_LOCATAIRES: "https://locataire.urbia-immobilier.fr"`, enregistrer, puis *Action* > *Créer*. Les liens envoyés aux candidats et aux propriétaires utilisent alors cette adresse.
 
 ### 6. Tester
 
 Depuis un téléphone en 4G (Wi-Fi coupé) : `https://locataire.urbia-immobilier.fr/` affiche une page introuvable (erreur 404) : c'est normal, seul le formulaire est ouvert. Sur une candidature, *Envoyer le lien au candidat*, puis ouvrir le lien sur le téléphone : le formulaire s'affiche.
+
+**Tunnel déjà en place avant le formulaire propriétaire :** Cloudflare > *Networking* > *Tunnels* > `urbia-nas` > *Routes*, modifier la route `locataire` et remplacer son *Path* par `^/(locataire|proprietaire|static)/`. Sans cela, le lien envoyé au propriétaire affiche une erreur depuis Internet.
 
 ## Mettre à jour
 

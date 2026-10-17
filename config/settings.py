@@ -42,7 +42,7 @@ CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 
 # Adresse publique du formulaire des candidats (par exemple
 # https://locataire.urbia-immobilier.fr, servie par Cloudflare Tunnel). Sur
-# cette adresse, l'application ne répond qu'aux pages /locataire/.
+# cette adresse, l'application ne répond qu'aux pages /locataire/ et /proprietaire/.
 _url_locataires = urlparse(env("URL_LOCATAIRES", default=""))
 URL_LOCATAIRES = f"{_url_locataires.scheme}://{_url_locataires.netloc}" if _url_locataires.netloc else ""
 HOTE_LOCATAIRES = _url_locataires.hostname or ""

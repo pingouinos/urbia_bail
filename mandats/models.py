@@ -6,11 +6,14 @@ discontinuité : chaque mandat reçoit un numéro d'ordre définitif et n'est
 jamais supprimé.
 """
 
+import datetime as dt
+import secrets
 from decimal import Decimal
 
 from django.db import IntegrityError, models, transaction
 from django.db.models import Max
 from django.urls import reverse
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from contrats.base import Contrat
@@ -18,6 +21,10 @@ from proprietes.models import Propriete
 
 # Plafonds des honoraires de location imputables au locataire, en euros TTC
 # par m² de surface habitable (décret n° 2014-890 du 1er août 2014).
+# Lien envoyé au propriétaire pour remplir sa fiche et déposer ses pièces :
+# il sert jusqu'à son expiration, pour revenir avec une pièce oubliée.
+DUREE_LIEN_PROPRIETAIRE = dt.timedelta(days=30)
+
 PLAFOND_BAIL_ZONE_TENDUE = Decimal("10")
 PLAFOND_BAIL_HORS_ZONE_TENDUE = Decimal("8")
 PLAFOND_ETAT_DES_LIEUX = Decimal("3")
@@ -187,6 +194,11 @@ class Mandat(Contrat):
     fichier_signe = models.FileField("mandat signé (scan)", upload_to=ranger_mandat_signe, blank=True)
     observations = models.TextField(blank=True)
 
+    # Lien personnel du propriétaire : ses coordonnées, son IBAN et ses pièces.
+    jeton = models.CharField(max_length=64, null=True, blank=True, unique=True, editable=False)
+    lien_cree_le = models.DateTimeField("lien envoyé le", null=True, blank=True, editable=False)
+    rempli_le = models.DateTimeField("fiche remplie par le propriétaire le", null=True, blank=True, editable=False)
+
     history = HistoricalRecords()
 
     class Meta:
@@ -253,6 +265,54 @@ class Mandat(Contrat):
     @property
     def en_cours(self):
         return self.date_fin is None
+
+    @property
+    def lien_expire_le(self):
+        return self.lien_cree_le + DUREE_LIEN_PROPRIETAIRE if self.lien_cree_le else None
+
+    @property
+    def lien_valide(self):
+        return bool(self.jeton and self.en_cours and timezone.now() < self.lien_expire_le)
+
+    def creer_lien(self):
+        """Nouveau lien pour le propriétaire ; l'ancien cesse de fonctionner."""
+        self.jeton = secrets.token_urlsafe(32)
+        self.lien_cree_le = timezone.now()
+        self.save(update_fields=["jeton", "lien_cree_le", "modifie_le"])
+
+    @classmethod
+    def par_jeton(cls, jeton):
+        """Mandat dont le lien est encore valable, ou None."""
+        # Toutes agences : le lien est ouvert sans connexion, son jeton suffit.
+        mandat = cls.tous.select_related("propriete__bailleur", "agence").filter(jeton=jeton).first() if jeton else None
+        return mandat if mandat and mandat.lien_valide else None
+
+    def reprendre_mandant(self):
+        """Avant la signature, le mandat suit la fiche du bailleur."""
+        if self.signe:
+            return
+        bailleur = self.propriete.bailleur
+        self.mandant = bailleur.designation
+        self.mandant_adresse = bailleur.adresse
+        self.mandant_code_postal_ville = f"{bailleur.code_postal} {bailleur.ville}".strip()
+        self.save(update_fields=["mandant", "mandant_adresse", "mandant_code_postal_ville", "modifie_le"])
+
+    def texte_lien(self, lien, signataire=""):
+        from core.models import Organisation
+
+        return (
+            "Bonjour,\n\n"
+            f"Pour préparer votre mandat de gestion du logement situé {self.adresse_bien}, merci de vérifier "
+            "vos coordonnées, d'indiquer l'IBAN sur lequel verser vos loyers et de déposer les pièces que vous "
+            "avez sous la main (pièce d'identité, RIB, taxe foncière…), à l'adresse suivante :\n\n"
+            f"{lien}\n\n"
+            "Cela prend quelques minutes, et une photo prise au téléphone suffit pour les pièces. Vous pouvez "
+            "revenir avec le même lien pour en ajouter une, jusqu'au "
+            f"{timezone.localtime(self.lien_expire_le):%d/%m/%Y}.\n\n"
+            "Cordialement,\n"
+            + (f"{signataire}\n" if signataire else "")
+            + Organisation.courante().designation
+        )
 
     @property
     def signature_retirable(self):

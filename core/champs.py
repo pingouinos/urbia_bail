@@ -56,3 +56,12 @@ def siren_valide(valeur):
         total += nombre - 9 if nombre > 9 else nombre
     if total % 10:
         raise ValidationError("Ce numéro SIREN ne passe pas le contrôle : vérifier les chiffres saisis.")
+
+
+def iban_valide(valeur):
+    """IBAN, espaces admis, avec sa clé de contrôle (modulo 97)."""
+    iban = re.sub(r"\s", "", valeur or "").upper()
+    if not re.fullmatch(r"[A-Z]{2}\d{2}[A-Z0-9]{11,30}", iban):
+        raise ValidationError("Un IBAN commence par deux lettres et deux chiffres (FR76…).")
+    if int("".join(str(int(c, 36)) for c in iban[4:] + iban[:4])) % 97 != 1:
+        raise ValidationError("Cet IBAN ne passe pas le contrôle : vérifier les caractères saisis.")

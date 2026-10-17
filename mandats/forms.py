@@ -1,7 +1,9 @@
+import re
+
 from django import forms
 from django.utils import timezone
 
-from proprietes.models import Propriete
+from proprietes.models import Bailleur, Piece, Propriete
 from core.fichiers import controler_fichier
 from documents.forms import FichierSigneMixin, SignatureMixin
 
@@ -109,3 +111,76 @@ class SignatureForm(SignatureMixin, forms.ModelForm):
         fields = SignatureMixin.CHAMPS
         widgets = SignatureMixin.WIDGETS
         labels = SignatureMixin.LIBELLES
+
+
+# Formulaires ouverts au propriétaire, par le lien qu'il a reçu : il ne
+# touche qu'à ses coordonnées, au versement de ses loyers et à ses pièces.
+class ProprietaireVousForm(forms.ModelForm):
+    PERSONNE = [
+        "civilite", "nom", "prenom", "conjoint_civilite", "conjoint_nom", "conjoint_prenom",
+        "adresse", "code_postal", "ville", "telephone", "email",
+    ]
+    SOCIETE = [
+        "representant_civilite", "representant_nom", "representant_prenom", "representant_qualite",
+        "adresse", "code_postal", "ville", "telephone", "email",
+    ]
+
+    class Meta:
+        model = Bailleur
+        fields = sorted(set(["civilite", "nom", "prenom", "conjoint_civilite", "conjoint_nom", "conjoint_prenom",
+                             "representant_civilite", "representant_nom", "representant_prenom",
+                             "representant_qualite", "adresse", "code_postal", "ville", "telephone", "email"]))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # La raison sociale d'une société ne se corrige qu'à l'agence.
+        gardes = self.SOCIETE if self.instance.societe else self.PERSONNE
+        for nom in list(self.fields):
+            if nom not in gardes:
+                del self.fields[nom]
+        self.order_fields(gardes)
+        libelles = {
+            "nom": "Nom", "conjoint_nom": "Nom du conjoint ou co-propriétaire, le cas échéant",
+            "representant_nom": "Nom de la personne qui signe pour la société",
+            "representant_prenom": "Son prénom", "representant_civilite": "Sa civilité",
+            "representant_qualite": "Sa qualité (gérant, gérante…)",
+        }
+        for nom, libelle in libelles.items():
+            if nom in self.fields:
+                self.fields[nom].label = libelle
+        for nom in ("adresse", "code_postal", "ville", "email"):
+            self.fields[nom].required = True
+
+
+class VersementForm(forms.ModelForm):
+    class Meta:
+        model = Bailleur
+        fields = ["versement", "iban"]
+        widgets = {"versement": forms.RadioSelect}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["versement"].choices = Bailleur.Versement.choices
+        self.fields["versement"].label = "Rythme"
+        self.fields["iban"].label = "IBAN du compte qui reçoit les loyers"
+        self.fields["iban"].widget.attrs.update({"placeholder": "FR76 …", "autocomplete": "off", "inputmode": "text"})
+
+    def clean_iban(self):
+        iban = re.sub(r"\s", "", self.cleaned_data["iban"]).upper()
+        return " ".join(iban[i:i + 4] for i in range(0, len(iban), 4))
+
+
+class PieceProprietaireForm(forms.Form):
+    """Une pièce du dossier du mandant, déposée par le propriétaire."""
+
+    TAILLE_MAX = 10 * 1024 * 1024
+
+    type = forms.ChoiceField(choices=Piece.Type.choices, widget=forms.HiddenInput)
+    fichier = forms.FileField(widget=forms.FileInput(attrs={"accept": ".pdf,.jpg,.jpeg,.png,image/*"}))
+
+    def __init__(self, *args, types=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["type"].choices = [(t, t) for t in types]
+
+    def clean_fichier(self):
+        return controler_fichier(self.cleaned_data["fichier"], self.TAILLE_MAX)

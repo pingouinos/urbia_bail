@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block titre %}Vos informations pour le mandat · {{ agence.designation }}{% endblock %}
+{% block contenu %}
+<h1>Vos informations pour le mandat de gestion</h1>
+<p>Logement : <strong>{{ mandat.adresse_bien }}</strong></p>
+<ol class="etapes-proprietaire" aria-label="Étapes">
+  {% for nom in etapes %}<li class="{% if forloop.counter < etape %}faite{% elif forloop.counter == etape %}courante{% endif %}"{% if forloop.counter == etape %} aria-current="step"{% endif %}>
+    {% if forloop.counter < etape %}<a href="?etape={{ forloop.counter }}">{{ forloop.counter }} · {{ nom }} ✓</a>{% else %}{{ forloop.counter }} · {{ nom }}{% endif %}
+  </li>{% endfor %}
+</ol>
+{% if etape == 1 %}
+<p class="message message-info">Quelques minutes suffisent. Ce que {{ agence.designation }} connaît déjà est prérempli : vérifiez, complétez ce qui manque, puis continuez.</p>
+<form method="post" class="formulaire" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>{% if bailleur.societe %}{{ bailleur.nom }}{% else %}Vous{% endif %}</legend>
+    {% for erreur in form.non_field_errors %}<p class="erreur pleine-largeur">{{ erreur }}</p>{% endfor %}
+    {% for champ in form.visible_fields %}{% include "proprietes/_champ.html" %}{% endfor %}
+  </fieldset>
+  <div class="barre-actions"><button type="submit">Enregistrer et continuer ›</button></div>
+</form>
+{% elif etape == 2 %}
+<form method="post" class="formulaire" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>Versement de vos loyers</legend>
+    {% for champ in form.visible_fields %}{% include "proprietes/_champ.html" %}{% endfor %}
+    <p class="discret pleine-largeur">Vous pouvez laisser l'IBAN vide et déposer un RIB à l'étape suivante.</p>
+  </fieldset>
+  <div class="barre-actions actions-formulaire"><a class="bouton secondaire" href="?etape=1">‹ Vous</a><button type="submit">Enregistrer et continuer ›</button></div>
+</form>
+{% else %}
+<section class="carte" id="pieces">
+  <h2>Vos pièces</h2>
+  <p class="discret">Toutes sont facultatives : déposez celles que vous avez sous la main, une photo prise au téléphone suffit (PDF, JPEG ou PNG, 10 Mo au plus). Chaque pièce est enregistrée dès son dépôt.</p>
+  <ul class="pieces">
+    {% for ligne in lignes %}
+    <li class="{% if ligne.piece and not ligne.piece.perime %}fournie{% else %}facultative{% endif %}">
+      <div class="dossier-piece">
+        <strong>{{ ligne.libelle }}</strong>
+        {% if ligne.note %}<span class="discret">{{ ligne.note }}</span>{% endif %}
+      </div>
+      {% if ligne.piece and not ligne.piece.perime %}
+      <div class="dossier-etat"><span class="piece-fournie">✓ Reçue</span></div>
+      {% else %}
+      <form method="post" enctype="multipart/form-data" class="dossier-depot">
+        {% csrf_token %}
+        <input type="hidden" name="type" value="{{ ligne.type }}">
+        <label class="bouton-petit secondaire dossier-choisir">{% if ligne.piece %}Remplacer{% else %}Déposer{% endif %}<input type="file" name="fichier" accept=".pdf,.jpg,.jpeg,.png,image/*" required aria-label="Fichier : {{ ligne.libelle }}"></label>
+        <button type="submit" class="bouton-petit dossier-envoyer">Envoyer</button>
+        <span class="dossier-fichier discret" aria-live="polite"></span>
+        {% if erreur and erreur.0 == ligne.type %}<small class="erreur">{{ erreur.1 }}</small>{% endif %}
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  <p class="discret">Il vous manque une pièce ? Vous pouvez revenir avec le même lien jusqu'au {{ mandat.lien_expire_le|date:"d/m/Y" }}, ou la remettre plus tard à {{ agence.designation }}.</p>
+  <p class="discret">Vos informations servent uniquement à préparer et gérer votre mandat avec {{ agence.designation }}.</p>
+  <div class="barre-actions actions-formulaire"><a class="bouton secondaire" href="?etape=2">‹ Versement</a><button type="submit" name="action" value="envoyer">Envoyer à {{ agence.designation }}</button></div>
+</form>
+<script>
+  // Dépôt en un geste : choisir le fichier l'envoie. Sans script, le bouton Envoyer reste.
+  document.querySelectorAll(".dossier-depot").forEach(function (depot) {
+    var fichier = depot.querySelector("input[type=file]");
+    var nom = depot.querySelector(".dossier-fichier");
+    fichier.addEventListener("change", function () {
+      if (!fichier.files.length) return;
+      nom.textContent = "Envoi de " + fichier.files[0].name + "…";
+      depot.submit();
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titre %}Lien pour le propriétaire · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contrats:liste' %}">Contrats</a><span aria-hidden="true">›</span><a href="{% url 'mandats:registre' %}">Registre des mandats</a><span aria-hidden="true">›</span><a href="{{ mandat.get_absolute_url }}">Mandat n° {{ mandat.numero }}</a><span aria-hidden="true">›</span><span class="fil-ici">Lien pour le propriétaire</span></nav>
+<h1>Lien pour le propriétaire</h1>
+<p class="discret">Pour {{ mandat.propriete.bailleur }} · {{ mandat.adresse_bien }}<br>Destinataire : {{ destinataires|join:", "|default:"aucune adresse e-mail sur la fiche du bailleur" }}</p>
+<p class="message">En trois étapes courtes, sans compte ni mot de passe, le propriétaire vérifie ses coordonnées, indique le versement de ses loyers et son IBAN, et dépose les pièces qu'il a sous la main. Ses réponses complètent la fiche du bailleur{% if not mandat.signe %} et ce mandat, pas encore signé{% endif %}, et ses pièces le dossier du mandant. Le lien sert jusqu'au {{ mandat.lien_expire_le|date:"d/m/Y" }}, pour revenir avec une pièce oubliée.</p>
+{% if local %}<p class="message alerte-fond">La page n'est pas encore ouverte sur Internet : ce lien ne fonctionne que depuis le réseau du bureau.</p>{% endif %}
+<section class="carte">
+  <h2>Lien</h2>
+  <div class="copie">
+    <input type="text" id="adresse-lien" value="{{ adresse }}" readonly aria-label="Lien pour le propriétaire">
+    <button type="button" class="bouton secondaire" data-copier="adresse-lien">Copier le lien</button>
+  </div>
+  <small class="discret">À coller dans un SMS si le propriétaire n'a pas d'e-mail.</small>
+</section>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  <fieldset>
+    <legend>Message</legend>
+    {% include "proprietes/_champ.html" with champ=form.texte %}
+  </fieldset>
+  <div class="actions-formulaire">
+    {% if envoi %}<button type="submit" name="action" value="envoyer">Envoyer l'e-mail</button>{% endif %}
+    {% if destinataires %}<a class="bouton{% if envoi %} secondaire{% endif %}" href="{{ mailto }}">Ouvrir dans ma messagerie</a>{% endif %}
+    <button type="button" class="bouton secondaire" data-copier="id_texte">Copier le message</button>
+  </div>
+</form>
+<script>
+  // Copie dans le presse-papiers, pour Gmail ou un SMS.
+  document.querySelectorAll("[data-copier]").forEach(function (bouton) {
+    bouton.addEventListener("click", function () {
+      var champ = document.getElementById(bouton.dataset.copier);
+      var libelle = bouton.textContent;
+      navigator.clipboard.writeText(champ.value).then(function () {
+        bouton.textContent = "Copié";
+        setTimeout(function () { bouton.textContent = libelle; }, 2000);
+      }, function () { champ.select(); });
+    });
+  });
+</script>
+{% endblock %}

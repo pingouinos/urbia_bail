@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block titre %}Lien expiré · {{ agence.designation }}{% endblock %}
+{% block contenu %}
+<section class="carte connexion">
+  <h1>Ce lien n'est plus valable</h1>
+  <p>Sa date de validité est passée, ou un nouveau lien vous a été envoyé depuis. Contactez {{ agence.designation }} pour en recevoir un.</p>
+</section>
+{% endblock %}

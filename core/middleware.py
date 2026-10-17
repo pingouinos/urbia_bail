@@ -34,7 +34,7 @@ class SecuriteMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        public = request.path.startswith("/locataire/")
+        public = request.path.startswith(("/locataire/", "/proprietaire/"))
         if public and self.trop_de_demandes(request):
             reponse = HttpResponse(
                 "Trop de demandes depuis votre connexion. Merci de réessayer dans quelques minutes.",
@@ -48,8 +48,10 @@ class SecuriteMiddleware:
             reponse.setdefault("Content-Security-Policy", CSP)
             reponse.setdefault("Permissions-Policy", PERMISSIONS)
         if public:
-            # Le lien personnel du candidat ne doit fuir ni par l'en-tête Referer ni par un cache.
-            reponse["Referrer-Policy"] = "no-referrer"
+            # Le lien personnel du candidat ou du propriétaire ne doit fuir ni par l'en-tête Referer ni par un
+            # cache. « same-origin » et non « no-referrer » : avec ce dernier, le navigateur envoie
+            # « Origin: null » à l'envoi du formulaire, que la protection CSRF refuse.
+            reponse["Referrer-Policy"] = "same-origin"
         if not request.path.startswith("/static/"):
             # Des données personnelles : rien n'est gardé par le navigateur ou un proxy.
             reponse.setdefault("Cache-Control", "private, no-store")

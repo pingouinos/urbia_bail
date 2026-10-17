@@ -714,6 +714,17 @@ table.liste-modeles td:last-child { text-align: right; }
 .etape-modele p { margin: 0 0 6px; }
 .etape-modele input[type=text] { width: 100%; margin: 4px 0 8px; }
 
+/* Fiche du propriétaire en ligne : trois étapes, la courante soulignée de corail. */
+.etapes-proprietaire { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-size: 0.9rem; }
+.etapes-proprietaire li { padding-top: 10px; border-top: 6px solid var(--bord); color: var(--discret); }
+.etapes-proprietaire li.faite { border-top-color: var(--acier); color: var(--texte); }
+.etapes-proprietaire li.courante { border-top-color: var(--corail); color: var(--texte); font-weight: 700; }
+.lien-proprietaire { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 12px; padding: 12px 14px; background: var(--melon-clair); border-radius: 8px; }
+.lien-proprietaire > div { display: flex; flex-direction: column; gap: 2px; flex: 1 1 320px; }
+.lien-proprietaire form { margin: 0; }
+.outils-editeur button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 36px; min-height: 36px; }
+.outils-editeur .icone { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
 /* Tickets : retours des utilisateurs sur l'application. */
 .compteur { display: inline-block; min-width: 22px; margin-left: auto; padding: 0 7px; border-radius: 999px; background: var(--acier); color: #fff; font-size: 0.8rem; font-weight: 700; text-align: center; }
 .ticket-texte { white-space: pre-line; }

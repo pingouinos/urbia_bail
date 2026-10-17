@@ -1,0 +1,11 @@
+{% comment %}Lien envoyé au propriétaire pour remplir sa fiche et déposer ses pièces.{% endcomment %}
+{% if mandat.en_cours %}
+<div class="lien-proprietaire">
+  <div>
+    <strong>Informations du propriétaire</strong>
+    <span class="discret">{% if mandat.rempli_le %}Fiche remplie par le propriétaire le {{ mandat.rempli_le|date:"d/m/Y" }}.{% elif mandat.lien_valide %}Lien envoyé le {{ mandat.lien_cree_le|date:"d/m/Y" }}, valable jusqu'au {{ mandat.lien_expire_le|date:"d/m/Y" }}.{% else %}Il vérifie ses coordonnées, donne son IBAN et dépose ses pièces en ligne : la fiche bailleur et le dossier se complètent d'eux-mêmes.{% endif %}</span>
+  </div>
+  {% if mandat.lien_valide %}<a class="bouton secondaire" href="{% url 'mandats:lien' mandat.pk %}">Renvoyer le lien</a>
+  {% else %}<form method="post" action="{% url 'mandats:lien' mandat.pk %}">{% csrf_token %}<button type="submit" name="action" value="creer"{% if mandat.rempli_le %} class="secondaire"{% endif %}>{% if mandat.rempli_le %}Nouveau lien{% else %}Envoyer le lien{% endif %}</button></form>{% endif %}
+</div>
+{% endif %}

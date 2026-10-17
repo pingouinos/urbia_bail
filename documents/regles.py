@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from mandats.models import PLAFOND_BAIL_HORS_ZONE_TENDUE, PLAFOND_BAIL_ZONE_TENDUE, PLAFOND_ETAT_DES_LIEUX
 
-from .generation import BALISES_REQUISES, CLAUSES_PERIMEES, REMPLACEMENTS, defauts_modele, montant
+from .generation import BALISES_REQUISES, corriger_modele, defauts_modele, montant
 
 # Au-delà, une règle ou une relecture de modèle est à revérifier.
 VALIDITE = timedelta(days=365)
@@ -94,10 +94,11 @@ def etat(regle, defauts, aujourdhui=None):
 
 
 def corrigeable(regle, explication):
-    """Le défaut signalé est une clause périmée dont la correction est
-    validée : la page « Corriger le modèle » peut la proposer."""
-    clauses = CLAUSES_PERIMEES.get(regle.modele, {})
-    return any(clauses.get(extrait) == explication for extrait in REMPLACEMENTS.get(regle.modele, {}))
+    """La correction proposée (clause remplacée ou passage d'origine repris)
+    fait disparaître le défaut signalé : la page « Corriger le modèle » peut
+    la proposer."""
+    corrige, changements = corriger_modele(regle.modele)
+    return bool(changements) and explication not in defauts_modele(regle.modele, corrige)
 
 
 def zones_tendues():

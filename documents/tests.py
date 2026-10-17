@@ -1,4 +1,5 @@
 import io
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -15,7 +16,7 @@ from docx import Document
 from comptes.roles import ADMINISTRATEURS, attribuer_role
 from mandats.tests import Donnees
 
-from . import gabarits
+from . import gabarits, generation
 from .generation import MODELES_PAR_DEFAUT, generer_html, texte_document
 from .models import Modele
 
@@ -320,6 +321,46 @@ class CorrectionTests(MediaTemporaire, TestCase):
         self.client.force_login(creer_gestionnaire("gestion"))
         self.assertEqual(self.client.get(self.page).status_code, 403)
         self.assertEqual(self.client.get(reverse("documents:modele", args=["bail_habitation"])).status_code, 403)
+
+
+class MentionsManquantesTests(MediaTemporaire, TestCase):
+    """Mandat de l'agence sans le médiateur, la rétractation ni la RCP : la
+    correction reprend les passages du modèle d'origine à leur place."""
+
+    def setUp(self):
+        super().setUp()
+        texte = source("mandat_gestion")
+        texte = re.sub(r"<h2>Médiation de la consommation</h2>\n<p>.*?</p>\n", "", texte)
+        texte = re.sub(r'<div data-si="retractation">.*?</div>\n</div>\n', "", texte, flags=re.S)
+        texte = re.sub(r'<div data-si="formulaire_retractation">.*?</div>\n</div>\n?', "", texte, flags=re.S)
+        texte = re.sub(r"<p>[^\n]*agence\.rcp[^\n]*</p>\n", "", texte)
+        self.depose = deposer("mandat_gestion", texte)
+        self.page = reverse("documents:corriger", args=["mandat_gestion"])
+
+    def test_passages_repris_a_leur_place(self):
+        corrige, changements = generation.corriger_modele("mandat_gestion")
+        self.assertEqual(len(changements), 4)
+        self.assertEqual(generation.defauts_modele("mandat_gestion", corrige), [])
+        titres = gabarits.titres(gabarits.nettoyer(corrige))
+        rang = titres.index("Médiation de la consommation")
+        self.assertEqual(titres[rang - 1:rang + 3], [
+            "Détecteur de fumée", "Médiation de la consommation", "Droit de rétractation",
+            "DOCUMENTS A ANNEXER AU PRESENT MANDAT",
+        ])
+
+    def test_page_propose_la_correction(self):
+        fiche = self.client.get(reverse("documents:modele", args=["mandat_gestion"]))
+        self.assertContains(fiche, "Voir la correction proposée")
+        page = self.client.get(self.page)
+        self.assertContains(page, "Passage ajouté")
+        self.assertContains(page, "Médiation de la consommation")
+        self.assertContains(self.client.get(reverse("documents:regles")), self.page)
+
+    def test_mise_en_service(self):
+        with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7"):
+            self.client.get(reverse("documents:essai_correction", args=["mandat_gestion"]))
+        self.client.post(reverse("documents:appliquer_correction", args=["mandat_gestion"]))
+        self.assertEqual(generation.defauts_modele("mandat_gestion"), [])
 
 
 @override_settings(MFA_OBLIGATOIRE=False)
