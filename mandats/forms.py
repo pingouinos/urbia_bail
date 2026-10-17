@@ -54,6 +54,9 @@ class MandatForm(forms.ModelForm):
         numero = self.cleaned_data["numero"]
         if numero < 1:
             raise forms.ValidationError("Le numéro au registre commence à 1.")
+        # Registre de l'agence connectée : le manager ne lit que ses mandats.
+        if Mandat.objects.exclude(pk=self.instance.pk).filter(numero=numero).exists():
+            raise forms.ValidationError("Ce numéro est déjà porté par un autre mandat.")
         return numero
 
     def sections(self):

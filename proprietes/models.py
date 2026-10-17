@@ -19,6 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from core.agence import ParAgence, RattacheAgence
 from core.champs import TelephoneField, code_postal_francais, siren_valide
 from core.fichiers import nom_aleatoire
 
@@ -69,7 +70,7 @@ class Horodatage(models.Model):
         abstract = True
 
 
-class Bailleur(Horodatage):
+class Bailleur(RattacheAgence, Horodatage):
     class Type(models.TextChoices):
         PERSONNE_PHYSIQUE = "physique", "Personne physique"
         SCI_FAMILIALE = "sci_familiale", "SCI familiale"
@@ -90,7 +91,7 @@ class Bailleur(Horodatage):
     conjoint_nom = models.CharField("nom du conjoint ou co-propriétaire", max_length=200, blank=True)
     conjoint_prenom = models.CharField("prénom du conjoint", max_length=100, blank=True)
     ref_ics = models.CharField(
-        "référence ICS", max_length=50, unique=True, null=True, blank=True
+        "référence ICS", max_length=50, null=True, blank=True
     )
     adresse = models.CharField(max_length=255, blank=True)
     code_postal = models.CharField("code postal", max_length=10, blank=True)
@@ -122,6 +123,10 @@ class Bailleur(Horodatage):
     class Meta:
         ordering = ["nom", "prenom"]
         verbose_name = "bailleur"
+        constraints = [models.UniqueConstraint(
+            fields=["agence", "ref_ics"], name="bailleur_ref_ics_par_agence",
+            violation_error_message="Un bailleur porte déjà cette référence ICS.",
+        )]
 
     @property
     def societe(self):
@@ -213,8 +218,10 @@ class Bailleur(Horodatage):
         return 6 if self.type == self.Type.PERSONNE_MORALE else 3
 
 
-class Associe(models.Model):
+class Associe(ParAgence):
     """Associé d'une société bailleresse (SCI, personne morale)."""
+
+    chemins_agence = ("bailleur__agence",)
 
     bailleur = models.ForeignKey(Bailleur, on_delete=models.CASCADE, related_name="associes")
     civilite = models.CharField("civilité", max_length=5, choices=Bailleur.Civilite.choices, blank=True)
@@ -246,7 +253,7 @@ class Associe(models.Model):
         super().save(*args, **kwargs)
 
 
-class Immeuble(Horodatage):
+class Immeuble(RattacheAgence, Horodatage):
     """Bâtiment dont l'agence gère plusieurs lots. Il regroupe des propriétés
     à la même adresse ; chaque lot garde son bailleur, car une copropriété
     réunit plusieurs propriétaires."""
@@ -268,7 +275,10 @@ class Immeuble(Horodatage):
     class Meta:
         ordering = ["ville", "adresse", "nom"]
         verbose_name = "immeuble"
-        constraints = [models.UniqueConstraint(fields=["cle"], name="immeuble_unique")]
+        constraints = [models.UniqueConstraint(
+            fields=["agence", "cle"], name="immeuble_unique",
+            violation_error_message="Cet immeuble existe déjà.",
+        )]
 
     def __str__(self):
         return self.nom or f"{self.adresse}, {self.code_postal} {self.ville}"
@@ -308,7 +318,7 @@ class Immeuble(Horodatage):
                 lot.save()
 
 
-class Propriete(Horodatage):
+class Propriete(RattacheAgence, Horodatage):
     class Usage(models.TextChoices):
         HABITATION = "habitation", "Habitation"
         PROFESSIONNEL = "professionnel", "Local professionnel"
@@ -346,7 +356,7 @@ class Propriete(Horodatage):
 
     # Identification
     ref_ics = models.CharField(
-        "référence ICS du lot", max_length=50, unique=True, null=True, blank=True
+        "référence ICS du lot", max_length=50, null=True, blank=True
     )
     bailleur = models.ForeignKey(Bailleur, on_delete=models.PROTECT, related_name="proprietes")
     immeuble = models.ForeignKey(
@@ -461,6 +471,10 @@ class Propriete(Horodatage):
     class Meta:
         ordering = ["ville", "adresse", "complement"]
         verbose_name = "propriété"
+        constraints = [models.UniqueConstraint(
+            fields=["agence", "ref_ics"], name="propriete_ref_ics_par_agence",
+            violation_error_message="Une propriété porte déjà cette référence ICS.",
+        )]
 
     def save(self, *args, **kwargs):
         self.appliquer_zone_tendue()
@@ -586,7 +600,7 @@ def dossier_piece(piece, nom):
     return f"{'bailleurs' if piece.bailleur_id else 'proprietes'}/{nom_aleatoire(nom)}"
 
 
-class Piece(models.Model):
+class Piece(RattacheAgence):
     """Document attaché à une propriété (diagnostics, titre, assurance…) ou
     à un bailleur (pièce d'identité, RIB). Ce sont les pièces que le mandant
     fournit à la signature du mandat, et celles que l'on annexe au bail."""

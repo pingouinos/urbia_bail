@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from core.agence import ParAgence
 from core.champs import TelephoneField
 from core.fichiers import nom_aleatoire
 
@@ -557,7 +558,9 @@ class Bail(Contrat):
         return f"Bail {self.propriete.adresse} {noms}".strip()[:120]
 
 
-class Locataire(models.Model):
+class Locataire(ParAgence):
+    chemins_agence = ("bail__agence",)
+
     class Civilite(models.TextChoices):
         MONSIEUR = "M.", "Monsieur"
         MADAME = "Mme", "Madame"
@@ -617,11 +620,13 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août
         "décembre"]
 
 
-class Echeance(models.Model):
+class Echeance(ParAgence):
     """Loyer d'un mois pour un bail suivi : ce qui est dû, pour quand, et si
     c'est payé. Elle donne l'avis d'échéance, puis la quittance une fois le
     paiement pointé. Ce n'est pas de la comptabilité : ni compte du mandant,
     ni reversement, ni paiement partiel."""
+
+    chemins_agence = ("bail__agence",)
 
     # Un loyer est signalé impayé quelques jours après sa date d'exigibilité.
     TOLERANCE = dt.timedelta(days=5)
@@ -743,9 +748,11 @@ def libelle_trimestre(trimestre, annee):
     return f"{trimestre}{'er' if trimestre == 1 else 'e'} trimestre {annee}"
 
 
-class RevisionLoyer(models.Model):
+class RevisionLoyer(ParAgence):
     """Révision annuelle du loyer d'un bail, appliquée ou à laquelle le
     propriétaire a renoncé pour l'année. Le bail signé n'est pas modifié."""
+
+    chemins_agence = ("bail__agence",)
 
     class Statut(models.TextChoices):
         APPLIQUEE = "appliquee", "Appliquée"

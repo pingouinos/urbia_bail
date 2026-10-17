@@ -8,7 +8,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 
-from .agence import activer
+from .agence import TOUTES, activer
 from .journal import adresse_ip
 
 # Les pages n'appellent que l'application elle-même et, pour l'aide à la
@@ -80,8 +80,10 @@ CHEMINS_SUPERUTILISATEUR = (
 
 
 class AgenceMiddleware:
-    """Pendant la requête, `Organisation.courante()` est l'agence du compte
-    connecté."""
+    """Pose l'agence de la requête (voir core/agence.py) : celle du compte
+    connecté. Sans agence (visiteur anonyme, superutilisateur hors de la
+    console, compte non rattaché), aucune donnée d'agence n'est lisible ;
+    seule la console du superutilisateur lit toutes les agences."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -93,6 +95,8 @@ class AgenceMiddleware:
         if request.user.is_authenticated and request.user.is_superuser:
             if not request.path.startswith(CHEMINS_SUPERUTILISATEUR):
                 return redirect("plateforme")
+            if request.path.startswith("/admin/"):
+                agence = TOUTES
         elif request.user.is_authenticated:
             membre = Membre.objects.select_related("organisation").filter(utilisateur=request.user).first()
             agence = membre.organisation if membre else None

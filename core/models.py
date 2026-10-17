@@ -3,8 +3,8 @@ et les mentions légales que portent leurs mandats et leurs baux.
 
 Une installation peut servir plusieurs agences. Chaque compte appartient à une
 agence (`Membre`), et le code lit celle du compte connecté par
-`Organisation.courante()`. Les biens, baux et autres données s'y rattacheront
-à leur tour ; d'ici là, une installation ne sert en pratique qu'une agence.
+`Organisation.courante()`. Les biens, baux et autres données appartiennent
+aussi à une agence et sont filtrés automatiquement (voir core/agence.py).
 """
 
 from decimal import Decimal
@@ -13,6 +13,7 @@ from django.conf import settings
 from django.db import models
 from simple_history.models import HistoricalRecords
 
+from core.agence import ParAgence
 from core.champs import TelephoneField, code_postal_francais, siren_valide
 from core.fichiers import nom_aleatoire
 
@@ -173,10 +174,17 @@ class Membre(models.Model):
         return f"{self.utilisateur} · {self.organisation}"
 
 
-class Evenement(models.Model):
-    """Ligne du journal de sécurité (voir core/journal.py)."""
+class Evenement(ParAgence):
+    """Ligne du journal de sécurité (voir core/journal.py). Sans agence pour
+    les connexions refusées et les gestes de l'exploitant : ces lignes ne se
+    lisent que dans la console."""
 
     CONSERVATION_JOURS = 365
+    chemins_agence = ("agence",)
+
+    agence = models.ForeignKey(
+        Organisation, on_delete=models.SET_NULL, null=True, blank=True, related_name="+", editable=False,
+    )
 
     date = models.DateTimeField(auto_now_add=True, db_index=True)
     utilisateur = models.ForeignKey(

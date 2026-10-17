@@ -27,11 +27,15 @@ def connexion_refusee(sender, credentials, request=None, **kwargs):
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def rattacher_compte(sender, instance, raw=False, **kwargs):
+def rattacher_compte(sender, instance, created=False, raw=False, update_fields=None, **kwargs):
     """Un compte appartient à l'agence de qui le crée. Le superutilisateur,
-    qui exploite la plateforme, n'appartient à aucune."""
+    qui exploite la plateforme, n'appartient à aucune. Un enregistrement
+    partiel (la date de connexion, par exemple) ne rattache pas un compte
+    resté sans agence : il pourrait atterrir chez une agence qui n'est pas la
+    sienne."""
     from .models import Membre, Organisation
 
-    if raw or instance.is_superuser or Membre.objects.filter(utilisateur=instance).exists():
+    if raw or instance.is_superuser or (update_fields and not created):
         return
-    Membre.objects.create(utilisateur=instance, organisation=Organisation.courante())
+    if not Membre.objects.filter(utilisateur=instance).exists():
+        Membre.objects.create(utilisateur=instance, organisation=Organisation.courante())

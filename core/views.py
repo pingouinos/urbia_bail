@@ -215,7 +215,7 @@ def journal(request):
     """Journal de sécurité : connexions, documents ouverts, exports,
     suppressions, changements de droits. Gardé un an."""
     _administrateur(request)
-    Evenement.objects.filter(date__lt=timezone.now() - timezone.timedelta(days=Evenement.CONSERVATION_JOURS)).delete()
+    Evenement.tous.filter(date__lt=timezone.now() - timezone.timedelta(days=Evenement.CONSERVATION_JOURS)).delete()
     evenements = Evenement.objects.select_related("utilisateur")
     action, q = request.GET.get("action", ""), request.GET.get("q", "").strip()
     if action:
