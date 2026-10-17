@@ -453,14 +453,15 @@ class OrganisationTests(TestCase):
         bail.save()
         titres = {tache.titre: tache for tache in taches([])}
         for attendu in ("Réponse à envoyer à Lina ROUX", "Représentant de la société à renseigner",
-                        "Diagnostic de performance énergétique (DPE) périmé", "Départ à confirmer : locataire"):
+                        "Diagnostic de performance énergétique (DPE) périmé",
+                        "État des lieux de sortie à enregistrer : locataire"):
             self.assertIn(attendu, titres)
         # Une seule ligne par mandat : la signature, et les pièces qui lui manquent en détail.
         du_mandat = [tache for tache in titres.values() if tache.rubrique == "Mandats"]
         self.assertEqual(len(du_mandat), 1)
         self.assertEqual(du_mandat[0].titre, f"Faire signer le mandat n° {mandat.numero}")
         self.assertRegex(du_mandat[0].detail, r"^\d+ pièces aussi à fournir$")
-        self.assertTrue(titres["Départ à confirmer : locataire"].urgent)
+        self.assertTrue(titres["État des lieux de sortie à enregistrer : locataire"].urgent)
         page = self.client.get(reverse("accueil"))
         self.assertContains(page, "Faire signer le mandat")
         self.assertContains(page, "en retard")
@@ -668,6 +669,10 @@ class ProcessusTests(TestCase):
             self.assertEqual(processus.courante.libelle, "Entrée dans les lieux")
             self.assertTrue(processus.courante.prevue)
         with mock.patch("django.utils.timezone.localdate", return_value=dt.date(2026, 12, 1)):
+            # Entré sans état des lieux enregistré : l'entrée reste à vérifier.
+            processus = processus_bail(bail)
+            self.assertEqual((processus.courante.libelle, processus.courante.etat), ("Entrée dans les lieux", "alerte"))
+            bail.edl_entree_le = dt.date(2026, 11, 1)
             self.assertEqual(processus_bail(bail).courante.libelle, "Location en cours")
             bail.conge_recu_le, bail.date_depart_prevue = dt.date(2027, 1, 5), dt.date(2027, 4, 5)
         with mock.patch("django.utils.timezone.localdate", return_value=dt.date(2027, 2, 1)):
@@ -678,7 +683,11 @@ class ProcessusTests(TestCase):
             # Départ prévu passé et non confirmé : la sortie est en retard.
             processus = processus_bail(bail)
             self.assertEqual((processus.courante.libelle, processus.courante.etat), ("Sortie", "alerte"))
-            bail.date_fin_effective = dt.date(2027, 4, 5)
+            # Clés rendues : la sortie attend la restitution du dépôt, sous un mois si conforme.
+            bail.date_fin_effective, bail.edl_sortie_conforme = dt.date(2027, 4, 5), True
+            processus = processus_bail(bail)
+            self.assertEqual((processus.courante.detail, processus.courante.date), ("dépôt à restituer", dt.date(2027, 5, 5)))
+            bail.depot_restitue_le = dt.date(2027, 4, 20)
             self.assertIsNone(processus_bail(bail).courante)
 
     def test_mise_en_location_sans_mandat(self):

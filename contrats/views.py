@@ -2,6 +2,7 @@
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.http import Http404
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
@@ -12,8 +13,9 @@ from proprietes.models import Propriete
 from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from contacts.models import Contact
+from core.fichiers import servir
 from core.journal import noter
-from core.processus import navigation, processus_bail, sections_etapes
+from core.processus import Processus, navigation, processus_bail, sections_etapes, sous_etapes_sortie
 from mandats.models import Mandat
 from documents import views as documents
 from documents.archives import verrouiller, assurer_historique, creer, motif_correction, signer
@@ -21,7 +23,8 @@ from documents.archives import verrouiller, assurer_historique, creer, motif_cor
 from django.utils import timezone
 
 from .forms import (
-    BailForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm, SignatureForm, initial_fin,
+    BailForm, CongeForm, EdlSortieForm, EntreeForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm,
+    RestitutionForm, SignatureForm, initial_fin,
 )
 from .echeances import assurance_due, euros, prochaine_date_revision, revision_due
 from .models import Bail, IndiceIRL, RevisionLoyer
@@ -152,10 +155,14 @@ def etapes_ouvrables(bail, rang):
     """Les étapes qui se rouvrent d'un crayon ou d'une flèche de la frise :
     l'étape en cours ; le bail tant qu'il n'est pas signé ; la signature
     tant que le locataire n'est pas entré (on peut alors la retirer) ; la
-    sortie dès la location en cours, quand un congé arrive. Terminé, plus rien."""
-    if bail.date_fin_effective:
+    sortie dès la location en cours, quand un congé arrive ; l'entrée, pour
+    corriger son état des lieux, tant que la location court. Terminé (dépôt
+    restitué), plus rien."""
+    if bail.termine:
         return set()
     ouvrables = {rang}
+    if rang == 6 and bail.edl_entree_le:
+        ouvrables.add(5)
     if not bail.signe:
         ouvrables.add(3)
         if rang <= 4:
@@ -204,7 +211,7 @@ def etapes(request, pk):
     ouvrables = etapes_ouvrables(objet, processus.rang)
     # Une fois le locataire entré, seul un administrateur corrige le bail signé.
     corrigeables = {3} if administrateur and objet.signe and processus.rang >= 6 else set()
-    if administrateur and objet.date_fin_effective:
+    if administrateur and objet.termine:
         corrigeables.add(7)
     demandee = request.GET.get("etape", "")
     demandee = int(demandee) if demandee.isdigit() else None
@@ -222,7 +229,11 @@ def etapes(request, pk):
         "annuler": vers_etapes(objet),
         "form": form, "locataires": locataires,
         "form_signe": SignatureForm(instance=objet),
-        "form_fin": FinBailForm(instance=objet, initial=initial_fin(objet)),
+        "form_fin": CongeForm(instance=objet, initial=initial_fin(objet)),
+        "form_entree": EntreeForm(instance=objet),
+        "form_edl_sortie": EdlSortieForm(instance=objet),
+        "form_restitution": RestitutionForm(instance=objet),
+        "sortie": frise_sortie(objet, ouverte == 7, request.GET.get("sous", "")),
         "candidature": Candidature.objects.filter(bail=objet).prefetch_related("candidats").first(),
         # Message de fin de parcours, une seule fois après la création.
         "vient_d_etre_cree": request.session.pop("bail_cree", None) == objet.pk,
@@ -289,6 +300,125 @@ def annuler_conge(request, pk):
     return redirect(vers_etapes(objet))
 
 
+def frise_sortie(bail, ouverte, demandee):
+    """La petite frise de la sortie (congé, état des lieux, dépôt) et la
+    sous-étape ouverte ; un point se rouvre d'un clic tant qu'il se modifie."""
+    numero, possibles = sous_ouverte(bail, demandee)
+    etapes = sous_etapes_sortie(bail)
+    page = bail.get_absolute_url()
+    for n, etape in enumerate(etapes, 1):
+        etape.lien = f"{page}?etape=7&sous={n}#etape-7" if ouverte and n in possibles else ""
+    return {"processus": Processus("Sortie", etapes, bail.sous_etape_sortie), "ouverte": numero}
+
+
+def sous_ouverte(bail, demandee):
+    """La sous-étape de la sortie ouverte sur la page : celle en cours, ou la
+    précédente quand elle se modifie encore (le congé tant que les clés ne sont
+    pas rendues, l'état des lieux de sortie tant que le dépôt n'est pas rendu).
+    Un bail terminé ne rouvre que la restitution, pour un administrateur."""
+    courante = min(bail.sous_etape_sortie, 3)
+    possibles = {courante}
+    if courante == 2 and bail.conge_recu_le:
+        possibles.add(1)
+    if courante == 3 and not bail.termine:
+        possibles.add(2)
+    demandee = int(demandee) if demandee.isdigit() else None
+    return (demandee if demandee in possibles else courante), possibles
+
+
+def _erreurs(request, form):
+    for erreurs in form.errors.values():
+        for erreur in erreurs:
+            messages.error(request, erreur)
+
+
+@require_POST
+@verrouiller(Bail)
+def entree(request, pk):
+    """L'état des lieux d'entrée clôt l'entrée dans les lieux."""
+    objet = get_object_or_404(Bail, pk=pk)
+    if not objet.signe or not objet.en_cours:
+        messages.error(request, "L'état des lieux d'entrée s'enregistre sur un bail signé, en cours.")
+        return redirect(vers_etapes(objet))
+    form = EntreeForm(request.POST, request.FILES, instance=objet)
+    if not form.is_valid():
+        _erreurs(request, form)
+        return redirect(vers_etapes(objet, 5))
+    objet = form.save()
+    noter(request, "état des lieux d'entrée", objet, f"le {objet.edl_entree_le:%d/%m/%Y}")
+    messages.success(request, f"État des lieux d'entrée enregistré au {objet.edl_entree_le:%d/%m/%Y}.")
+    return redirect(vers_etapes(objet))
+
+
+@require_POST
+@verrouiller(Bail)
+def edl_sortie(request, pk):
+    """Remise des clés et état des lieux de sortie : le logement redevient
+    libre, et le délai de restitution du dépôt court."""
+    objet = get_object_or_404(Bail.objects.select_related("propriete"), pk=pk)
+    if objet.termine:
+        messages.error(request, "Ce bail est terminé : seul un administrateur peut corriger sa fin.")
+        return redirect(vers_etapes(objet))
+    premiere = objet.en_cours
+    form = EdlSortieForm(request.POST, request.FILES, instance=objet)
+    if not form.is_valid():
+        _erreurs(request, form)
+        return redirect(f"{vers_etapes(objet, 7).split('#')[0]}&sous=2#etape-7")
+    objet = form.save()
+    noter(request, "fin contrat", objet, f"Clés rendues le {objet.date_fin_effective:%d/%m/%Y}")
+    if objet.restitution_attendue:
+        messages.success(request, f"Clés rendues le {objet.date_fin_effective:%d/%m/%Y} : logement libre. "
+                                  f"Dépôt à restituer avant le {objet.restitution_avant:%d/%m/%Y}.")
+    else:
+        messages.success(request, f"Départ enregistré : logement libre depuis le {objet.date_fin_effective:%d/%m/%Y}.")
+    propriete = objet.propriete
+    if premiere and not propriete.a_louer and not propriete.situation.a_venir:
+        # Le départ ouvre la mise en location du logement.
+        return redirect("proprietes:mettre_en_location", pk=propriete.pk)
+    return redirect(vers_etapes(objet))
+
+
+@require_POST
+@verrouiller(Bail)
+def restitution(request, pk):
+    """La restitution du dépôt de garantie termine le bail. Une fois terminé,
+    seul un administrateur la corrige, avec un motif."""
+    objet = get_object_or_404(Bail, pk=pk)
+    if not objet.date_fin_effective:
+        messages.error(request, "Le dépôt se restitue une fois les clés rendues.")
+        return redirect(vers_etapes(objet))
+    motif = ""
+    if objet.termine:
+        if not est_administrateur(request.user):
+            messages.error(request, "Ce bail est terminé : seul un administrateur peut corriger sa fin.")
+            return redirect(vers_etapes(objet))
+        try:
+            motif = motif_correction(request)
+        except ValidationError as erreur:
+            messages.error(request, " ".join(erreur.messages))
+            return redirect(vers_etapes(objet, 7))
+    form = RestitutionForm(request.POST, request.FILES, instance=objet)
+    if not form.is_valid():
+        _erreurs(request, form)
+        return redirect(vers_etapes(objet, 7))
+    objet = form.save()
+    noter(request, "restitution du dépôt", objet, motif or f"{objet.depot_a_rendre} € rendus le {objet.depot_restitue_le:%d/%m/%Y}")
+    messages.success(request, f"Dépôt restitué le {objet.depot_restitue_le:%d/%m/%Y} : le bail est terminé.")
+    return redirect(vers_etapes(objet))
+
+
+FICHIERS_EDL = {"edl_entree": "État des lieux d'entrée", "edl_sortie": "État des lieux de sortie",
+                "depot_justificatif": "Justificatif des retenues"}
+
+
+def fichier_edl(request, pk, champ):
+    if champ not in FICHIERS_EDL:
+        raise Http404
+    objet = get_object_or_404(Bail, pk=pk)
+    noter(request, "document ouvert", f"{FICHIERS_EDL[champ]} · {objet}")
+    return servir(getattr(objet, champ))
+
+
 def choisir_logement(request):
     """Étape 1 du parcours : le logement loué, retrouvé par son adresse, sa
     référence ou son propriétaire."""
@@ -336,18 +466,21 @@ def fin(request, pk):
     """Départ du locataire en une page : le congé reçu et la fin du préavis
     sont proposés d'avance, puis le départ effectif une fois le préavis fini."""
     objet = get_object_or_404(Bail.objects.select_related("propriete"), pk=pk)
-    if request.method == "POST" and objet.date_fin_effective and not est_administrateur(request.user):
+    if request.method == "POST" and objet.termine and not est_administrateur(request.user):
         messages.error(request, "Ce bail est terminé : seul un administrateur peut corriger sa fin.")
         return redirect(vers_etapes(objet))
     motif = ""
-    if request.method == "POST" and objet.date_fin_effective:
+    if request.method == "POST" and objet.termine:
         try:
             motif = motif_correction(request)
         except ValidationError as erreur:
             messages.error(request, " ".join(erreur.messages))
             return redirect(vers_etapes(objet))
     source = assurer_historique(objet, request.user) if motif else None
-    form = FinBailForm(request.POST or None, instance=objet, initial=initial_fin(objet))
+    # Depuis la page du bail, seul le congé est envoyé : la remise des clés a
+    # sa propre sous-étape.
+    classe = CongeForm if request.POST.get("etapes") else FinBailForm
+    form = classe(request.POST or None, instance=objet, initial=initial_fin(objet))
     if request.method == "POST" and form.is_valid():
         objet = form.save()
         if motif:

@@ -1,13 +1,22 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from proprietes.forms import NouveauBailleurForm
 from proprietes.models import Bailleur, Propriete
+from core.fichiers import controler_fichier
 from documents.forms import SignatureMixin
 
 from .models import Bail, Locataire, ajouter_mois
 
 DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+# Les états des lieux et le dépôt ont leurs formulaires (EntreeForm,
+# EdlSortieForm, RestitutionForm), hors de celui du bail.
+CHAMPS_EDL = [
+    "edl_entree_le", "edl_entree", "cles_remises", "edl_sortie", "edl_sortie_conforme",
+    "depot_retenues", "depot_motif", "depot_justificatif", "depot_restitue_le",
+]
+FICHIER = forms.ClearableFileInput(attrs={"accept": ".pdf,.jpg,.jpeg,.png"})
 
 
 def verifier_fin(form, donnees):
@@ -29,6 +38,7 @@ class BailForm(forms.ModelForm):
         exclude = [
             "cree_le", "modifie_le", "fichier_signe", "date_signature",
             "conge_origine", "conge_recu_le", "date_depart_prevue", "date_fin_effective",
+            *CHAMPS_EDL,
         ]
         widgets = {
             **{nom: DATE for nom in ("date_effet", "precedent_date_versement", "precedent_date_revision")},
@@ -182,7 +192,7 @@ class FinBailForm(forms.ModelForm):
         model = Bail
         fields = ["conge_origine", "conge_recu_le", "date_depart_prevue", "date_fin_effective"]
         widgets = {nom: DATE for nom in fields[1:]} | {"conge_origine": forms.RadioSelect}
-        labels = {"date_fin_effective": "Parti le", "conge_recu_le": "Congé reçu ou donné le"}
+        labels = {"date_fin_effective": "Clés rendues et EDL de sortie le", "conge_recu_le": "Congé reçu ou donné le"}
         help_texts = {
             "conge_recu_le": "Date de réception du préavis du locataire, ou d'envoi du congé par le bailleur.",
             "date_fin_effective": "À renseigner une fois le logement rendu : il redevient libre.",
@@ -200,6 +210,125 @@ class FinBailForm(forms.ModelForm):
         fin = donnees.get("date_fin_effective")
         if fin and fin < self.instance.date_effet:
             self.add_error("date_fin_effective", "Le départ ne peut pas précéder la prise d'effet du bail.")
+        return donnees
+
+
+class CongeForm(FinBailForm):
+    """La première sous-étape de la sortie : le congé et la fin du préavis,
+    sans toucher à la remise des clés."""
+
+    class Meta(FinBailForm.Meta):
+        fields = ["conge_origine", "conge_recu_le", "date_depart_prevue"]
+        widgets = {nom: DATE for nom in fields[1:]} | {"conge_origine": forms.RadioSelect}
+
+
+class FichiersMixin:
+    """Contrôle du contenu des fichiers déposés (PDF ou image)."""
+
+    FICHIERS = ()
+
+    def clean(self):
+        donnees = super().clean()
+        for nom in self.FICHIERS:
+            fichier = donnees.get(nom)
+            if fichier and hasattr(fichier, "content_type"):
+                try:
+                    controler_fichier(fichier)
+                except ValidationError as erreur:
+                    self.add_error(nom, erreur)
+        return donnees
+
+
+def _pas_dans_le_futur(form, nom):
+    date = form.cleaned_data.get(nom)
+    if date and date > timezone.localdate():
+        form.add_error(nom, "Cette date ne peut pas être dans le futur.")
+
+
+class EntreeForm(FichiersMixin, forms.ModelForm):
+    """L'entrée dans les lieux : l'état des lieux d'entrée, signé."""
+
+    FICHIERS = ("edl_entree",)
+
+    class Meta:
+        model = Bail
+        fields = ["edl_entree_le", "edl_entree", "cles_remises"]
+        widgets = {"edl_entree_le": DATE, "edl_entree": FICHIER}
+        labels = {"edl_entree": "État des lieux signé (PDF)"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["edl_entree_le"].required = True
+        if not self.instance.edl_entree_le:
+            self.initial["edl_entree_le"] = min(self.instance.date_effet, timezone.localdate())
+
+    def clean(self):
+        donnees = super().clean()
+        _pas_dans_le_futur(self, "edl_entree_le")
+        return donnees
+
+
+class EdlSortieForm(FichiersMixin, forms.ModelForm):
+    """La remise des clés et l'état des lieux de sortie, comparé à celui
+    d'entrée : le logement redevient libre, le délai de restitution du dépôt
+    court."""
+
+    FICHIERS = ("edl_sortie",)
+
+    class Meta:
+        model = Bail
+        fields = ["date_fin_effective", "edl_sortie", "edl_sortie_conforme"]
+        widgets = {"date_fin_effective": DATE, "edl_sortie": FICHIER, "edl_sortie_conforme": forms.RadioSelect}
+        labels = {"date_fin_effective": "Clés rendues et EDL le", "edl_sortie": "État des lieux signé (PDF)"}
+        help_texts = {"date_fin_effective": ""}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["date_fin_effective"].required = True
+        self.fields["edl_sortie_conforme"].required = True
+        self.fields["edl_sortie_conforme"].choices = [("True", "Conforme"), ("False", "Dégradations")]
+        if not self.instance.date_fin_effective and self.instance.date_depart_prevue:
+            self.initial["date_fin_effective"] = min(self.instance.date_depart_prevue, timezone.localdate())
+
+    def clean(self):
+        donnees = super().clean()
+        _pas_dans_le_futur(self, "date_fin_effective")
+        fin = donnees.get("date_fin_effective")
+        if fin and fin < self.instance.date_effet:
+            self.add_error("date_fin_effective", "Le départ ne peut pas précéder la prise d'effet du bail.")
+        return donnees
+
+
+class RestitutionForm(FichiersMixin, forms.ModelForm):
+    """La restitution du dépôt de garantie, avec les retenues justifiées."""
+
+    FICHIERS = ("depot_justificatif",)
+
+    class Meta:
+        model = Bail
+        fields = ["depot_retenues", "depot_motif", "depot_justificatif", "depot_restitue_le"]
+        widgets = {"depot_restitue_le": DATE, "depot_justificatif": FICHIER,
+                   "depot_motif": forms.TextInput()}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["depot_restitue_le"].required = True
+        if not self.instance.depot_restitue_le:
+            self.initial["depot_restitue_le"] = timezone.localdate()
+
+    def clean(self):
+        donnees = super().clean()
+        _pas_dans_le_futur(self, "depot_restitue_le")
+        retenues = donnees.get("depot_retenues") or 0
+        if retenues < 0:
+            self.add_error("depot_retenues", "Les retenues ne peuvent pas être négatives.")
+        elif retenues > self.instance.depot_garantie:
+            self.add_error("depot_retenues", "Les retenues ne peuvent pas dépasser le dépôt de garantie.")
+        elif retenues and not donnees.get("depot_motif"):
+            self.add_error("depot_motif", "Indiquer le motif des retenues.")
+        restitue = donnees.get("depot_restitue_le")
+        if restitue and self.instance.date_fin_effective and restitue < self.instance.date_fin_effective:
+            self.add_error("depot_restitue_le", "La restitution ne peut pas précéder la remise des clés.")
         return donnees
 
 

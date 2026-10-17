@@ -107,12 +107,17 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
     depart = bail.date_depart_prevue if bail else None
     if not bail:
         rang = 3 if retenue else 2 if propriete.a_louer or a_etudier else 1
-    elif bail.date_fin_effective:
+    elif bail.termine:
         rang = 8
-    elif bail.conge_recu_le:
+    elif bail.date_fin_effective or bail.conge_recu_le:
         rang = 7
     elif not bail.signe:
         rang = 3 if alertes else 4
+    elif bail.edl_entree_le:
+        rang = 6
+    elif bail.edl_entree_attendu:
+        # L'entrée attend son état des lieux, même la date d'effet passée.
+        rang = 5
     else:
         rang = 5 if bail.date_effet > aujourd_hui else 6
 
@@ -138,12 +143,13 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
                     else f"{reverse('contrats:creer')}?candidature={retenue.pk}") if retenue else ""),
         Etape("Signature", date=bail.date_signature if bail else None,
               detail=("scan déposé" if bail.fichier_signe else "scan à déposer") if bail and bail.signe else ""),
-        Etape("Entrée dans les lieux", date=bail.date_effet if bail else None,
-              prevue=bool(bail) and bail.date_effet > aujourd_hui),
+        Etape("Entrée dans les lieux", date=(bail.edl_entree_le or bail.date_effet) if bail else None,
+              prevue=bool(bail) and not bail.edl_entree_le and bail.date_effet > aujourd_hui,
+              detail="état des lieux à enregistrer" if bail and bail.edl_entree_attendu else ""),
         Etape("Location en cours", detail=f"{bail.total_actuel} € par mois".replace(".", ",") if bail else ""),
-        Etape("Sortie", date=(bail.date_fin_effective or depart or bail.date_fin) if bail else None,
-              prevue=bool(bail) and not bail.date_fin_effective,
-              detail=_conge(bail) if bail else ""),
+        Etape("Sortie", date=_date_sortie(bail) if bail else None,
+              prevue=bool(bail) and (not bail.date_fin_effective or bail.restitution_attendue),
+              detail=_detail_sortie(bail) if bail else ""),
     ]
     if bail:
         # Depuis un bail, chaque point de la frise ouvre son étape sur la page
@@ -160,8 +166,14 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
     if bail and not bail.date_fin_effective and depart and depart < aujourd_hui:
         # Départ annoncé passé et non confirmé.
         etapes[6].etat = ALERTE
+    if bail and bail.edl_entree_attendu and bail.date_effet < aujourd_hui and rang == 5:
+        # Locataire entré sans état des lieux enregistré.
+        etapes[4].etat = ALERTE
+    if bail and bail.restitution_attendue and bail.restitution_avant < aujourd_hui:
+        # Dépôt de garantie rendu en retard : la majoration légale court.
+        etapes[6].etat = ALERTE
     _marquer(etapes, rang)
-    return Processus("Location", etapes, rang, termine=bool(bail and bail.date_fin_effective),
+    return Processus("Location", etapes, rang, termine=bool(bail and bail.termine),
                      sans_mandat=not mandat and rang > 1)
 
 
@@ -182,6 +194,49 @@ def _candidature(bail):
         return bail.candidature
     except ObjectDoesNotExist:
         return None
+
+
+def _date_sortie(bail):
+    """La remise des clés, la fin du préavis ou le terme du bail ; après les
+    clés, la date limite de restitution du dépôt."""
+    if bail.restitution_attendue:
+        return bail.restitution_avant
+    return bail.date_fin_effective or bail.date_depart_prevue or bail.date_fin
+
+
+def _detail_sortie(bail):
+    if bail.restitution_attendue:
+        return "dépôt à restituer"
+    if bail.conge_recu_le and not bail.date_fin_effective:
+        return "état des lieux de sortie" if bail.date_depart_prevue and bail.date_depart_prevue <= timezone.localdate() else _conge(bail)
+    return _conge(bail)
+
+
+ETAPES_SORTIE = ["Congé", "État des lieux de sortie", "Restitution du dépôt"]
+
+
+def sous_etapes_sortie(bail):
+    """La petite frise de la sortie : congé, état des lieux de sortie,
+    restitution du dépôt. Une restitution sans dépôt est sans objet."""
+    rang = bail.sous_etape_sortie
+    etapes = [
+        Etape("Congé", date=bail.conge_recu_le,
+              detail="du bailleur" if bail.conge_origine == "bailleur" else "du locataire" if bail.conge_recu_le else ""),
+        Etape("État des lieux de sortie", date=bail.date_fin_effective or bail.date_depart_prevue,
+              prevue=not bail.date_fin_effective,
+              detail=("conforme" if bail.edl_sortie_conforme else "dégradations" if bail.edl_sortie_conforme is False
+                      else "") if bail.date_fin_effective else "départ prévu" if bail.date_depart_prevue else ""),
+        Etape("Restitution du dépôt", date=bail.depot_restitue_le or bail.restitution_avant,
+              prevue=not bail.depot_restitue_le,
+              detail=f"{bail.depot_garantie} €".replace(".", ",") if bail.depot_garantie else ""),
+    ]
+    if not bail.depot_garantie or (bail.termine and not bail.depot_restitue_le):
+        etapes[2].etat = SAUTEE
+        etapes[2].date = None
+    if bail.restitution_attendue and bail.restitution_avant < timezone.localdate():
+        etapes[2].etat = ALERTE
+    _marquer(etapes, rang)
+    return etapes
 
 
 def _conge(bail):

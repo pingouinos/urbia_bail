@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from candidatures.models import Candidature
 from contrats import echeances
-from contrats.models import Bail
+from contrats.models import SUIVI_EDL_DEPUIS, Bail
 from mandats.models import Mandat
 from proprietes.models import Bailleur, Piece, Propriete
 
@@ -24,6 +24,8 @@ ECHEANCES = "Loyers et échéances"
 RUBRIQUES = ["Mises en location", ECHEANCES, "Mandats", "Candidatures", "Baux", "Documents", "Fiches à compléter"]
 # Un diagnostic est signalé un peu avant sa fin de validité.
 PREAVIS_VALIDITE = dt.timedelta(days=60)
+# La restitution du dépôt est signalée comme urgente deux semaines avant son échéance.
+PREAVIS_RESTITUTION = dt.timedelta(days=14)
 
 
 @dataclass
@@ -130,9 +132,34 @@ def taches(locations):
     ).select_related("propriete").prefetch_related("locataires")
     for bail in departs:
         liste.append(Tache(
-            "Baux", f"Départ à confirmer : {bail.noms_locataires or 'locataire'}", _adresse(bail.propriete),
-            reverse("contrats:fin", args=[bail.pk]), "Confirmer le départ", urgent=True,
-            detail=f"prévu le {bail.date_depart_prevue:%d/%m/%Y}",
+            "Baux", f"État des lieux de sortie à enregistrer : {bail.noms_locataires or 'locataire'}", _adresse(bail.propriete),
+            f"{bail.get_absolute_url()}?etape=7&sous=2#etape-7", "Enregistrer la sortie", urgent=True,
+            detail=f"départ prévu le {bail.date_depart_prevue:%d/%m/%Y}",
+        ))
+
+    # Baux : état des lieux d'entrée attendu (entrée passée ou dans la semaine).
+    entrees = Bail.objects.filter(
+        date_signature__isnull=False, edl_entree_le__isnull=True, date_fin_effective__isnull=True,
+        date_effet__gte=SUIVI_EDL_DEPUIS, date_effet__lte=aujourd_hui + dt.timedelta(days=7),
+    ).select_related("propriete").prefetch_related("locataires")
+    for bail in entrees:
+        liste.append(Tache(
+            "Baux", f"État des lieux d'entrée à enregistrer : {bail.noms_locataires or 'locataire'}", _adresse(bail.propriete),
+            f"{bail.get_absolute_url()}?etape=5#etape-5", "Enregistrer l'entrée", urgent=bail.date_effet < aujourd_hui,
+            detail=f"entrée {'le' if bail.date_effet >= aujourd_hui else 'depuis le'} {bail.date_effet:%d/%m/%Y}",
+        ))
+
+    # Baux : dépôt de garantie à restituer, signalé deux semaines avant l'échéance.
+    restitutions = Bail.objects.filter(
+        date_fin_effective__gte=SUIVI_EDL_DEPUIS, depot_restitue_le__isnull=True, depot_garantie__gt=0,
+    ).select_related("propriete").prefetch_related("locataires")
+    for bail in restitutions:
+        echeance = bail.restitution_avant
+        liste.append(Tache(
+            "Baux", f"Dépôt de garantie à restituer : {bail.noms_locataires or 'locataire'}", _adresse(bail.propriete),
+            f"{bail.get_absolute_url()}?etape=7#etape-7", "Restituer le dépôt",
+            urgent=echeance - PREAVIS_RESTITUTION <= aujourd_hui,
+            detail=f"{'en retard depuis le' if echeance < aujourd_hui else 'avant le'} {echeance:%d/%m/%Y}",
         ))
 
     liste += taches_echeances(aujourd_hui)

@@ -252,6 +252,8 @@ class ArchivesTests(Donnees, TestCase):
             original = objet.versions_document.first()
             champ = "date_fin_effective" if objet.code_type == "bail" else "date_fin"
             setattr(objet, champ, self.jour)
+            if objet.code_type == "bail":
+                objet.depot_restitue_le = self.jour  # bail terminé : dépôt restitué
             objet.save()
             self.client.force_login(self.admin)
             data = {champ: self.jour.isoformat()}
