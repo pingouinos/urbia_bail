@@ -5,13 +5,18 @@
   <div>
     <h1>{{ agence.designation }}</h1>
     <p class="accroche-salut">Bonjour {{ user.get_full_name|default:user.username }}</p>
-    {% if nb_taches %}
     <p class="puces">
+      {% if nb_geres %}
+      <a class="puce puce-parc" href="{% url 'proprietes:liste' %}"><b>{{ nb_geres }}</b> bien{{ nb_geres|pluralize }} géré{{ nb_geres|pluralize }}</a>
+      <a class="puce puce-parc" href="{% url 'proprietes:liste' %}?situation=libre"><b>{{ nb_inoccupes }}</b> inoccupé{{ nb_inoccupes|pluralize }}{% if nb_sans_bail %} <span class="discret">dont {{ nb_sans_bail }} sans bail enregistré</span>{% endif %}</a>
+      <span class="puces-separateur" aria-hidden="true"></span>
+      {% endif %}
+      {% if nb_taches %}
       {% if locations %}<span class="puce"><b>{{ locations|length }}</b> mise{{ locations|length|pluralize }} en location</span>{% endif %}
       {% if nb_mandats_a_finaliser %}<span class="puce"><b>{{ nb_mandats_a_finaliser }}</b> mandat{{ nb_mandats_a_finaliser|pluralize }} à finaliser</span>{% endif %}
       {% if nb_urgentes %}<span class="puce puce-retard"><b>{{ nb_urgentes }}</b> en retard</span>{% else %}<span class="puce puce-ok">Aucun retard</span>{% endif %}
+      {% else %}<span class="puce puce-ok">Tout est à jour</span>{% endif %}
     </p>
-    {% else %}<p>Tout est à jour.</p>{% endif %}
   </div>
 </section>
 {% if agence_manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ agence_manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux. <a href="{% url 'agence' %}">Compléter la fiche</a></p>{% endif %}

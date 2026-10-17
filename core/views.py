@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import connection
-from django.db.models import Q
+from django.db.models import Exists, Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from contrats.models import Bail
-from proprietes.models import Propriete
+from proprietes.models import Propriete, baux_en_place
 from candidatures.models import Candidature
 from comptes.roles import est_administrateur
 from mandats.models import Mandat
@@ -100,12 +100,19 @@ def accueil(request):
     mandats = Mandat.objects.filter(date_fin__isnull=True).select_related("propriete__bailleur").prefetch_related(
         "propriete__pieces", "propriete__bailleur__pieces",
     )
+    # Le parc : biens gérés (fiche active) et, parmi eux, ceux sans bail en
+    # place. Un bien sans aucun bail dans l'application est compté à part :
+    # importé d'Excel, il est souvent loué par un bail plus ancien.
+    geres = Propriete.objects.filter(actif=True)
+    inoccupes = geres.filter(~Exists(baux_en_place()))
     return render(request, "core/accueil.html", {
         "est_admin": est_admin,
         "agence_manquants": Organisation.courante().manquants if est_admin else [],
         "derniers_baux": Bail.objects.select_related("propriete__bailleur").prefetch_related("locataires").order_by("-modifie_le")[:5],
         "locations": locations, "taches": par_rubrique(a_faire), "nb_taches": len(a_faire),
         "nb_urgentes": sum(tache.urgent for tache in a_faire),
+        "nb_geres": geres.count(), "nb_inoccupes": inoccupes.count(),
+        "nb_sans_bail": inoccupes.filter(baux__isnull=True).count(),
         # Mandats en cours pas encore en gestion : signature ou dossier à finir.
         "nb_mandats_a_finaliser": sum(1 for mandat in mandats if not mandat.signe or mandat.pieces_manquantes),
     })

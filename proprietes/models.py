@@ -33,6 +33,17 @@ class Situation:
     a_venir: object = None  # bail rédigé dont la prise d'effet est à venir
 
 
+
+def baux_en_place(jour=None):
+    """Baux dont le locataire occupe le bien ce jour-là, à rapprocher de
+    chaque bien par ``Exists`` : un bien sans bail en place est libre."""
+    from contrats.models import Bail
+
+    jour = jour or timezone.localdate()
+    return Bail.objects.filter(propriete=models.OuterRef("pk"), date_effet__lte=jour).filter(
+        models.Q(date_fin_effective__isnull=True) | models.Q(date_fin_effective__gt=jour)
+    )
+
 # Abréviations courantes des voies, pour reconnaître une même adresse.
 VOIES = {
     "av": "avenue", "ave": "avenue", "bd": "boulevard", "bld": "boulevard", "boul": "boulevard", "pl": "place",

@@ -186,6 +186,37 @@ class OrganisationTests(TestCase):
         self.assertEqual(self.client.post(reverse("utilisateur_debloquer", args=[gestionnaire.pk])).status_code, 302)
         self.assertEqual(self.client.get(reverse("utilisateur_mfa", args=[gestionnaire.pk])).status_code, 405)
 
+    def test_parc_du_tableau_de_bord(self):
+        """Le tableau de bord compte les biens gérés et, parmi eux, ceux sans
+        locataire en place ; ceux qui n'ont aucun bail sont signalés à part."""
+        import datetime as dt
+
+        from contrats.models import Bail
+
+        self.connecter(GESTIONNAIRES)
+        self.assertNotContains(self.client.get(reverse("accueil")), "biens gérés")
+        sci = Bailleur.objects.create(type="sci_familiale", nom="SCI ESGT")
+
+        def bien(adresse, **champs):
+            return Propriete.objects.create(bailleur=sci, adresse=adresse, code_postal="31000", ville="Toulouse", dernier_loyer=600, **champs)
+
+        def bail(propriete, effet, fin=None):
+            contrat = Bail.depuis_propriete(propriete)
+            contrat.date_effet, contrat.date_fin_effective = effet, fin
+            contrat.irl_trimestre, contrat.irl_valeur = "2e trimestre 2023", "140.59"
+            contrat.save()
+
+        bail(bien("1 rue des Lois"), dt.date(2024, 1, 1))  # loué
+        bail(bien("2 rue des Lois"), dt.date(2020, 1, 1), dt.date(2024, 1, 1))  # libre depuis la fin du bail
+        bail(bien("3 rue des Lois"), timezone.localdate() + dt.timedelta(days=30))  # bail à venir : encore libre
+        bien("4 rue des Lois")  # importé, sans bail enregistré
+        bien("5 rue des Lois", actif=False)  # plus géré
+        page = self.client.get(reverse("accueil"))
+        self.assertContains(page, "<b>4</b> biens gérés", html=False)
+        self.assertContains(page, "<b>3</b> inoccupés")
+        self.assertContains(page, "dont 1 sans bail enregistré")
+        self.assertContains(page, f'{reverse("proprietes:liste")}?situation=libre')
+
     def test_taches_du_tableau_de_bord(self):
         """Le tableau de bord liste les actions en attente, déduites des
         fiches ; une action faite fait disparaître sa ligne."""
