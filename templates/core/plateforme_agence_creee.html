@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block titre %}Agence créée · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'plateforme' %}">Plateforme</a><span aria-hidden="true">›</span><span class="fil-ici">{{ agence.designation }}</span></nav>
+<h1>{{ agence.designation }} est créée</h1>
+<section class="carte">
+  <h2>Accès de {{ compte.get_full_name }}</h2>
+  <p>Identifiant : <strong>{{ compte.username }}</strong></p>
+  <p>Mot de passe initial : <code class="mot-de-passe">{{ mot_de_passe }}</code></p>
+  <p class="discret">Il n'est affiché qu'une fois : transmettez-le à l'administrateur par un autre canal que son e-mail. À sa première connexion, il configurera sa double authentification ; il pourra changer son mot de passe dans Administration › Utilisateurs.</p>
+</section>
+<p><a href="{% url 'plateforme_agence' agence.pk %}">Ouvrir la fiche de l'agence</a></p>
+{% endblock %}

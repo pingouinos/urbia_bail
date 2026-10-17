@@ -131,11 +131,87 @@ class AgencesTests(TestCase):
         self.client.force_login(exploitant)
         for page in (reverse("accueil"), reverse("utilisateurs"), reverse("proprietes:liste")):
             with self.subTest(page=page):
-                self.assertRedirects(self.client.get(page), reverse("admin:index"))
+                self.assertRedirects(self.client.get(page), reverse("plateforme"))
         # Redevenu un compte ordinaire, il rejoint une agence.
         exploitant.is_superuser = False
         exploitant.save()
         self.assertEqual(exploitant.membre.organisation, self.urbia)
+
+
+@override_settings(MFA_OBLIGATOIRE=False)
+class PlateformeTests(TestCase):
+    """L'exploitant crée, désactive et suit les agences, sans voir leurs
+    données ; personne d'autre n'entre dans l'espace Plateforme."""
+
+    def setUp(self):
+        self.urbia = Organisation.objects.create(nom="URBIA Immobilier", ville="Toulouse")
+        self.elodie = User.objects.create_user("elodie", password="x")
+        attribuer_role(self.elodie, ADMINISTRATEURS)
+        self.exploitant = User.objects.create_superuser("exploitant", password="x")
+
+    def test_reservee_a_l_exploitant(self):
+        self.client.force_login(self.elodie)
+        for page in (reverse("plateforme"), reverse("plateforme_agence_nouvelle"),
+                     reverse("plateforme_agence", args=[self.urbia.pk])):
+            with self.subTest(page=page):
+                self.assertEqual(self.client.get(page).status_code, 403)
+        self.assertEqual(self.client.post(reverse("plateforme_agence_etat", args=[self.urbia.pk]), {"active": "0"}).status_code, 403)
+        self.assertNotContains(self.client.get(reverse("accueil")), reverse("plateforme"))
+        self.urbia.refresh_from_db()
+        self.assertTrue(self.urbia.active)
+
+    def test_liste_et_fiche(self):
+        self.client.force_login(self.exploitant)
+        liste = self.client.get(reverse("plateforme"))
+        self.assertContains(liste, "URBIA Immobilier")
+        self.assertContains(liste, "1 compte actif")
+        # Son menu ne mène qu'à la Plateforme et à la console, jamais aux données des agences.
+        self.assertNotContains(liste, reverse("proprietes:liste"))
+        self.assertNotContains(liste, reverse("contrats:liste"))
+        fiche = self.client.get(reverse("plateforme_agence", args=[self.urbia.pk]))
+        self.assertContains(fiche, "elodie")
+        self.assertContains(fiche, "Désactiver l'agence")
+
+    def test_creer_une_agence_et_son_administrateur(self):
+        self.client.force_login(self.exploitant)
+        reponse = self.client.post(reverse("plateforme_agence_nouvelle"), {
+            "nom": "Agence des Carmes", "ville": "Toulouse", "prenom": "Claire", "nom_admin": "Dumas",
+            "email": "Claire@Carmes.example",
+        })
+        self.assertEqual(reponse.status_code, 200)
+        mot_de_passe = reponse.context["mot_de_passe"]
+        self.assertContains(reponse, mot_de_passe)
+        carmes = Organisation.objects.get(nom="Agence des Carmes")
+        claire = User.objects.get(username="claire@carmes.example")
+        self.assertEqual(claire.membre.organisation, carmes)
+        self.assertTrue(est_administrateur(claire))
+        self.assertTrue(claire.check_password(mot_de_passe))
+        # Connectée, elle travaille dans sa nouvelle agence et ne voit pas les comptes d'URBIA.
+        self.client.force_login(claire)
+        self.assertContains(self.client.get(reverse("accueil")), "<h1>Agence des Carmes</h1>", html=True)
+        self.assertNotContains(self.client.get(reverse("utilisateurs")), "elodie")
+        # Une adresse déjà prise est refusée.
+        self.client.force_login(self.exploitant)
+        reponse = self.client.post(reverse("plateforme_agence_nouvelle"), {
+            "nom": "Doublon", "prenom": "A", "nom_admin": "B", "email": "claire@carmes.example",
+        })
+        self.assertContains(reponse, "Un compte existe déjà avec cette adresse.")
+        self.assertFalse(Organisation.objects.filter(nom="Doublon").exists())
+
+    def test_desactiver_puis_reactiver(self):
+        self.client.force_login(self.exploitant)
+        self.client.post(reverse("plateforme_agence_etat", args=[self.urbia.pk]), {"active": "0"})
+        self.urbia.refresh_from_db()
+        self.assertFalse(self.urbia.active)
+        # Même déjà connectée, Elodie perd l'accès ; ses données restent.
+        self.client.force_login(self.elodie)
+        self.assertRedirects(self.client.get(reverse("accueil")), f"{reverse('connexion')}?agence=desactivee")
+        self.assertContains(self.client.get(reverse("connexion"), {"agence": "desactivee"}), "suspendu")
+        self.assertEqual(self.client.get(reverse("accueil")).status_code, 302)
+        self.client.force_login(self.exploitant)
+        self.client.post(reverse("plateforme_agence_etat", args=[self.urbia.pk]), {"active": "1"})
+        self.client.force_login(self.elodie)
+        self.assertEqual(self.client.get(reverse("accueil")).status_code, 200)
 
 
 @override_settings(MFA_OBLIGATOIRE=False)
