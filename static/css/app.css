@@ -593,12 +593,26 @@ button.secondaire.bouton-danger[type=submit]:hover { background: var(--erreur-cl
 .puce b { font-variant-numeric: tabular-nums; }
 .puce-ok { border-color: var(--vert); background: var(--vert-clair); }
 .puce-retard { border-color: #f3c3bf; background: var(--erreur-clair); color: var(--erreur); }
-/* Le parc (biens gérés, inoccupés) en gris, à part des actions à faire. */
-.puce-parc { border-color: var(--bord); background: #eef0f5; color: var(--texte); }
-a.puce-parc:hover { border-color: var(--corail); color: var(--texte); }
-.puce .discret { font-weight: 400; }
-.puces-separateur { width: 1px; margin: 2px 4px; background: #fbd9cb; }
-@media (max-width: 520px) { .puces-separateur { display: none; } }
+/* Le parc en quatre tuiles : gérés (avec la barre d'occupation), loués, en
+   préavis, libres. Chacune ouvre la liste des biens filtrée. */
+.tuiles-parc { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.tuile-parc { display: grid; gap: 2px; align-content: start; padding: 12px 16px; background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); color: var(--texte); min-width: 0; }
+.tuile-parc:hover { border-color: var(--corail); background: var(--melon-clair); color: var(--texte); }
+.tuile-parc-libre { border-color: var(--corail); }
+.tuile-chiffre { font-size: 1.6rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tuile-libelle { font-weight: 600; font-size: 0.9rem; }
+.tuile-parc .discret { font-size: 0.8rem; overflow-wrap: anywhere; }
+.parc-pastille { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; vertical-align: middle; }
+.parc-loue { background: var(--vert); }
+.parc-preavis { background: var(--melon); }
+.parc-libre { background: var(--corail); }
+/* La part restante de la barre, en corail, est celle des biens libres. */
+.barre-parc { display: flex; height: 6px; margin-top: 6px; border-radius: 3px; overflow: hidden; background: var(--corail); }
+.barre-parc i { display: block; }
+.tuiles-parc + .carte { margin-top: 16px; }
+@media (max-width: 760px) {
+  .tuiles-parc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .titre-compte { display: flex; align-items: center; gap: 8px; }
 .lignes-taches { margin: 0; padding: 0; list-style: none; }
 .lignes-taches > li + li { border-top: 1px solid var(--bord); }
