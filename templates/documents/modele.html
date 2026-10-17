@@ -22,8 +22,8 @@
     <form class="etape-modele" method="post" action="{% url 'documents:abandonner' nom %}">{% csrf_token %}
       <span class="numero-etape{% if essai_vu %} fait{% elif not en_attente %} attente{% endif %}">2</span>
       <div><h3>Vérifier le document d'essai</h3>
-        {% if en_attente %}<p class="discret">L'essai est rempli avec le dernier dossier enregistré : vérifiez le texte et la mise en page.</p>
-        <p class="actions-formulaire"><a class="bouton{% if essai_vu %} secondaire{% endif %}" href="{% url 'documents:essai_version' nom %}" target="_blank" rel="noopener" data-recharger>{% if avec_donnees %}Document d'essai (PDF){% else %}Version modifiée (Word){% endif %}</a>
+        {% if en_attente %}<p class="discret">{% if avec_donnees %}L'essai est rempli avec le dernier dossier enregistré{% else %}L'essai montre le texte avec les seules données de l'agence{% endif %} : vérifiez le texte et la mise en page.</p>
+        <p class="actions-formulaire"><a class="bouton{% if essai_vu %} secondaire{% endif %}" href="{% url 'documents:essai_version' nom %}" target="_blank" rel="noopener" data-recharger>Document d'essai (PDF)</a>
           <button type="submit" class="lien">Abandonner les changements</button></p>
         {% else %}<p class="discret">Disponible après l'étape 1.</p>{% endif %}</div>
     </form>
@@ -53,23 +53,9 @@
 </div>
 <details class="carte">
   <summary>Autres actions</summary>
-  <form method="post" enctype="multipart/form-data" action="{% url 'documents:deposer' nom %}" class="en-ligne">{% csrf_token %}
-    <input type="file" name="fichier" accept=".docx" required aria-label="Fichier Word">
-    <button type="submit" class="secondaire">Déposer un fichier Word</button>
-  </form>
-  <form method="post" action="{% url 'documents:reprendre' nom %}" class="copie">{% csrf_token %}
-    <input type="url" name="lien_google" value="{{ etat.lien_google }}" placeholder="https://docs.google.com/document/d/…" aria-label="Lien du Google Doc" required>
-    <button type="submit" class="secondaire">Reprendre depuis Google Docs</button>
-  </form>
-  <p class="discret">Le Google Doc doit être partagé en lecture à « Tous les utilisateurs qui ont le lien ».</p>
-  {% if etat.lien_google %}<p><a href="{{ etat.lien_google }}" target="_blank" rel="noopener noreferrer">Ouvrir le Google Doc</a></p>{% endif %}
-  <p class="actions-formulaire">
-    <a href="{% url 'documents:telecharger' nom %}">Télécharger le modèle en service (Word)</a>
-    {% if avec_donnees %}<a href="{% url 'documents:essai' nom %}">Document d'essai du modèle en service (PDF)</a>{% endif %}
-  </p>
+  {% if avec_donnees %}<p class="actions-formulaire"><a href="{% url 'documents:essai' nom %}">Document d'essai du modèle en service (PDF)</a></p>{% endif %}
   {% if precedent %}<form method="post" action="{% url 'documents:precedent' nom %}" class="en-ligne">{% csrf_token %}<button type="submit" class="lien">Revenir à la version précédente</button></form>{% endif %}
   {% if personnalise %}<form method="post" action="{% url 'documents:retablir' nom %}" class="en-ligne">{% csrf_token %}<button type="submit" class="lien">Rétablir le modèle d'origine</button></form>{% endif %}
-  <details><summary>Balises disponibles</summary><p><code>{% for variable in variables %}{% templatetag openvariable %} {{ variable }} {% templatetag closevariable %}{% if not forloop.last %}, {% endif %}{% endfor %}</code></p></details>
 </details>
 <script>
 document.querySelectorAll("[data-recharger]").forEach(function (lien) {

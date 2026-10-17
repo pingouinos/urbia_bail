@@ -11,7 +11,7 @@ from django.db import transaction
 
 from comptes.roles import acces_metier, est_administrateur
 from core.journal import noter
-from .generation import chemin_modele, defauts_modele, generer_docx
+from .generation import defauts_modele, generer_html, lire_modele
 from .models import PdfArchive, VersionContrat
 
 
@@ -32,7 +32,7 @@ def verrouiller(model):
 
 
 def nom_modele(objet):
-    return "bail_habitation.docx" if objet.code_type == "bail" else "mandat_gestion.docx"
+    return "bail_habitation" if objet.code_type == "bail" else "mandat_gestion"
 
 
 def interdictions(objet):
@@ -48,8 +48,10 @@ def derniere_version(objet):
 def creer(objet, user, nature, motif, source=None, scan=None):
     nom = nom_modele(objet)
     contexte = source.contexte if source else objet.contexte_courant()
-    modele = bytes(source.modele) if source else chemin_modele(nom).read_bytes()
-    docx = bytes(source.docx) if source else generer_docx(nom, contexte, source=modele)
+    # Le champ « docx » garde le document produit : la page HTML imprimée
+    # (les archives d'avant le passage au HTML y gardent leur Word).
+    modele = bytes(source.modele) if source else lire_modele(nom).encode("utf-8")
+    docx = bytes(source.docx) if source else generer_html(nom, contexte, source=modele.decode("utf-8")).encode("utf-8")
     contenu_scan, nom_scan = None, ""
     if scan:
         with scan.open("rb") as fichier:

@@ -28,11 +28,14 @@ Les espaces publics candidats et les parcours d'authentification sont conservés
 
 1. Compléter le contrat et son référentiel.
 2. Cliquer **Préparer la version à signer** sur le dossier.
-3. Télécharger le Word ou le PDF archivé et transmettre cette version aux parties.
+3. Télécharger le PDF archivé et transmettre cette version aux parties.
 4. Enregistrer la date de signature et, s'il est disponible, le scan.
 
-La préparation capture les données de fusion, les octets du modèle Word et le
-Word rendu (logo inclus). Les téléchargements suivants utilisent ces octets.
+La préparation capture les données de fusion, le modèle HTML en service et la
+page HTML du document rempli (logo inclus), dans les champs `modele` et `docx`.
+Les téléchargements suivants utilisent ces octets. Les archives préparées avant
+le passage des modèles au HTML gardent leur Word : il reste téléchargeable et
+son PDF passe par LibreOffice.
 Le premier PDF obtenu est conservé ; les copies préparation/signature/scan
 utilisent le même PDF. Les autres documents, avis et quittances, gardent leur
 fonctionnement actuel. La signature est refusée si les données ont changé depuis
@@ -57,7 +60,7 @@ et verrouillent la ligne du contrat sous PostgreSQL.
 ## Contrats déjà signés avant la migration
 
 La migration ne fabrique aucune archive rétroactive. Le scan existant reste
-consultable. Le téléchargement d'un Word/PDF généré est bloqué tant qu'il n'existe
+consultable. Le téléchargement d'un PDF généré est bloqué tant qu'il n'existe
 pas d'archive : un administrateur peut utiliser **Archiver une reconstitution
 actuelle**. Celle-ci capture l'état actuel, porte la mention « original historique
 inconnu » et ne prétend pas retrouver l'original. Une correction ou un dépôt tardif
@@ -65,7 +68,7 @@ de scan conserve aussi cette distinction.
 
 ## Exploitation et validation
 
-Les archives (Word, modèles, scans et PDF) sont stockées en base, ce qui les inclut
+Les archives (documents, modèles, scans et PDF) sont stockées en base, ce qui les inclut
 dans le dump PostgreSQL. Les fichiers courants continuent de nécessiter la
 sauvegarde du volume des documents. Prévoir la croissance de la base, les scans
 pouvant atteindre 20 Mo. Ne pas supprimer les archives par SQL ou scripts de purge.

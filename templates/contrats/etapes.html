@@ -21,7 +21,6 @@ sur une ligne.
       <p class="discret">{{ bail.noms_locataires|default:"Locataire à renseigner" }} · {{ bail.get_type_display }} · du {{ bail.date_effet|date:"d/m/Y" }} au {{ bail.date_fin|date:"d/m/Y" }}</p>
     </div>
     <nav class="actions-document" aria-label="Documents du bail">
-      <a href="{% url 'contrats:word' bail.pk %}">Word</a>
       <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a>
       {% if bail.fichier_signe %}<a href="{% url 'contrats:fichier_signe' bail.pk %}" target="_blank" rel="noopener">Bail signé</a>{% endif %}
       <a href="#historique">Historique</a>
@@ -29,7 +28,7 @@ sur une ligne.
   </div>
   {% include "_frise_fleches.html" %}
 </section>
-{% if vient_d_etre_cree %}<p class="message">Bail enregistré : il se télécharge en <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> ou en <a href="{% url 'contrats:word' bail.pk %}">Word</a> pour le faire signer.</p>{% endif %}
+{% if vient_d_etre_cree %}<p class="message">Bail enregistré : il se télécharge en <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> pour le faire signer.</p>{% endif %}
 {% if correction %}<p class="message message-erreur">Correction administrative : une nouvelle version sera créée. Les archives et l’exemplaire signé sont conservés.</p>{% endif %}
 
 {% if suivi and suivi_en_haut %}{% include "contrats/_suivi_location.html" %}{% endif %}
@@ -83,7 +82,7 @@ sur une ligne.
 
   {% elif numero == 4 %}
   {% if mode == "ouverte" %}
-  <p class="ligne-etape">Le bail à faire signer : <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> ou <a href="{% url 'contrats:word' bail.pk %}">Word</a>. La date s'enregistre une fois le bail signé par les parties ; le scan peut attendre.</p>
+  <p class="ligne-etape">Le bail à faire signer : <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a>. La date s'enregistre une fois le bail signé par les parties ; le scan peut attendre.</p>
   <div class="annexes-etape">
     <p><strong>Annexes à joindre</strong></p>
     <ul>{% for annexe in bail.annexes %}<li>{{ annexe }}</li>{% endfor %}</ul>

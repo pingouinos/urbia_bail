@@ -279,7 +279,7 @@ def agence(request):
         messages.success(request, "Fiche de l'agence enregistrée.")
         return redirect("agence")
     return render(request, "core/agence.html", {
-        "form": form, "organisation": organisation, "balises": list(organisation.contexte_document()),
+        "form": form, "organisation": organisation,
         "historique": organisation.history.select_related("history_user")[:10],
     })
 

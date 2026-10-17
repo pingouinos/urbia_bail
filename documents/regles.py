@@ -36,7 +36,7 @@ class Regle:
     source: str
     texte: str
     verifiee_le: date
-    # Modèle Word dont un défaut (message de ``defauts_modele`` contenant
+    # Modèle dont un défaut (message de ``defauts_modele`` contenant
     # ``signal``) montre que la règle n'y est plus respectée.
     modele: str = ""
     signal: str = ""
@@ -48,12 +48,12 @@ class Regle:
 
 VERIFICATION = date(2026, 10, 15)
 BAIL, MANDAT = "Bail", "Mandat"
-_balises_mandat = BALISES_REQUISES["mandat_gestion.docx"]
+_balises_mandat = BALISES_REQUISES["mandat_gestion"]
 
 REGLES = (
     Regle(BAIL, "Clause résolutoire", "Six semaines après un commandement de payer resté sans effet",
           "Loi du 6 juillet 1989, art. 24, modifié par la loi du 27 juillet 2023", "loi n° 2023-668",
-          VERIFICATION, "bail_habitation.docx", "clause résolutoire"),
+          VERIFICATION, "bail_habitation", "clause résolutoire"),
     Regle(BAIL, "Logement interdit à la location", "Classe G : nouveau bail refusé depuis le 1er janvier 2025",
           "Loi du 6 juillet 1989, art. 6 (loi Climat et résilience)", "loi n° 2021-1104", VERIFICATION),
     Regle(BAIL, "Gel des loyers F et G", "Loyer limité à celui du précédent locataire",
@@ -70,13 +70,13 @@ REGLES = (
           "Décret du 1er août 2014", "décret n° 2014-890", VERIFICATION),
     Regle(MANDAT, "Rétractation du mandant particulier", "14 jours, avec le formulaire en annexe",
           "Code de la consommation, art. L221-18", "L221-18", VERIFICATION,
-          "mandat_gestion.docx", _balises_mandat["retractation"]),
+          "mandat_gestion", _balises_mandat["retractation"]),
     Regle(MANDAT, "Médiateur de la consommation", "Nom et site du médiateur de l'agence dans le mandat",
           "Code de la consommation, art. L616-1", "L616-1", VERIFICATION,
-          "mandat_gestion.docx", _balises_mandat["agence.mediateur"]),
+          "mandat_gestion", _balises_mandat["agence.mediateur"]),
     Regle(MANDAT, "Assurance responsabilité civile professionnelle", "Assureur de l'agence cité dans le mandat",
           "Loi Hoguet du 2 janvier 1970, art. 3", "loi n° 70-9", VERIFICATION,
-          "mandat_gestion.docx", _balises_mandat["agence.rcp"]),
+          "mandat_gestion", _balises_mandat["agence.rcp"]),
 )
 
 

@@ -1,34 +1,30 @@
-"""Modèles Word des documents, et leur remplacement par un administrateur :
-reprise depuis un Google Doc où Elodie retouche le texte, ou dépôt d'un
-fichier Word. Un modèle n'est mis en service qu'après vérification de ses
-balises et un remplissage d'essai ; la version remplacée reste disponible."""
+"""Modèles des documents (HTML) et leur modification par un administrateur
+dans l'éditeur intégré. Une version n'est mise en service qu'après
+vérification de ses données et un document d'essai ; la version remplacée
+reste disponible."""
 
 import hashlib
-import io
-import json
-import mimetypes
 from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import FileResponse, Http404, HttpResponse
+from django.core.exceptions import PermissionDenied
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from docxtpl import DocxTemplate
-from jinja2 import TemplateSyntaxError
+from jinja2 import TemplateError
 
 from comptes.roles import est_administrateur
-from core.fichiers import controler_archive, servir
+from core.fichiers import servir
 from core.journal import noter
 from proprietes.zones_tendues import derniere_liste
 
-from . import editeur, google
+from . import gabarits
 from .generation import (
-    CLAUSES_PERIMEES, DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, corriger_modele,
-    defauts_modele, convertir_pdf, generer_docx, remplir,
+    CLAUSES_PERIMEES, HTML, MODELES_PAR_DEFAUT, ConversionImpossible, convertir_ancien, convertir_pdf,
+    corriger_modele, defauts_modele, fichier, generer_html, lire_modele,
 )
 from .archives import interdictions
 from .models import Modele
@@ -37,22 +33,22 @@ from . import regles as registre_regles
 # Modèles remplaçables : libellé, et objet dont le dernier modifié sert au
 # remplissage d'essai.
 MODELES = {
-    "mandat_gestion.docx": ("Mandat de gestion", "mandats.Mandat"),
-    "bail_habitation.docx": ("Bail d'habitation (nu ou meublé)", "contrats.Bail"),
+    "mandat_gestion": ("Mandat de gestion", "mandats.Mandat"),
+    "bail_habitation": ("Bail d'habitation (nu ou meublé)", "contrats.Bail"),
 }
 # Groupe du registre des règles légales, et textes proposés pour noter la
 # relecture quand personne ne l'a encore fait.
-DOCUMENT_REGLES = {"mandat_gestion.docx": registre_regles.MANDAT, "bail_habitation.docx": registre_regles.BAIL}
+DOCUMENT_REGLES = {"mandat_gestion": registre_regles.MANDAT, "bail_habitation": registre_regles.BAIL}
 REFERENCE_RELECTURE = {
-    "mandat_gestion.docx": "la loi Hoguet et le code de la consommation",
-    "bail_habitation.docx": "la loi du 6 juillet 1989 et le décret 2015-587",
+    "mandat_gestion": "la loi Hoguet et le code de la consommation",
+    "bail_habitation": "la loi du 6 juillet 1989 et le décret 2015-587",
 }
-TAILLE_MAX = 10 * 1024 * 1024
+TAILLE_MAX = 2 * 1024 * 1024
 
 
-def document(request, objet, modele, format_):
-    """Réponse de téléchargement du document d'un objet (mandat, bail) en
-    Word ou en PDF ; sans PDF disponible, retour à la fiche avec un message."""
+def document(request, objet, modele, format_="pdf"):
+    """Téléchargement du document d'un objet (mandat, bail) en PDF ; sans
+    conversion possible, retour à la fiche avec un message."""
     if hasattr(objet, "versions_document"):
         from .archives import derniere_version
         from .archives_views import reponse_version
@@ -67,18 +63,13 @@ def document(request, objet, modele, format_):
             for obstacle in obstacles:
                 messages.error(request, obstacle)
             return redirect(objet)
-    contenu = generer_docx(modele, objet.contexte_document())
-    type_, extension = DOCX, "docx"
-    if format_ == "pdf":
-        try:
-            contenu = convertir_pdf(contenu, modele)
-        except ConversionImpossible as erreur:
-            messages.error(request, f"La conversion en PDF est indisponible ({erreur}) ; "
-                                    "téléchargez la version Word.")
-            return redirect(objet)
-        type_, extension = "application/pdf", "pdf"
-    reponse = HttpResponse(contenu, content_type=type_)
-    reponse["Content-Disposition"] = f'attachment; filename="{objet.nom_fichier}.{extension}"'
+    try:
+        contenu = convertir_pdf(generer_html(modele, objet.contexte_document()).encode("utf-8"), modele)
+    except ConversionImpossible as erreur:
+        messages.error(request, f"Le PDF n'a pas pu être produit ({erreur}) ; réessayez dans un instant.")
+        return redirect(objet)
+    reponse = HttpResponse(contenu, content_type="application/pdf")
+    reponse["Content-Disposition"] = f'attachment; filename="{objet.nom_fichier}.pdf"'
     return reponse
 
 
@@ -92,19 +83,25 @@ def _verifier(request, nom):
         raise PermissionDenied
     if nom not in MODELES:
         raise Http404
+    for chemin in (_depose(nom), _precedent(nom), _essai(nom)):
+        convertir_ancien(chemin)
 
 
 def _depose(nom):
-    return Path(settings.MEDIA_ROOT) / "modeles" / nom
+    return Path(settings.MEDIA_ROOT) / "modeles" / fichier(nom)
 
 
 def _precedent(nom):
-    return Path(settings.MEDIA_ROOT) / "modeles" / "precedent" / nom
+    return Path(settings.MEDIA_ROOT) / "modeles" / "precedent" / fichier(nom)
 
 
 def _essai(nom):
-    """Version reprise ou déposée, en attente de mise en service."""
-    return Path(settings.MEDIA_ROOT) / "modeles" / "essai" / nom
+    """Version modifiée, en attente de mise en service."""
+    return Path(settings.MEDIA_ROOT) / "modeles" / "essai" / fichier(nom)
+
+
+def _lire(chemin):
+    return chemin.read_text(encoding="utf-8")
 
 
 def _origine_essai(nom):
@@ -116,13 +113,13 @@ def _cle_version(nom):
 
 
 def _empreinte(contenu):
-    return hashlib.sha256(contenu).hexdigest()
+    return hashlib.sha256(contenu.encode("utf-8")).hexdigest()
 
 
 def preparer_essai(nom, contenu, origine):
     essai = _essai(nom)
     essai.parent.mkdir(parents=True, exist_ok=True)
-    essai.write_bytes(contenu)
+    essai.write_text(contenu, encoding="utf-8")
     _origine_essai(nom).write_text(origine)
 
 
@@ -131,8 +128,8 @@ def abandonner_essai(nom):
     _origine_essai(nom).unlink(missing_ok=True)
 
 
-def _variables(source):
-    return DocxTemplate(source).get_undeclared_template_variables()
+def _defaut(nom):
+    return _lire(MODELES_PAR_DEFAUT / fichier(nom))
 
 
 def _objet_essai(nom):
@@ -141,19 +138,20 @@ def _objet_essai(nom):
 
 def verifier_modele(nom, contenu):
     """Raison pour laquelle le modèle ne peut pas servir, ou None."""
+    if len(contenu.encode("utf-8")) > TAILLE_MAX:
+        return "Le texte du modèle est trop long."
     try:
-        controler_archive(contenu)
-    except ValidationError as erreur:
-        return erreur.messages[0]
-    try:
-        variables = _variables(io.BytesIO(contenu))
-    except TemplateSyntaxError as erreur:
-        return f"Une balise est mal écrite ({erreur.message}) : vérifier les {{{{ … }}}} et {{% … %}}."
-    except Exception:
-        return "Ce fichier Word n'a pas pu être lu."
-    inconnues = variables - _variables(MODELES_PAR_DEFAUT / nom)
+        variables = gabarits.variables(contenu)
+    except gabarits.ModeleInvalide as erreur:
+        return str(erreur)
+    except TemplateError:
+        return "Le texte du modèle n'a pas pu être lu : recharger la page."
+    if not gabarits.texte(gabarits.nettoyer(contenu)).strip():
+        return "Le modèle est vide."
+    inconnues = variables - gabarits.variables(_defaut(nom))
     if inconnues:
-        return "Balises inconnues : " + ", ".join(sorted(inconnues)) + "."
+        return ("Données inconnues ou placées hors de leur bloc « Pour chaque » : "
+                + ", ".join(gabarits.libelle(v) for v in sorted(inconnues)) + ".")
     perimees = defauts_modele(nom, contenu)
     if perimees:
         return perimees[0]
@@ -161,7 +159,7 @@ def verifier_modele(nom, contenu):
     if objet is not None:
         # Remplissage d'essai avec le dernier document de ce type.
         try:
-            remplir(DocxTemplate(io.BytesIO(contenu)), objet.contexte_document())
+            gabarits.remplir(contenu, objet.contexte_document())
         except Exception as erreur:
             return f"Le remplissage d'essai échoue ({erreur})."
     return None
@@ -172,12 +170,13 @@ def mettre_en_service(nom, contenu, origine, utilisateur):
     précédente. Sans contenu, revient au modèle d'origine."""
     depose, precedent = _depose(nom), _precedent(nom)
     precedent.parent.mkdir(parents=True, exist_ok=True)
-    ancien = chemin_modele(nom).read_bytes()
+    ancien = lire_modele(nom)
     if contenu is None:
         depose.unlink(missing_ok=True)
     else:
-        depose.write_bytes(contenu)
-    precedent.write_bytes(ancien)
+        depose.parent.mkdir(parents=True, exist_ok=True)
+        depose.write_text(contenu, encoding="utf-8")
+    precedent.write_text(ancien, encoding="utf-8")
     Modele.objects.update_or_create(nom=nom, defaults={
         "origine": origine, "mis_en_service_le": timezone.now(), "mis_en_service_par": utilisateur,
     })
@@ -242,11 +241,10 @@ def modele(request, nom):
         "nom": nom, "libelle": MODELES[nom][0], "etat": etat, "a_relire": _a_relire(etat),
         "legal": _etat_legal(nom, registre_regles.registre(timezone.localdate())),
         "personnalise": _depose(nom).exists(), "precedent": _precedent(nom).exists(),
-        "avec_donnees": _objet_essai(nom) is not None, "variables": sorted(_variables(MODELES_PAR_DEFAUT / nom)),
-        "en_attente": en_attente,
+        "avec_donnees": _objet_essai(nom) is not None, "en_attente": en_attente,
         "origine_essai": _minuscule(Modele.Origine(_origine_essai(nom).read_text()).label)
         if en_attente and _origine_essai(nom).exists() else "",
-        "essai_vu": en_attente and request.session.get(_cle_version(nom)) == _empreinte(essai.read_bytes()),
+        "essai_vu": en_attente and request.session.get(_cle_version(nom)) == _empreinte(_lire(essai)),
         "reference": etat.relu_reference or REFERENCE_RELECTURE[nom],
     })
 
@@ -284,9 +282,9 @@ def _correction(nom):
     """(contenu corrigé, changements, empreinte du modèle en service) : la
     correction vue en essai reste celle qu'on met en service tant que le
     modèle n'a pas changé entre-temps."""
-    source = chemin_modele(nom).read_bytes()
+    source = lire_modele(nom)
     contenu, changements = corriger_modele(nom, source)
-    return contenu, changements, hashlib.sha256(source).hexdigest()
+    return contenu, changements, _empreinte(source)
 
 
 def _cle_essai(nom):
@@ -311,30 +309,35 @@ def corriger(request, nom):
     return render(request, "documents/corriger.html", {
         "nom": nom, "libelle": MODELES[nom][0], "lignes": lignes,
         "essai_vu": request.session.get(_cle_essai(nom)) == empreinte,
-        "avec_donnees": _objet_essai(nom) is not None, "lien_google": Modele.objects.filter(nom=nom, lien_google__gt="").exists(),
+        "avec_donnees": _objet_essai(nom) is not None,
     })
 
 
+def _document_essai(request, nom, contenu):
+    """PDF d'essai d'une version du modèle, rempli avec le dernier document
+    de ce type (sans dossier enregistré, avec les seules données de
+    l'agence) ; la page HTML si le PDF ne peut pas être produit."""
+    from core.models import Organisation
+
+    objet = _objet_essai(nom)
+    contexte = objet.contexte_document() if objet is not None else {"agence": Organisation.courante().contexte_document()}
+    page = generer_html(nom, contexte, source=contenu)
+    try:
+        return HttpResponse(convertir_pdf(page.encode("utf-8"), nom), content_type="application/pdf", headers={
+            "Content-Disposition": f'inline; filename="essai-{nom}.pdf"'})
+    except ConversionImpossible:
+        return HttpResponse(page, content_type=f"{HTML}; charset=utf-8")
+
+
 def essai_correction(request, nom):
-    """Document d'essai produit avec le modèle corrigé (le dernier document
-    de ce type, ou à défaut le modèle corrigé lui-même) ; l'ouvrir débloque
-    la mise en service de cette correction-là."""
+    """Document d'essai produit avec le modèle corrigé ; l'ouvrir débloque la
+    mise en service de cette correction-là."""
     _verifier(request, nom)
     contenu, changements, empreinte = _correction(nom)
     if not changements:
         return redirect("documents:modele", nom=nom)
     request.session[_cle_essai(nom)] = empreinte
-    objet = _objet_essai(nom)
-    if objet is None:
-        return HttpResponse(contenu, content_type=DOCX, headers={
-            "Content-Disposition": f'attachment; filename="corrige-{nom}"'})
-    rempli = generer_docx(nom, objet.contexte_document(), source=contenu)
-    try:
-        return HttpResponse(convertir_pdf(rempli, nom), content_type="application/pdf", headers={
-            "Content-Disposition": f'inline; filename="essai-{nom[:-5]}.pdf"'})
-    except ConversionImpossible:
-        return HttpResponse(rempli, content_type=DOCX, headers={
-            "Content-Disposition": f'attachment; filename="essai-{nom}"'})
+    return _document_essai(request, nom, contenu)
 
 
 @require_POST
@@ -351,20 +354,14 @@ def appliquer_correction(request, nom):
     if raison:
         messages.error(request, f"« {libelle} » n'a pas été corrigé. {raison}")
         return redirect("documents:corriger", nom=nom)
-    mettre_en_service(nom, contenu, Modele.Origine.DEPOT, request.user)
+    mettre_en_service(nom, contenu, Modele.Origine.EDITEUR, request.user)
     reference = "; ".join(f"« {remplacement} » au lieu de « {extrait} »" for extrait, remplacement, _, _ in changements)
     Modele.objects.filter(nom=nom).update(
         relu_le=timezone.localdate(), relu_par=request.user, relu_reference=f"la correction proposée ({reference})"[:200])
     del request.session[_cle_essai(nom)]
     noter(request, "modèle corrigé", nom, reference)
-    messages.success(request, f"« {libelle} » corrigé et mis en service ; la version précédente reste récupérable. "
-                              "Reportez la correction dans le Google Doc de l'agence.")
+    messages.success(request, f"« {libelle} » corrigé et mis en service ; la version précédente reste récupérable.")
     return redirect("documents:modele", nom=nom)
-
-
-def telecharger(request, nom):
-    _verifier(request, nom)
-    return FileResponse(chemin_modele(nom).open("rb"), as_attachment=True, filename=nom, content_type=DOCX)
 
 
 def essai(request, nom):
@@ -384,19 +381,9 @@ def essai_version(request, nom):
     _verifier(request, nom)
     if not _essai(nom).exists():
         return redirect("documents:modele", nom=nom)
-    contenu = _essai(nom).read_bytes()
+    contenu = _lire(_essai(nom))
     request.session[_cle_version(nom)] = _empreinte(contenu)
-    objet = _objet_essai(nom)
-    if objet is None:
-        return HttpResponse(contenu, content_type=DOCX, headers={
-            "Content-Disposition": f'attachment; filename="essai-{nom}"'})
-    rempli = generer_docx(nom, objet.contexte_document(), source=contenu)
-    try:
-        return HttpResponse(convertir_pdf(rempli, nom), content_type="application/pdf", headers={
-            "Content-Disposition": f'inline; filename="essai-{nom[:-5]}.pdf"'})
-    except ConversionImpossible:
-        return HttpResponse(rempli, content_type=DOCX, headers={
-            "Content-Disposition": f'attachment; filename="essai-{nom}"'})
+    return _document_essai(request, nom, contenu)
 
 
 def texte(request, nom):
@@ -405,83 +392,34 @@ def texte(request, nom):
     _verifier(request, nom)
     libelle = MODELES[nom][0]
     en_attente = _essai(nom).exists()
-    source = (_essai(nom) if en_attente else chemin_modele(nom)).read_bytes()
+    source = _lire(_essai(nom)) if en_attente else lire_modele(nom)
     alertes = [(extrait, _sans_renvoi(message)) for extrait, message in CLAUSES_PERIMEES.get(nom, {}).items()]
-    document_editeur = None
     if request.method == "POST":
+        envoye = request.POST.get("texte", "")
         try:
-            document_editeur = json.loads(request.POST.get("texte", ""))
-            contenu = editeur.ecrire(source, document_editeur)
-        except (ValueError, StopIteration) as erreur:
-            raison = str(erreur) if isinstance(erreur, editeur.TexteInvalide) else "Le texte envoyé est illisible : recharger la page."
-            messages.error(request, raison)
+            contenu = gabarits.normaliser(envoye)
+        except gabarits.ModeleInvalide as erreur:
+            raison = str(erreur)
         else:
             raison = verifier_modele(nom, contenu)
-            if raison:
-                messages.error(request, f"Le texte n'a pas été enregistré. {_sans_renvoi(raison)}")
-            else:
-                preparer_essai(nom, contenu, Modele.Origine.EDITEUR)
-                noter(request, "modèle modifié", libelle, "dans l'application")
-                messages.success(request, "Texte enregistré. Ouvrez le document d'essai, puis mettez en service.")
-                return redirect("documents:modele", nom=nom)
-    if not isinstance(document_editeur, dict):
-        document_editeur = editeur.lire(source, alertes)
-    sommaire = [
-        (bloc["attrs"]["rang"], "".join(n.get("text", "") for n in bloc.get("content", [])))
-        for bloc in document_editeur.get("content", [])
-        if bloc.get("type") == "paragraph" and (bloc.get("attrs") or {}).get("titre")
-    ]
-    donnees = [("{{ " + variable + " }}", editeur.libelle_balise("{{ " + variable + " }}"))
-               for variable in sorted(_variables(MODELES_PAR_DEFAUT / nom))]
+            source = contenu
+        if raison:
+            messages.error(request, f"Le texte n'a pas été enregistré. {_sans_renvoi(raison)}")
+        else:
+            preparer_essai(nom, contenu, Modele.Origine.EDITEUR)
+            noter(request, "modèle modifié", libelle, "dans l'application")
+            messages.success(request, "Texte enregistré. Ouvrez le document d'essai, puis mettez en service.")
+            return redirect("documents:modele", nom=nom)
+    defaut = gabarits.nettoyer(_defaut(nom))
+    arbre = gabarits.nettoyer(source)
     return render(request, "documents/texte.html", {
-        "nom": nom, "libelle": libelle, "document_editeur": document_editeur, "sommaire": sommaire,
-        "donnees": donnees, "en_attente": en_attente,
+        "nom": nom, "libelle": libelle, "en_attente": en_attente,
+        "document_editeur": gabarits.pour_editeur(arbre, alertes),
+        "sommaire": gabarits.titres(arbre),
+        "donnees": [(code, gabarits.libelle(code)) for code in gabarits.expressions(defaut, "data-donnee")],
+        "conditions": [(code, gabarits.libelle_condition({"data-si": code})) for code in gabarits.expressions(defaut, "data-si")],
         "corrigeable": bool(alertes) and bool(corriger_modele(nom, source)[1]),
     })
-
-
-@require_POST
-def reprendre(request, nom):
-    _verifier(request, nom)
-    libelle = MODELES[nom][0]
-    modele, _ = Modele.objects.get_or_create(nom=nom)
-    lien = request.POST.get("lien_google", "").strip() or modele.lien_google
-    if lien != modele.lien_google:
-        if google.identifiant(lien) is None:
-            messages.error(request, "Coller le lien du Google Doc, de la forme https://docs.google.com/document/d/….")
-            return redirect("documents:modele", nom=nom)
-        modele.lien_google = lien
-        modele.save(update_fields=["lien_google"])
-    try:
-        contenu = google.telecharger(modele.lien_google)
-    except google.LectureImpossible as erreur:
-        messages.error(request, f"« {libelle} » n'a pas été repris. {erreur}")
-        return redirect("documents:modele", nom=nom)
-    raison = verifier_modele(nom, contenu)
-    if raison:
-        messages.error(request, f"« {libelle} » n'a pas été repris. {raison}")
-        return redirect("documents:modele", nom=nom)
-    preparer_essai(nom, contenu, Modele.Origine.GOOGLE)
-    messages.success(request, f"« {libelle} » repris de Google Docs. "
-                              "Ouvrez le document d'essai, puis mettez en service.")
-    return redirect("documents:modele", nom=nom)
-
-
-@require_POST
-def deposer(request, nom):
-    _verifier(request, nom)
-    fichier = request.FILES.get("fichier")
-    if not fichier or not fichier.name.lower().endswith(".docx") or fichier.size > TAILLE_MAX:
-        messages.error(request, "Fournir un fichier Word (.docx) de 10 Mo au maximum.")
-        return redirect("documents:modele", nom=nom)
-    contenu = fichier.read()
-    raison = verifier_modele(nom, contenu)
-    if raison:
-        messages.error(request, raison)
-        return redirect("documents:modele", nom=nom)
-    preparer_essai(nom, contenu, Modele.Origine.DEPOT)
-    messages.success(request, "Fichier Word déposé. Ouvrez le document d'essai, puis mettez en service.")
-    return redirect("documents:modele", nom=nom)
 
 
 @require_POST
@@ -492,7 +430,7 @@ def mettre_en_service_essai(request, nom):
     libelle, essai = MODELES[nom][0], _essai(nom)
     if not essai.exists():
         return redirect("documents:modele", nom=nom)
-    contenu = essai.read_bytes()
+    contenu = _lire(essai)
     if request.session.get(_cle_version(nom)) != _empreinte(contenu):
         messages.error(request, "Ouvrir d'abord le document d'essai.")
         return redirect("documents:modele", nom=nom)
@@ -504,7 +442,7 @@ def mettre_en_service_essai(request, nom):
     if raison:
         messages.error(request, f"« {libelle} » n'a pas été mis en service. {raison}")
         return redirect("documents:modele", nom=nom)
-    origine = _origine_essai(nom).read_text() if _origine_essai(nom).exists() else Modele.Origine.DEPOT
+    origine = _origine_essai(nom).read_text() if _origine_essai(nom).exists() else Modele.Origine.EDITEUR
     mettre_en_service(nom, contenu, origine, request.user)
     abandonner_essai(nom)
     del request.session[_cle_version(nom)]
@@ -531,7 +469,7 @@ def precedent(request, nom):
     _verifier(request, nom)
     if not _precedent(nom).exists():
         raise Http404
-    mettre_en_service(nom, _precedent(nom).read_bytes(), Modele.Origine.PRECEDENT, request.user)
+    mettre_en_service(nom, _lire(_precedent(nom)), Modele.Origine.PRECEDENT, request.user)
     noter(request, "modèle remplacé", nom, "version précédente")
     messages.success(request, f"Version précédente de « {MODELES[nom][0]} » remise en service.")
     return redirect("documents:modele", nom=nom)

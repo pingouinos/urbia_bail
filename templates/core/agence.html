@@ -17,11 +17,6 @@
   {% endfor %}
   <div class="actions-formulaire"><button type="submit" class="bouton-corail">Enregistrer</button></div>
 </form>
-<section class="carte">
-  <h2>Balises pour les modèles Word</h2>
-  <p class="discret">À écrire telles quelles dans un modèle de bail ou de mandat ; ajouter <code>|upper</code> pour des majuscules, par exemple <code>{% templatetag openvariable %} agence.nom|upper {% templatetag closevariable %}</code>.</p>
-  <p class="balises">{% for balise in balises %}<code>{% templatetag openvariable %} agence.{{ balise }} {% templatetag closevariable %}</code> {% endfor %}</p>
-</section>
 {% if historique %}
 <section class="carte">
   <h2>Historique</h2>

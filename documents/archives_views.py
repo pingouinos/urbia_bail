@@ -52,7 +52,10 @@ def reponse_version(request, version, format_):
         type_ = "application/pdf" if contenu.startswith(b"%PDF") else ("image/png" if contenu.startswith(b"\x89PNG") else "image/jpeg")
         extension = "pdf" if type_ == "application/pdf" else ("png" if type_ == "image/png" else "jpg")
     elif format_ == "docx":
+        # Seules les archives d'avant le passage au HTML ont un Word.
         contenu, type_, extension = bytes(version.docx), DOCX, "docx"
+        if not contenu.startswith(b"PK"):
+            raise Http404
     elif format_ == "pdf":
         origine = version
         while origine.source_id and bytes(origine.source.docx) == bytes(origine.docx):
@@ -62,7 +65,7 @@ def reponse_version(request, version, format_):
             try:
                 contenu = convertir_pdf(bytes(version.docx))
             except ConversionImpossible as erreur:
-                messages.error(request, f"Conversion PDF indisponible ({erreur}) ; téléchargez le Word archivé.")
+                messages.error(request, f"Le PDF n'a pas pu être produit ({erreur}) ; réessayez dans un instant.")
                 return redirect(version.bail or version.mandat)
             pdf, _ = PdfArchive.objects.get_or_create(version=origine, defaults={"contenu": contenu})
         contenu, type_, extension = bytes(pdf.contenu), "application/pdf", "pdf"

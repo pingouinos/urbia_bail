@@ -199,7 +199,7 @@
         <td>{{ contrat.debut|date:"d/m/Y"|default:"—" }}</td>
         <td>{% with echeance=contrat.echeance %}{{ echeance.0|date:"d/m/Y"|default:"—" }}{% if echeance.1 %}<br><span class="discret">{{ echeance.1 }}</span>{% endif %}{% endwith %}</td>
         <td>{% with etat=contrat.etat %}<span class="pastille pastille-{{ etat.0 }}">{{ etat.1 }}</span>{% endwith %}</td>
-        <td class="liens">{% if contrat.code_type == "bail" %}<a href="{% url 'contrats:pdf' contrat.pk %}">PDF</a> <a href="{% url 'contrats:word' contrat.pk %}">Word</a>{% else %}<a href="{% url 'mandats:pdf' contrat.pk %}">PDF</a> <a href="{% url 'mandats:word' contrat.pk %}">Word</a>{% endif %}</td>
+        <td class="liens">{% if contrat.code_type == "bail" %}<a href="{% url 'contrats:pdf' contrat.pk %}">PDF</a>{% else %}<a href="{% url 'mandats:pdf' contrat.pk %}">PDF</a>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>

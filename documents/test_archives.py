@@ -1,5 +1,4 @@
 import datetime as dt
-import io
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -10,7 +9,6 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from docx import Document
 
 from comptes.roles import ADMINISTRATEURS, attribuer_role
 from core.models import Evenement, Organisation
@@ -99,11 +97,11 @@ class ArchivesTests(Donnees, TestCase):
                 Organisation.objects.all().update(nom="AUTRE AGENCE")
                 dossier = Path(self.temp.name) / "modeles"
                 dossier.mkdir(exist_ok=True)
-                nom = "bail_habitation.docx" if objet.code_type == "bail" else "mandat_gestion.docx"
-                doc = Document()
-                doc.add_paragraph("AUTRE MODELE")
-                doc.save(dossier / nom)
-                self.assertEqual(self.client.get(self.url(objet, "word")).content, bytes(preparation.docx))
+                nom = "bail_habitation" if objet.code_type == "bail" else "mandat_gestion"
+                (dossier / f"{nom}.html").write_text("<p>AUTRE MODELE</p>")
+                self.assertTrue(bytes(preparation.docx).startswith(b"<!doctype html>"))
+                with mock.patch("documents.archives_views.convertir_pdf", side_effect=lambda contenu, *args: contenu):
+                    self.assertEqual(self.client.get(self.url(objet, "pdf")).content, bytes(preparation.docx))
                 self.assertEqual(objet.contexte_document(), preparation.contexte)
                 preparation.refresh_from_db()
                 self.assertEqual(preparation.nature, "preparation")
@@ -180,7 +178,7 @@ class ArchivesTests(Donnees, TestCase):
     def test_historique_ne_se_reconstitue_pas_silencieusement(self):
         self.bail.date_signature = self.jour
         self.bail.save()
-        self.assertEqual(self.client.get(self.url(self.bail, "word")).status_code, 302)
+        self.assertEqual(self.client.get(self.url(self.bail, "pdf")).status_code, 302)
         self.assertEqual(self.bail.versions_document.count(), 0)
         url = reverse("documents:preparer", args=["bail", self.bail.pk])
         self.assertEqual(self.client.post(url).status_code, 403)
@@ -268,10 +266,26 @@ class ArchivesTests(Donnees, TestCase):
     def test_superutilisateur_hors_agence_et_archive_inaccessible_sans_role(self):
         self.client.force_login(self.admin)
         version = self.preparer(self.bail)
-        self.assertEqual(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])).status_code, 200)
+        url = reverse("documents:archive", args=[version.pk, "pdf"])
+        with mock.patch("documents.archives_views.convertir_pdf", return_value=b"%PDF-1.7"):
+            self.assertEqual(self.client.get(url).status_code, 200)
+        # Seules les archives d'avant le passage au HTML ont un Word.
+        self.assertEqual(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])).status_code, 404)
         # Le superutilisateur exploite la plateforme : les documents des agences ne lui sont pas servis.
         self.client.force_login(User.objects.create_superuser("root", "root@example.com", "test-password"))
-        self.assertRedirects(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])),
-                             reverse("plateforme"), fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(url), reverse("plateforme"), fetch_redirect_response=False)
         self.client.force_login(User.objects.create_user("inconnu"))
-        self.assertEqual(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])).status_code, 403)
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_archive_word_d_avant_le_html(self):
+        self.client.force_login(self.admin)
+        ancienne = VersionContrat.objects.create(
+            bail=self.bail, nature="preparation", auteur=self.admin, auteur_nom="administrateur", motif="Avant le HTML.",
+            contexte={}, modele=b"PK\x03\x04modele", docx=b"PK\x03\x04document", empreinte="0" * 64)
+        self.assertTrue(ancienne.est_word)
+        self.assertEqual(self.client.get(reverse("documents:archive", args=[ancienne.pk, "docx"])).content,
+                         b"PK\x03\x04document")
+        self.assertContains(self.client.get(self.bail.get_absolute_url()), "Word archivé")
+        with mock.patch("documents.archives_views.convertir_pdf", return_value=b"%PDF-1.7") as conversion:
+            self.client.get(reverse("documents:archive", args=[ancienne.pk, "pdf"]))
+        self.assertEqual(conversion.call_args.args[0], b"PK\x03\x04document")

@@ -26,7 +26,7 @@ from .forms import (
 from .echeances import assurance_due, euros, prochaine_date_revision, revision_due
 from .models import Bail, IndiceIRL, RevisionLoyer
 
-MODELE = "bail_habitation.docx"
+MODELE = "bail_habitation"
 # Logements proposés à la fois à l'étape « Logement ».
 NB_LOGEMENTS = 30
 
