@@ -6,6 +6,13 @@
   <div class="actions"><a class="bouton-petit bouton-action" href="{% url 'plateforme_agence_nouvelle' %}">+ Nouvelle agence</a></div>
 </div>
 <p class="discret">{{ agences|length }} agence{{ agences|length|pluralize }}, dont {{ nb_actives }} active{{ nb_actives|pluralize }} · {{ nb_comptes }} compte{{ nb_comptes|pluralize }} actif{{ nb_comptes|pluralize }}</p>
+<section class="carte version-en-ligne" aria-labelledby="version-titre">
+  <div class="titre-actions"><h2 id="version-titre">Version en ligne</h2><span class="pastille pastille-loue">Répond</span></div>
+  <dl class="resume">
+    <div><dt>Commit</dt><dd>{% if version.lien %}<a href="{{ version.lien }}"><code>{{ version.court }}</code></a>{% else %}<code>{{ version.court }}</code>{% endif %}</dd></div>
+    <div><dt>Publiée le</dt><dd>{{ version.date|date:"d/m/Y à H:i"|default:"—" }}</dd></div>
+  </dl>
+</section>
 <table>
   <thead><tr><th>Agence</th><th>Ville</th><th>Comptes actifs</th><th>Dernière connexion</th><th>État</th></tr></thead>
   <tbody>

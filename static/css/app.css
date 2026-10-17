@@ -762,3 +762,6 @@ table.liste-modeles td:last-child { text-align: right; }
 }
 /* Nom de l'agence quand elle n'a pas déposé de logo. */
 .nom-agence { color: var(--nuit); font-weight: 700; font-size: 1.15rem; line-height: 1.2; }
+.version-en-ligne { margin-bottom: 16px; }
+.version-en-ligne h2 { margin: 0; font-size: 1.1rem; }
+.version-en-ligne .titre-actions { margin: 0; }
