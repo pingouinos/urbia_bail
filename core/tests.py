@@ -172,6 +172,23 @@ class PlateformeTests(TestCase):
         self.assertContains(fiche, "elodie")
         self.assertContains(fiche, "Désactiver l'agence")
 
+    def test_console_en_lecture_seule(self):
+        """Les agences et leurs membres se consultent dans la console, mais ne
+        s'y modifient pas : tout passe par Plateforme."""
+        self.client.force_login(self.exploitant)
+        liste = self.client.get(reverse("admin:core_organisation_changelist"))
+        self.assertContains(liste, "URBIA Immobilier")
+        self.assertNotContains(liste, reverse("admin:core_organisation_add"))
+        fiche = self.client.get(reverse("admin:core_organisation_change", args=[self.urbia.pk]))
+        self.assertContains(fiche, "elodie")
+        self.assertNotContains(fiche, 'name="_save"')
+        self.assertContains(self.client.get(reverse("admin:core_membre_changelist")), "elodie")
+        self.assertEqual(self.client.get(reverse("admin:core_organisation_add")).status_code, 403)
+        self.client.post(reverse("admin:core_organisation_change", args=[self.urbia.pk]), {"nom": "Autre"})
+        self.client.post(reverse("admin:core_organisation_delete", args=[self.urbia.pk]), {"post": "yes"})
+        self.urbia.refresh_from_db()
+        self.assertEqual(self.urbia.nom, "URBIA Immobilier")
+
     def test_creer_une_agence_et_son_administrateur(self):
         self.client.force_login(self.exploitant)
         reponse = self.client.post(reverse("plateforme_agence_nouvelle"), {

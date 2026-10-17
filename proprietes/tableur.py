@@ -37,7 +37,6 @@ class Colonne:
 
 COLONNES = [
     Colonne("N° de lot", "numero_lot", largeur=12),
-    Colonne("Réf. ICS bailleur", "ref_ics", modele=Bailleur, largeur=14),
     Colonne("Type de bailleur", "type", "choix", modele=Bailleur, largeur=20),
     Colonne("Bailleur (nom ou raison sociale)", "nom", modele=Bailleur, obligatoire=True, largeur=28),
     Colonne("Bailleur prénom", "prenom", modele=Bailleur),
@@ -326,10 +325,6 @@ def _trouver_propriete(valeurs):
 
 
 def _trouver_bailleur(valeurs):
-    if valeurs.get("ref_ics"):
-        trouve = Bailleur.objects.filter(ref_ics=valeurs["ref_ics"]).first()
-        if trouve:
-            return trouve
     return Bailleur.objects.filter(
         nom__iexact=valeurs["nom"], prenom__iexact=valeurs.get("prenom", "")
     ).first()

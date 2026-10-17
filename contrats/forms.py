@@ -2,7 +2,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from proprietes.forms import NouveauBailleurForm, RefIcsVideEnNullMixin
+from proprietes.forms import NouveauBailleurForm
 from proprietes.models import Bailleur, Propriete
 from core.fichiers import controler_fichier
 from documents.forms import SignatureMixin
@@ -112,7 +112,7 @@ class BailForm(forms.ModelForm):
         return donnees
 
 
-class LogementForm(RefIcsVideEnNullMixin, forms.ModelForm):
+class LogementForm(forms.ModelForm):
     """Création rapide d'un logement pendant la rédaction d'un bail : les
     mentions que le bail exige, le reste se complète ensuite sur sa fiche."""
 
@@ -124,7 +124,7 @@ class LogementForm(RefIcsVideEnNullMixin, forms.ModelForm):
     class Meta:
         model = Propriete
         fields = [
-            "adresse", "complement", "code_postal", "ville", "numero_lot", "meuble", "type_habitat",
+            "adresse", "complement", "code_postal", "ville", "meuble", "type_habitat",
             "regime_juridique", "periode_construction", "surface", "nb_pieces", "chauffage", "eau_chaude",
             "classe_dpe", "equipements", "zone_tendue", "dernier_loyer", "charges",
         ]
@@ -132,7 +132,7 @@ class LogementForm(RefIcsVideEnNullMixin, forms.ModelForm):
         widgets = {"equipements": forms.Textarea(attrs={"rows": 3})}
 
     SECTIONS = [
-        ("Adresse", ["adresse", "complement", "code_postal", "ville", "numero_lot"]),
+        ("Adresse", ["adresse", "complement", "code_postal", "ville"]),
         ("Description", [
             "meuble", "type_habitat", "regime_juridique", "periode_construction", "surface", "nb_pieces",
             "chauffage", "eau_chaude", "classe_dpe", "equipements",

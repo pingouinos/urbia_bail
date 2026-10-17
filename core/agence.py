@@ -119,7 +119,7 @@ class RattacheAgence(ParAgence):
 
     # Les formulaires n'ont pas le champ agence : sans ces deux méthodes, ils
     # ne vérifieraient pas les unicités propres à chaque agence (numéro de
-    # mandat, référence ICS…) et l'enregistrement échouerait en base.
+    # mandat, n° de lot…) et l'enregistrement échouerait en base.
     def validate_unique(self, exclude=None):
         self._rattacher()
         super().validate_unique(exclude=_sans_agence(exclude))

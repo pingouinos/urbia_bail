@@ -5,14 +5,6 @@ from core.fichiers import controler_fichier
 from .models import Associe, Bailleur, Immeuble, Piece, Propriete, cle_adresse
 
 
-class RefIcsVideEnNullMixin:
-    """Une référence ICS laissée vide est enregistrée comme absente, pour ne
-    pas heurter l'unicité entre plusieurs fiches sans référence."""
-
-    def clean_ref_ics(self):
-        return self.cleaned_data.get("ref_ics") or None
-
-
 class SocieteOuPersonneMixin:
     """Une société porte un nom et un représentant ; une personne, une
     civilité, un prénom et éventuellement un conjoint. Les champs qui ne
@@ -56,13 +48,13 @@ class AdresseDejaConnueMixin:
             self.add_error("adresse", "Cette adresse est déjà enregistrée : voir en haut de la page.")
 
 
-class BailleurForm(SocieteOuPersonneMixin, RefIcsVideEnNullMixin, forms.ModelForm):
+class BailleurForm(SocieteOuPersonneMixin, forms.ModelForm):
     class Meta:
         model = Bailleur
         fields = [
             "type", "nom", "civilite", "prenom", "conjoint_civilite", "conjoint_nom", "conjoint_prenom",
             "representant_civilite", "representant_nom", "representant_prenom", "representant_qualite", "siren",
-            "ref_ics", "adresse", "code_postal", "ville", "email", "telephone", "versement", "iban",
+            "adresse", "code_postal", "ville", "email", "telephone", "versement", "iban",
         ]
 
 
