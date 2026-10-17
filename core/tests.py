@@ -352,35 +352,47 @@ class OrganisationTests(TestCase):
         self.assertEqual(self.client.get(reverse("utilisateur_mfa", args=[gestionnaire.pk])).status_code, 405)
 
     def test_parc_du_tableau_de_bord(self):
-        """Le tableau de bord compte les biens gérés et, parmi eux, ceux sans
-        locataire en place ; ceux qui n'ont aucun bail sont signalés à part."""
+        """Le tableau de bord montre le parc en quatre tuiles : biens gérés,
+        loués, en préavis et libres ; les libres sans aucun bail sont
+        signalés à part."""
         import datetime as dt
 
         from contrats.models import Bail
 
         self.connecter(GESTIONNAIRES)
-        self.assertNotContains(self.client.get(reverse("accueil")), "biens gérés")
+        self.assertNotContains(self.client.get(reverse("accueil")), "tuiles-parc")
         sci = Bailleur.objects.create(type="sci_familiale", nom="SCI ESGT")
+        aujourd_hui = timezone.localdate()
 
         def bien(adresse, **champs):
             return Propriete.objects.create(bailleur=sci, adresse=adresse, code_postal="31000", ville="Toulouse", dernier_loyer=600, **champs)
 
-        def bail(propriete, effet, fin=None):
+        def bail(propriete, effet, fin=None, **champs):
             contrat = Bail.depuis_propriete(propriete)
             contrat.date_effet, contrat.date_fin_effective = effet, fin
             contrat.irl_trimestre, contrat.irl_valeur = "2e trimestre 2023", "140.59"
+            for champ, valeur in champs.items():
+                setattr(contrat, champ, valeur)
             contrat.save()
 
         bail(bien("1 rue des Lois"), dt.date(2024, 1, 1))  # loué
+        depart = aujourd_hui + dt.timedelta(days=20)
+        bail(bien("6 rue des Lois"), dt.date(2024, 1, 1), conge_recu_le=aujourd_hui, date_depart_prevue=depart)
         bail(bien("2 rue des Lois"), dt.date(2020, 1, 1), dt.date(2024, 1, 1))  # libre depuis la fin du bail
-        bail(bien("3 rue des Lois"), timezone.localdate() + dt.timedelta(days=30))  # bail à venir : encore libre
+        bail(bien("3 rue des Lois"), aujourd_hui + dt.timedelta(days=30))  # bail à venir : encore libre
         bien("4 rue des Lois")  # importé, sans bail enregistré
         bien("5 rue des Lois", actif=False)  # plus géré
+        parc = self.client.get(reverse("accueil")).context["parc"]
+        self.assertEqual(
+            (parc["geres"], parc["loues"], parc["preavis"], parc["libres"], parc["sans_bail"]), (5, 1, 1, 3, 1),
+        )
+        self.assertEqual(parc["prochain_depart"], depart)
+        self.assertEqual((parc["part_loues"], parc["part_preavis"]), (20, 20))
         page = self.client.get(reverse("accueil"))
-        self.assertContains(page, "<b>4</b> biens gérés", html=False)
-        self.assertContains(page, "<b>3</b> inoccupés")
         self.assertContains(page, "dont 1 sans bail enregistré")
-        self.assertContains(page, f'{reverse("proprietes:liste")}?situation=libre')
+        self.assertContains(page, f"premier départ le {depart:%d/%m}")
+        for situation in ("loue", "preavis", "libre"):
+            self.assertContains(page, f'{reverse("proprietes:liste")}?situation={situation}')
 
     def test_taches_du_tableau_de_bord(self):
         """Le tableau de bord liste les actions en attente, déduites des
