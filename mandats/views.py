@@ -296,12 +296,15 @@ def deposer_signe(request, pk):
             signer(request, objet, form)
         except ValidationError as erreur:
             messages.error(request, " ".join(erreur.messages))
-            return redirect(vers_etapes(objet))
+            # Haut de page : le message s'y affiche, au-dessus de la préparation
+            # qu'il réclame souvent ; l'ancre de l'étape le laissait hors de vue.
+            return redirect(objet)
         messages.success(request, f"Signature du mandat enregistrée au {objet.date_signature:%d/%m/%Y}.")
     else:
         for erreurs in form.errors.values():
             for erreur in erreurs:
                 messages.error(request, erreur)
+        return redirect(objet)
     return redirect(vers_etapes(objet))
 
 

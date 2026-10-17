@@ -260,6 +260,15 @@ class OrganisationTests(TestCase):
         self.assertEqual(reponse.status_code, 200)
         self.assertFalse(Organisation.courante().nom)
 
+    def test_sites_sans_https(self):
+        """Une adresse de site tapée sans « https:// » est acceptée et complétée (#160)."""
+        self.connecter(ADMINISTRATEURS)
+        page = self.client.get(reverse("agence"))
+        self.assertNotContains(page, 'type="url"')
+        self.client.post(reverse("agence"), {**self.DONNEES, "site": "www.urbia.fr", "mediateur_site": "mediateur.example"})
+        organisation = Organisation.courante()
+        self.assertEqual((organisation.site, organisation.mediateur_site), ("https://www.urbia.fr", "https://mediateur.example"))
+
     def test_reservee_aux_administrateurs(self):
         self.connecter(GESTIONNAIRES)
         self.assertEqual(self.client.get(reverse("agence")).status_code, 403)

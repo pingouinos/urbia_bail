@@ -248,6 +248,11 @@ class VuesTests(Donnees, TestCase):
         demain = timezone.localdate() + timezone.timedelta(days=1)
         reponse = self.client.post(deposer, {"date_signature": demain.isoformat()}, follow=True)
         self.assertContains(reponse, "ne peut pas être dans le futur")
+        # Sans version préparée, le refus s'affiche en haut de page, pas sous
+        # l'ancre de l'étape où il passait inaperçu (ticket n° 1, #160).
+        reponse = self.client.post(deposer, {"date_signature": "2026-09-15"}, follow=True)
+        self.assertEqual(reponse.redirect_chain, [(mandat.get_absolute_url(), 302)])
+        self.assertContains(reponse, "Préparez la version à signer")
         # La date seule suffit ; le scan suit quand il est disponible.
         self.client.post(reverse("documents:preparer", args=["mandat", mandat.pk]))
         reponse = self.client.post(deposer, {"date_signature": "2026-09-15"}, follow=True)
