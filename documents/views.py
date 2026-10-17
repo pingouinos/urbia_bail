@@ -29,6 +29,7 @@ from .generation import (
 )
 from .archives import interdictions
 from .models import Modele
+from . import regles as registre_regles
 
 # Modèles remplaçables : libellé, et objet dont le dernier modifié sert au
 # remplissage d'essai.
@@ -153,7 +154,42 @@ def modeles(request):
          "essai": _objet_essai(nom) is not None, "variables": sorted(_variables(MODELES_PAR_DEFAUT / nom))}
         for nom, (libelle, _) in MODELES.items()
     ]
+    aujourdhui = timezone.localdate()
+    for modele in liste:
+        # À relire : jamais relu, relu il y a plus d'un an, ou remplacé depuis.
+        etat, relu_le = modele["etat"], modele["etat"].relu_le
+        modele["a_relire"] = (
+            relu_le is None or aujourdhui - relu_le > registre_regles.VALIDITE
+            or (etat.mis_en_service_le is not None and timezone.localdate(etat.mis_en_service_le) > relu_le)
+        )
     return render(request, "documents/modeles.html", {"modeles": liste})
+
+
+def regles(request):
+    if not est_administrateur(request.user):
+        raise PermissionDenied
+    groupes = registre_regles.registre(timezone.localdate())
+    return render(request, "documents/regles.html", {
+        "groupes": groupes, "resume": registre_regles.resume(groupes),
+        "relecture_avocat": registre_regles.RELECTURE_AVOCAT,
+    })
+
+
+@require_POST
+def relu(request, nom):
+    """Un administrateur note qu'il a relu le modèle en service, et d'après
+    quels textes."""
+    _verifier(request, nom)
+    reference = " ".join(request.POST.get("reference", "").split())[:200]
+    if not reference:
+        messages.error(request, "Indiquer d'après quels textes le modèle a été relu.")
+        return redirect("documents:modeles")
+    Modele.objects.update_or_create(nom=nom, defaults={
+        "relu_le": timezone.localdate(), "relu_par": request.user, "relu_reference": reference,
+    })
+    noter(request, "modèle relu", MODELES[nom][0], reference)
+    messages.success(request, f"{MODELES[nom][0]} : relecture enregistrée.")
+    return redirect("documents:modeles")
 
 
 def telecharger(request, nom):

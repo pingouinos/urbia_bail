@@ -269,6 +269,18 @@ dd { margin: 0; }
 .pagination { display: flex; gap: 16px; margin-top: 12px; }
 .historique { margin: 0; padding-left: 18px; }
 
+/* Règles légales : une ligne par règle, groupées par document. */
+.tableau-defilant { overflow-x: auto; }
+table.regles { min-width: 640px; }
+table.regles tr.groupe th { background: var(--melon-clair); }
+.nombre { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pastille-a_jour { background: var(--vert-clair); border-color: var(--vert); }
+.pastille-a_reverifier { background: var(--melon-clair); border-color: var(--melon); }
+.pastille-a_corriger { background: var(--erreur-clair); border-color: #f6c9c6; color: var(--erreur); }
+.relecture { display: grid; gap: 6px; }
+.relecture details { display: flex; gap: 8px; flex-wrap: wrap; }
+.relecture input { width: 100%; max-width: 420px; margin: 6px 8px 6px 0; }
+
 /* Ordinateur : le menu est un panneau fixe à gauche, le compte en bas. */
 @media (min-width: 761px) {
   .avec-panneau { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
