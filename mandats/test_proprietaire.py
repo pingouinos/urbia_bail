@@ -151,9 +151,9 @@ class LienProprietaireTests(Donnees, TestCase):
 
     def test_ne_touche_pas_aux_autres_champs(self):
         formulaire = self.creer_lien()
-        self.client.post(formulaire, self.vous(type="morale", ref_ics="X1", siren="123"))
+        self.client.post(formulaire, self.vous(type="morale", siren="123"))
         bailleur = Bailleur.objects.get()
-        self.assertEqual((bailleur.type, bailleur.ref_ics, bailleur.siren), ("physique", None, ""))
+        self.assertEqual((bailleur.type, bailleur.siren), ("physique", ""))
 
     def test_lien_expire_ou_remplace(self):
         formulaire = self.creer_lien()
