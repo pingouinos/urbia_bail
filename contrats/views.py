@@ -1,4 +1,3 @@
-import datetime as dt
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -27,7 +26,8 @@ from .forms import (
     BailForm, CongeForm, EdlSortieForm, EntreeForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm,
     RestitutionForm, SignatureForm, initial_fin,
 )
-from .models import Bail, Echeance
+from .echeances import assurance_due, euros, prochaine_date_revision, revision_due
+from .models import Bail, IndiceIRL, RevisionLoyer
 
 MODELE = "bail_habitation.docx"
 # Logements proposés à la fois à l'étape « Logement ».
@@ -70,96 +70,6 @@ def liste(request):
     return render(request, "contrats/liste.html", {
         "page": page, "parametres": parametres.urlencode(), "types": TYPES,
     })
-
-
-def _echeances(bail):
-    """Les douze derniers mois du suivi des loyers, échéancier mis à jour."""
-    if not bail.suivi_loyers_depuis:
-        return []
-    bail.completer_echeancier()
-    return list(bail.echeances.all()[:12])
-
-
-@require_POST
-def loyers_suivre(request, pk):
-    """Démarre (ou arrête) le suivi des loyers d'un bail. On choisit le
-    premier mois suivi : un bail ancien ne fait pas naître des années
-    d'échéances à pointer."""
-    objet = get_object_or_404(Bail, pk=pk)
-    if request.POST.get("action") == "arreter":
-        if objet.echeances.filter(paye_le__isnull=False).exists():
-            messages.error(request, "Des loyers sont déjà pointés sur ce bail : le suivi ne s'arrête plus.")
-        else:
-            objet.echeances.all().delete()
-            objet.suivi_loyers_depuis = None
-            objet.save(update_fields=["suivi_loyers_depuis", "modifie_le"])
-            messages.success(request, "Suivi des loyers arrêté pour ce bail.")
-        return redirect(f"{objet.get_absolute_url()}#loyers")
-    try:
-        depuis = dt.datetime.strptime(request.POST.get("depuis", ""), "%Y-%m").date()
-    except ValueError:
-        messages.error(request, "Indiquer le premier mois à suivre.")
-        return redirect(f"{objet.get_absolute_url()}#loyers")
-    if depuis < objet.date_effet.replace(day=1):
-        messages.error(request, "Le suivi ne peut pas commencer avant la prise d'effet du bail.")
-        return redirect(f"{objet.get_absolute_url()}#loyers")
-    objet.suivi_loyers_depuis = depuis
-    objet.save(update_fields=["suivi_loyers_depuis", "modifie_le"])
-    nombre = len(objet.completer_echeancier())
-    messages.success(request, f"Suivi des loyers démarré : {nombre} échéance{'s' if nombre > 1 else ''} créée{'s' if nombre > 1 else ''}.")
-    return redirect(f"{objet.get_absolute_url()}#loyers")
-
-
-@require_POST
-def echeance_pointer(request, pk):
-    """Pointe le paiement d'un loyer (ou l'annule, en cas d'erreur)."""
-    objet = get_object_or_404(Echeance.objects.select_related("bail"), pk=pk)
-    if request.POST.get("action") == "annuler":
-        objet.paye_le = None
-        objet.save(update_fields=["paye_le", "modifie_le"])
-        messages.success(request, f"Paiement de {objet.libelle} annulé.")
-        return redirect(objet)
-    try:
-        paye_le = dt.date.fromisoformat(request.POST.get("paye_le", ""))
-    except ValueError:
-        messages.error(request, "Indiquer la date du paiement.")
-        return redirect(objet)
-    if paye_le > timezone.localdate():
-        messages.error(request, "La date du paiement ne peut pas être dans le futur.")
-        return redirect(objet)
-    objet.paye_le = paye_le
-    objet.save(update_fields=["paye_le", "modifie_le"])
-    messages.success(request, f"Loyer de {objet.libelle} pointé : la quittance est disponible.")
-    return redirect(objet)
-
-
-def echeance_document(request, pk, type_):
-    """Avis d'échéance tant que le loyer n'est pas payé, quittance ensuite."""
-    objet = get_object_or_404(Echeance.objects.select_related("bail__propriete__bailleur"), pk=pk)
-    if type_ == "quittance" and not objet.payee:
-        messages.error(request, "La quittance n'est délivrée qu'une fois le loyer payé.")
-        return redirect(objet)
-    modele = "quittance.docx" if type_ == "quittance" else "avis_echeance.docx"
-    return documents.document(request, DocumentLoyer(objet, type_), modele, request.GET.get("format", "pdf"))
-
-
-class DocumentLoyer:
-    """Une échéance vue comme l'un de ses deux documents."""
-
-    def __init__(self, echeance, type_):
-        self.echeance, self.type = echeance, type_
-
-    def contexte_document(self):
-        return self.echeance.contexte_document()
-
-    def get_absolute_url(self):
-        return self.echeance.get_absolute_url()
-
-    @property
-    def nom_fichier(self):
-        noms = " ".join(locataire.nom.upper() for locataire in self.echeance.bail.locataires.all())
-        titre = "Quittance" if self.type == "quittance" else "Avis d'échéance"
-        return f"{titre} {self.echeance.libelle} {noms}".strip()[:120]
 
 
 def choisir(request):
@@ -328,7 +238,30 @@ def etapes(request, pk):
         # Message de fin de parcours, une seule fois après la création.
         "vient_d_etre_cree": request.session.pop("bail_cree", None) == objet.pk,
         "administrateur": administrateur, "historique": objet.history.select_related("history_user")[:10],
+        **suivi_location(objet),
     })
+
+
+def suivi_location(bail):
+    """Révision du loyer et attestation d'assurance, sur la fiche d'un bail
+    signé en cours."""
+    if not bail.signe or bail.date_fin_effective:
+        return {}
+    revisions = list(bail.revisions.select_related("cree_par"))
+    derniere = revisions[0] if revisions else None
+    revision, assurance = revision_due(bail), assurance_due(bail)
+    courrier = derniere if derniere and derniere.statut == RevisionLoyer.Statut.APPLIQUEE \
+        and (timezone.localdate() - derniere.cree_le.date()).days <= 60 else None
+    return {
+        "suivi": True,
+        # Une action à faire (ou le courrier à envoyer) remonte le cadre en haut de la fiche.
+        "suivi_en_haut": bool((revision and not revision.gelee) or assurance or courrier),
+        "revision": revision, "revisions": revisions,
+        "prochaine_revision": prochaine_date_revision(bail),
+        # Courrier au locataire, proposé dans les deux mois qui suivent la révision.
+        "courrier": courrier, "assurance_due": assurance,
+        "aujourd_hui": timezone.localdate(),
+    }
 
 
 @require_POST
@@ -624,3 +557,84 @@ def deposer_signe(request, pk):
 
 def fichier_signe(request, pk):
     return documents.fichier_signe(request, get_object_or_404(Bail, pk=pk))
+
+
+def _date_postee(request, nom):
+    """Date saisie au format du navigateur (AAAA-MM-JJ), aujourd'hui par défaut,
+    jamais dans le futur."""
+    from datetime import date
+
+    try:
+        valeur = date.fromisoformat(request.POST.get(nom, ""))
+    except ValueError:
+        return timezone.localdate()
+    return min(valeur, timezone.localdate())
+
+
+def _indice_poste(request, nom):
+    from decimal import Decimal, InvalidOperation
+
+    texte = request.POST.get(nom, "").strip().replace(",", ".")
+    try:
+        valeur = Decimal(texte)
+    except InvalidOperation:
+        return None
+    return valeur if 50 < valeur < 1000 else None
+
+
+@require_POST
+@verrouiller(Bail)
+def reviser(request, pk):
+    """Révision annuelle du loyer : appliquée au loyer calculé avec l'IRL, ou
+    refusée par le propriétaire pour cette année. Le bail signé ne change pas."""
+    objet = get_object_or_404(Bail.objects.select_related("propriete"), pk=pk)
+    revision = revision_due(objet)
+    if not revision:
+        messages.error(request, "Aucune révision de loyer n'est à faire sur ce bail pour le moment.")
+        return redirect(objet)
+    if request.POST.get("decision") == "renoncer":
+        RevisionLoyer.objects.create(
+            bail=objet, date_revision=revision.date, applicable_le=revision.applicable_le,
+            statut=RevisionLoyer.Statut.RENONCEE, ancien_loyer=revision.ancien_loyer, nouveau_loyer=revision.ancien_loyer,
+            irl_libelle=revision.libelle_irl, irl_ancien=revision.irl_ancien, irl_nouveau=revision.irl_nouveau,
+            cree_par=request.user,
+        )
+        noter(request, "révision de loyer", objet, f"Non révisé au {revision.date:%d/%m/%Y}")
+        messages.success(request, f"Révision du {revision.date:%d/%m/%Y} notée comme non faite : le loyer reste "
+                                  f"à {euros(revision.ancien_loyer)}.")
+        return redirect(f"{objet.get_absolute_url()}#revision")
+    if revision.gelee:
+        messages.error(request, "Logement classé F ou G : la loi interdit d'augmenter le loyer.")
+        return redirect(f"{objet.get_absolute_url()}#revision")
+    # Indice publié depuis la dernière mise à jour : saisi ici, il sert à tous les baux.
+    for nom, annee in (("irl_nouveau", revision.annee), ("irl_ancien", (revision.annee or 0) - 1)):
+        valeur = _indice_poste(request, nom)
+        if valeur and revision.trimestre and getattr(revision, nom) is None:
+            IndiceIRL.objects.get_or_create(trimestre=revision.trimestre, annee=annee, defaults={"valeur": valeur})
+            setattr(revision, nom, valeur)
+    if revision.nouveau_loyer is None:
+        messages.error(request, "Indiquer l'indice publié par l'INSEE pour calculer le nouveau loyer.")
+        return redirect(f"{objet.get_absolute_url()}#revision")
+    RevisionLoyer.objects.create(
+        bail=objet, date_revision=revision.date, applicable_le=revision.applicable_le,
+        statut=RevisionLoyer.Statut.APPLIQUEE, ancien_loyer=revision.ancien_loyer, nouveau_loyer=revision.nouveau_loyer,
+        irl_libelle=revision.libelle_irl, irl_ancien=revision.irl_ancien, irl_nouveau=revision.irl_nouveau,
+        cree_par=request.user,
+    )
+    noter(request, "révision de loyer", objet,
+          f"{euros(revision.ancien_loyer)} → {euros(revision.nouveau_loyer)} au {revision.applicable_le:%d/%m/%Y}")
+    messages.success(request, f"Loyer révisé : {euros(revision.nouveau_loyer)} hors charges à partir du "
+                              f"{revision.applicable_le:%d/%m/%Y}. Le courrier au locataire est prêt ci-dessous.")
+    return redirect(f"{objet.get_absolute_url()}#revision")
+
+
+@require_POST
+@verrouiller(Bail)
+def assurance(request, pk):
+    """Attestation d'assurance habitation reçue du locataire."""
+    objet = get_object_or_404(Bail, pk=pk)
+    objet.attestation_assurance_le = _date_postee(request, "attestation_assurance_le")
+    objet.save(update_fields=["attestation_assurance_le", "modifie_le"])
+    messages.success(request, f"Attestation d'assurance notée au {objet.attestation_assurance_le:%d/%m/%Y} : "
+                              "elle sera redemandée dans un an.")
+    return redirect(f"{objet.get_absolute_url()}#assurance")

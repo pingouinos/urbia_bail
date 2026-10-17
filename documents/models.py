@@ -3,6 +3,8 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 
+from core.agence import ParAgence
+
 
 class Modele(models.Model):
     """État d'un modèle Word : d'où vient la version en service, et le Google
@@ -22,6 +24,12 @@ class Modele(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
         verbose_name="mis en service par",
     )
+    relu_le = models.DateField("relu le", null=True, blank=True)
+    relu_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        verbose_name="relu par",
+    )
+    relu_reference = models.CharField("relu d'après", max_length=200, blank=True)
 
     class Meta:
         verbose_name = "modèle"
@@ -30,8 +38,10 @@ class Modele(models.Model):
         return self.nom
 
 
-class VersionContrat(models.Model):
+class VersionContrat(ParAgence):
     """Archives ajoutées, jamais réécrites. Les octets vivent dans la sauvegarde DB."""
+
+    chemins_agence = ("bail__agence", "mandat__agence")
 
     bail = models.ForeignKey("contrats.Bail", null=True, on_delete=models.PROTECT, related_name="versions_document")
     mandat = models.ForeignKey("mandats.Mandat", null=True, on_delete=models.PROTECT, related_name="versions_document")
@@ -72,6 +82,8 @@ class VersionContrat(models.Model):
         raise ValidationError("Une archive contractuelle doit être conservée.")
 
 
-class PdfArchive(models.Model):
+class PdfArchive(ParAgence):
+    chemins_agence = ("version__bail__agence", "version__mandat__agence")
+
     version = models.OneToOneField(VersionContrat, on_delete=models.PROTECT, related_name="pdf_archive")
     contenu = models.BinaryField()

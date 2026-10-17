@@ -269,6 +269,33 @@ dd { margin: 0; }
 .pagination { display: flex; gap: 16px; margin-top: 12px; }
 .historique { margin: 0; padding-left: 18px; }
 
+/* Règles légales : une ligne par règle, groupées par document. */
+.tableau-defilant { overflow-x: auto; }
+table.regles { min-width: 640px; }
+table.regles tr.groupe th { background: var(--melon-clair); }
+.nombre { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pastille-a_jour { background: var(--vert-clair); border-color: var(--vert); }
+.pastille-a_reverifier { background: var(--melon-clair); border-color: var(--melon); }
+.pastille-a_corriger { background: var(--erreur-clair); border-color: #f6c9c6; color: var(--erreur); }
+.relecture { display: grid; gap: 6px; }
+/* Correction proposée d'un modèle : avant, après, puis deux étapes. */
+.comparaison { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 12px 0 20px; }
+.comparaison > div { min-width: 0; padding: 12px 14px; background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); }
+.comparaison p { margin: 6px 0 0; }
+.version-avant { border-left: 4px solid var(--erreur) !important; }
+.version-apres { border-left: 4px solid var(--vert) !important; }
+del { background: var(--erreur-clair); color: var(--erreur); }
+ins { background: var(--vert-clair); text-decoration: none; font-weight: 600; }
+.etapes-correction { display: grid; gap: 14px; }
+.etape-correction { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; margin: 0; }
+.etape-correction p { margin: 0; }
+.numero-etape { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--acier); color: #fff; font-weight: 700; }
+.numero-etape.attente { background: var(--bord); color: var(--discret); }
+.numero-etape.fait { background: var(--vert); color: var(--acier); }
+@media (max-width: 760px) { .etape-correction { grid-template-columns: 32px 1fr; } .etape-correction > :last-child { grid-column: 2; justify-self: start; } }
+.relecture details { display: flex; gap: 8px; flex-wrap: wrap; }
+.relecture input { width: 100%; max-width: 420px; margin: 6px 8px 6px 0; }
+
 /* Ordinateur : le menu est un panneau fixe à gauche, le compte en bas. */
 @media (min-width: 761px) {
   .avec-panneau { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
@@ -417,12 +444,6 @@ button.lien.lien-danger { color: var(--erreur); }
 .actions-fiche .bouton-petit, .actions-fiche button.bouton-petit[type=submit] { display: inline-flex; align-items: center; gap: 6px; }
 button.bouton-petit.bouton-supprimer[type=submit] { padding: 6px 14px; background: var(--carte); color: var(--erreur); border-color: var(--erreur); }
 button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erreur); color: #fff; }
-
-/* Suivi des loyers d'un bail. */
-.loyers form.en-ligne { margin: 0; }
-.loyers input[type=date] { width: auto; padding: 4px 8px; }
-.loyers td { white-space: nowrap; }
-.loyers form.en-ligne { flex-wrap: nowrap; }
 
 /* Éléments de navigation : ils gardent leur couleur, le survol colore leur fond. */
 .menu a, .onglets a, .raccourcis .carte, .segments a, .choix a, .ajouter-liste a, .marque,
@@ -608,6 +629,23 @@ a.puce-parc:hover { border-color: var(--corail); color: var(--texte); }
 .derniers-contrats > li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 0; }
 .derniers-contrats > li > a:first-child { display: grid; min-width: 0; color: var(--texte); }
 .derniers-contrats > li > a:first-child:hover strong { color: var(--lien-survol); }
+
+/* Fiche du bail : révision annuelle du loyer et assurance du locataire. */
+.suivi-loyer { border: 2px solid var(--melon); }
+.revision { display: grid; gap: 12px; }
+.revision-calcul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.revision-case { display: grid; align-content: start; gap: 2px; padding: 10px 12px; border: 1px solid var(--bord); border-radius: 8px; min-width: 0; }
+.revision-case > span { font-size: 0.85rem; color: var(--discret); }
+.revision-case b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.revision-resultat { background: var(--vert-clair); border-color: var(--vert); }
+.revision-indice { display: grid; gap: 4px; font-size: 0.9rem; }
+.revision-indice input { max-width: 10em; }
+.courrier { margin-top: 12px; }
+.courrier summary { cursor: pointer; font-weight: 600; }
+.texte-courrier { display: block; width: 100%; margin: 8px 0; font: inherit; font-size: 0.92rem; }
+.en-ligne-formulaire { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+@media (max-width: 760px) { .revision-calcul { grid-template-columns: 1fr; } }
+button[disabled] { opacity: 0.45; cursor: not-allowed; }
 
 @media (max-width: 760px) {
   /* La petite frise de la sortie reste horizontale : trois points tiennent. */

@@ -8,10 +8,11 @@ d'une propriété utilisent sans distinguer les deux.
 
 from django.db import models
 
+from core.agence import RattacheAgence
 from proprietes.models import Horodatage
 
 
-class Contrat(Horodatage):
+class Contrat(RattacheAgence, Horodatage):
     #: « Bail » ou « Mandat », pour l'affichage et les filtres.
     TYPE = ""
 

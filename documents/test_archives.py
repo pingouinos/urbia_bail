@@ -200,7 +200,10 @@ class ArchivesTests(Donnees, TestCase):
         self.client.force_login(self.admin)
         self.client.post(self.url(self.bail, "supprimer"))
         self.assertTrue(type(self.bail).objects.filter(pk=self.bail.pk).exists())
-        self.assertEqual(self.client.post(reverse("admin:contrats_bail_change", args=[self.bail.pk]), {}).status_code, 403)
+        # La console Django est réservée au superutilisateur : un administrateur d'agence est renvoyé à sa connexion.
+        console = self.client.post(reverse("admin:contrats_bail_change", args=[self.bail.pk]), {})
+        self.assertEqual(console.status_code, 302)
+        self.assertTrue(console["Location"].startswith(reverse("admin:login")))
 
     def test_signature_et_archive_atomiques(self):
         self.preparer(self.bail)
@@ -264,10 +267,13 @@ class ArchivesTests(Donnees, TestCase):
                 objet.refresh_from_db()
                 self.assertEqual(objet.date_signature, self.jour - dt.timedelta(days=20))
 
-    def test_superutilisateur_sans_groupe_accede_et_archive_inaccessible_sans_role(self):
-        root = User.objects.create_superuser("root", "root@example.com", "test-password")
-        self.client.force_login(root)
+    def test_superutilisateur_hors_agence_et_archive_inaccessible_sans_role(self):
+        self.client.force_login(self.admin)
         version = self.preparer(self.bail)
         self.assertEqual(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])).status_code, 200)
+        # Le superutilisateur exploite la plateforme : les documents des agences ne lui sont pas servis.
+        self.client.force_login(User.objects.create_superuser("root", "root@example.com", "test-password"))
+        self.assertRedirects(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])),
+                             reverse("plateforme"), fetch_redirect_response=False)
         self.client.force_login(User.objects.create_user("inconnu"))
         self.assertEqual(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])).status_code, 403)

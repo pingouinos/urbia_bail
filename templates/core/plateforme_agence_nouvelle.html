@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titre %}Nouvelle agence · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'plateforme' %}">Plateforme</a><span aria-hidden="true">›</span><span class="fil-ici">Nouvelle agence</span></nav>
+<h1>Nouvelle agence</h1>
+<p class="discret">Son premier administrateur créera ensuite ses collègues. Les champs marqués d'un <span class="etoile">*</span> sont obligatoires.</p>
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  {% for erreur in form.non_field_errors %}<p class="message alerte-fond">{{ erreur }}</p>{% endfor %}
+  <fieldset>
+    <legend>Agence</legend>
+    {% include "proprietes/_champ.html" with champ=form.nom %}
+    {% include "proprietes/_champ.html" with champ=form.ville %}
+  </fieldset>
+  <fieldset>
+    <legend>Premier administrateur</legend>
+    {% include "proprietes/_champ.html" with champ=form.prenom %}
+    {% include "proprietes/_champ.html" with champ=form.nom_admin %}
+    {% include "proprietes/_champ.html" with champ=form.email %}
+  </fieldset>
+  <div class="actions-formulaire"><button type="submit" class="bouton-corail">Créer l'agence</button></div>
+</form>
+{% endblock %}

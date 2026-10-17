@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titre %}Règles légales · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><span class="fil-ici">Règles légales</span></nav>
+<h1>Règles légales</h1>
+<p>{% if resume.a_corriger %}<strong class="alerte">{{ resume.a_corriger }} règle{{ resume.a_corriger|pluralize }} à corriger</strong> dans les modèles en service.{% elif resume.a_reverifier %}<strong>{{ resume.a_reverifier }} règle{{ resume.a_reverifier|pluralize }} à revérifier</strong> : la dernière vérification a plus d'un an.{% else %}<strong>Toutes les règles sont à jour.</strong>{% endif %}
+  {% if relecture_avocat %}Dernière relecture par un avocat le {{ relecture_avocat|date:"d/m/Y" }}.{% else %}Aucune relecture par un avocat pour l'instant.{% endif %}
+  <span class="discret">Une veille des textes officiels a lieu chaque mois. Ces contrôles ne remplacent pas un avis juridique : l'agence reste responsable des contrats qu'elle signe.</span></p>
+<section class="carte">
+  <div class="tableau-defilant"><table class="regles">
+    <thead><tr><th>Règle</th><th>Ce qu'applique l'application</th><th>Source</th><th>Vérifiée le</th><th>État</th></tr></thead>
+    <tbody>{% for document, lignes in groupes.items %}
+      <tr class="groupe"><th colspan="5" scope="rowgroup">{{ document }}</th></tr>
+      {% for ligne in lignes %}<tr>
+        <td>{{ ligne.regle.libelle }}</td>
+        <td>{{ ligne.regle.applique }}</td>
+        <td><a href="{{ ligne.regle.url }}" target="_blank" rel="noopener noreferrer">{{ ligne.regle.source }}</a></td>
+        <td class="nombre">{{ ligne.regle.verifiee_le|date:"d/m/Y" }}</td>
+        <td><span class="pastille pastille-{{ ligne.etat }}">{{ ligne.libelle_etat }}</span>{% if ligne.explication %}<br><span class="discret">{{ ligne.explication }}</span>{% endif %}{% if ligne.corrigeable %}<br><a href="{% url 'documents:corriger' ligne.regle.modele %}">Voir la correction</a>{% endif %}</td>
+      </tr>{% endfor %}
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+{% if changements_zone_tendue %}
+<section class="carte">
+  <h2>Biens dont la zone tendue a changé</h2>
+  <p>Au dernier téléchargement de la liste officielle, {{ changements_zone_tendue|length }} bien{{ changements_zone_tendue|pluralize }} {{ changements_zone_tendue|pluralize:"a,ont" }} changé de zone tendue. Vérifiez leurs baux en cours : préavis du locataire et évolution du loyer en dépendent.</p>
+  <ul>{% for bien in changements_zone_tendue %}<li><a href="{% url 'proprietes:propriete' bien.id %}">{{ bien.bien }}</a> : {{ bien.zone_tendue|yesno:"désormais en zone tendue,plus en zone tendue" }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+<p class="discret">La relecture de chaque modèle se note dans <a href="{% url 'documents:modeles' %}">Modèles des documents</a>.</p>
+{% endblock %}

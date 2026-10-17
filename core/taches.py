@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from candidatures.models import Candidature
+from contrats import echeances
 from contrats.models import SUIVI_EDL_DEPUIS, Bail
 from mandats.models import Mandat
 from proprietes.models import Bailleur, Piece, Propriete
@@ -19,7 +20,8 @@ from proprietes.models import Bailleur, Piece, Propriete
 from .processus import processus_mandat
 
 # Rubriques, dans l'ordre d'affichage.
-RUBRIQUES = ["Mises en location", "Loyers", "Mandats", "Candidatures", "Baux", "Documents", "Fiches à compléter"]
+ECHEANCES = "Loyers et échéances"
+RUBRIQUES = ["Mises en location", ECHEANCES, "Mandats", "Candidatures", "Baux", "Documents", "Fiches à compléter"]
 # Un diagnostic est signalé un peu avant sa fin de validité.
 PREAVIS_VALIDITE = dt.timedelta(days=60)
 # La restitution du dépôt est signalée comme urgente deux semaines avant son échéance.
@@ -160,18 +162,7 @@ def taches(locations):
             detail=f"{'en retard depuis le' if echeance < aujourd_hui else 'avant le'} {echeance:%d/%m/%Y}",
         ))
 
-    # Loyers : une ligne par bail suivi qui a des loyers impayés.
-    suivis = Bail.objects.filter(suivi_loyers_depuis__isnull=False).select_related("propriete").prefetch_related("locataires")
-    for bail in suivis:
-        bail.completer_echeancier()
-        impayees = [e for e in bail.echeances.filter(paye_le__isnull=True) if e.impayee]
-        if impayees:
-            nombre, du = len(impayees), sum(e.total for e in impayees)
-            liste.append(Tache(
-                "Loyers", f"{nombre} loyer{'s' if nombre > 1 else ''} impayé{'s' if nombre > 1 else ''} : {bail.noms_locataires or 'locataire'}",
-                _adresse(bail.propriete), f"{bail.get_absolute_url()}#loyers", "Voir les loyers", urgent=True,
-                detail=f"{du:.2f} € depuis {impayees[-1].libelle}".replace(".", ","),
-            ))
+    liste += taches_echeances(aujourd_hui)
 
     # Documents : diagnostics périmés ou qui le seront bientôt (le plus récent de chaque type).
     vus = set()
@@ -206,6 +197,75 @@ def taches(locations):
             reverse("proprietes:bailleur_modifier", args=[bailleur.pk]), "Compléter la fiche",
             detail="il signe le mandat et le bail",
         ))
+    return liste
+
+
+def taches_echeances(aujourd_hui):
+    """Révisions de loyer, renouvellements de bail et de mandat, attestations
+    d'assurance : chaque échéance quand il est temps d'agir."""
+    liste = []
+    baux = Bail.objects.filter(date_signature__isnull=False, date_fin_effective__isnull=True).select_related(
+        "propriete__bailleur",
+    ).prefetch_related("locataires", "revisions")
+    for bail in baux:
+        noms = bail.noms_locataires
+        sujet, url = _adresse(bail.propriete), bail.get_absolute_url()
+        revision = echeances.revision_due(bail, aujourd_hui)
+        # Logement F ou G : la loi interdit la hausse, il n'y a rien à faire.
+        if revision and not revision.gelee:
+            quand = f"{'révisable depuis le' if revision.en_retard else 'au'} {revision.date:%d/%m/%Y}"
+            if revision.nouveau_loyer is not None:
+                detail = f"{echeances.euros(revision.nouveau_loyer)} au lieu de {echeances.euros(revision.ancien_loyer)}, {quand}"
+            else:
+                detail = f"indice du {revision.libelle_irl} à saisir, {quand}"
+            liste.append(Tache(
+                ECHEANCES, f"Réviser le loyer {de(noms)}" if noms else "Réviser le loyer", sujet,
+                f"{url}#revision", "Réviser", urgent=revision.en_retard, detail=detail,
+            ))
+        conge = echeances.conge_bailleur(bail, aujourd_hui)
+        if conge:
+            fin, limite = conge
+            if bail.type == Bail.Type.ETUDIANT:
+                titre, detail = "Préparer la fin du bail étudiant", f"il se termine le {fin:%d/%m/%Y}, sans reconduction"
+            else:
+                duree = bail.duree_mois // 12
+                titre = "Décider du renouvellement du bail"
+                detail = (f"congé du propriétaire possible jusqu'au {limite:%d/%m/%Y}, sinon reconduit "
+                          f"{duree} an{'s' if duree > 1 else ''} le {fin + dt.timedelta(days=1):%d/%m/%Y}")
+            liste.append(Tache(
+                ECHEANCES, f"{titre} {de(noms)}" if noms else titre, sujet, f"{url}?etape=7#etape-7", "Ouvrir le bail",
+                detail=detail,
+            ))
+        assurance = echeances.assurance_due(bail, aujourd_hui)
+        if assurance:
+            precedente = bail.attestation_assurance_le
+            titre = "Redemander l'attestation d'assurance"
+            liste.append(Tache(
+                ECHEANCES, f"{titre} {de(noms)}" if noms else titre, sujet, f"{url}#assurance", "Noter l'attestation",
+                urgent=bool(precedente) and assurance < aujourd_hui,
+                detail=f"dernière reçue le {precedente:%d/%m/%Y}" if precedente else f"un an de plus le {assurance:%d/%m/%Y}",
+            ))
+    mandats = Mandat.objects.filter(date_fin__isnull=True, date_signature__isnull=False).select_related("propriete__bailleur")
+    for mandat in mandats:
+        echeance = echeances.echeance_mandat(mandat, aujourd_hui)
+        if not echeance:
+            continue
+        fin, reconduction = echeance
+        sujet = f"{mandat.propriete.bailleur} · {_adresse(mandat.propriete)}"
+        if reconduction:
+            limite = echeances.ajouter_mois(fin, -1)
+            liste.append(Tache(
+                ECHEANCES, f"Prévenir {mandat.propriete.bailleur} de l'échéance du mandat n° {mandat.numero}", sujet,
+                f"{mandat.get_absolute_url()}#echeance", "Préparer la lettre", alerte="Obligatoire",
+                detail=f"lettre à envoyer avant le {limite:%d/%m/%Y}, sinon le mandat se renouvelle seul le "
+                       f"{fin + dt.timedelta(days=1):%d/%m/%Y}",
+            ))
+        else:
+            liste.append(Tache(
+                ECHEANCES, f"Renouveler le mandat n° {mandat.numero}", sujet, mandat.get_absolute_url(), "Ouvrir le mandat",
+                urgent=fin - aujourd_hui < dt.timedelta(days=30),
+                detail=f"il se termine le {fin:%d/%m/%Y}, sans reconduction possible",
+            ))
     return liste
 
 

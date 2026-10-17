@@ -123,8 +123,7 @@ class Mandat(Contrat):
         PROFESSIONNEL = "professionnel", "Mandant professionnel (société, SCI non familiale)"
 
     numero = models.PositiveIntegerField(
-        "numéro au registre", unique=True,
-        error_messages={"unique": "Ce numéro est déjà porté par un autre mandat."},
+        "numéro au registre",
     )
     propriete = models.ForeignKey(
         Propriete, on_delete=models.PROTECT, related_name="mandats", verbose_name="propriété",
@@ -147,6 +146,12 @@ class Mandat(Contrat):
     )
     date_fin = models.DateField(
         "fin du mandat", null=True, blank=True, help_text="À renseigner à la résiliation ou à l'échéance."
+    )
+    # Loi Chatel (article L. 215-1 du code de la consommation) : le mandant
+    # particulier est prévenu, de trois mois à un mois avant chaque échéance,
+    # qu'il peut s'opposer à la reconduction. Date de la dernière lettre.
+    information_reconduction_le = models.DateField(
+        "lettre de fin de période envoyée le", null=True, blank=True, editable=False,
     )
 
     # Rémunération
@@ -188,6 +193,11 @@ class Mandat(Contrat):
         ordering = ["-numero"]
         verbose_name = "mandat de gestion"
         verbose_name_plural = "mandats de gestion"
+        # Chaque agence tient son propre registre (loi Hoguet).
+        constraints = [models.UniqueConstraint(
+            fields=["agence", "numero"], name="mandat_numero_par_agence",
+            violation_error_message="Ce numéro est déjà porté par un autre mandat.",
+        )]
 
     def __str__(self):
         return f"Mandat n° {self.numero} · {self.mandant}"

@@ -1,10 +1,10 @@
-"""L'agence qui utilise l'application : son identité, ses coordonnées et les
-mentions légales que portent ses mandats et ses baux.
+"""Les agences qui utilisent l'application : leur identité, leurs coordonnées
+et les mentions légales que portent leurs mandats et leurs baux.
 
-Une installation sert une seule agence, donc une seule fiche. Elle vit dans une
-table et non dans la configuration pour qu'un administrateur la tienne à jour
-sans toucher au serveur, et pour que le reste puisse s'y rattacher le jour où
-plusieurs agences partageraient la même installation.
+Une installation peut servir plusieurs agences. Chaque compte appartient à une
+agence (`Membre`), et le code lit celle du compte connecté par
+`Organisation.courante()`. Les biens, baux et autres données appartiennent
+aussi à une agence et sont filtrés automatiquement (voir core/agence.py).
 """
 
 from decimal import Decimal
@@ -13,6 +13,7 @@ from django.conf import settings
 from django.db import models
 from simple_history.models import HistoricalRecords
 
+from core.agence import ParAgence
 from core.champs import TelephoneField, code_postal_francais, siren_valide
 from core.fichiers import nom_aleatoire
 
@@ -86,6 +87,10 @@ class Organisation(Horodatage):
         help_text="Taux prérempli à la création d'un mandat ; il reste modifiable sur chaque mandat.",
     )
 
+    active = models.BooleanField(
+        default=True, help_text="Une agence désactivée garde ses données, mais ses comptes ne peuvent plus se connecter.",
+    )
+
     history = HistoricalRecords()
 
     class Meta:
@@ -96,7 +101,15 @@ class Organisation(Horodatage):
 
     @classmethod
     def courante(cls):
-        """La fiche de l'agence, créée vide à la première demande."""
+        """L'agence du compte connecté (ou celle qu'une commande a activée).
+        Hors de ce contexte (lien du candidat, commandes, tests), la première
+        agence, créée vide à la première demande."""
+        from .agence import agence_active
+
+        return agence_active() or cls.premiere()
+
+    @classmethod
+    def premiere(cls):
         return cls.objects.order_by("pk").first() or cls.objects.create()
 
     @property
@@ -146,10 +159,32 @@ class Organisation(Horodatage):
         }
 
 
-class Evenement(models.Model):
-    """Ligne du journal de sécurité (voir core/journal.py)."""
+class Membre(models.Model):
+    """Appartenance d'un compte à son agence. Une fiche à part plutôt qu'un
+    modèle d'utilisateur personnalisé : Django ne permet pas d'en changer sur
+    une base déjà en service."""
+
+    utilisateur = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="membre")
+    organisation = models.ForeignKey(Organisation, on_delete=models.PROTECT, related_name="membres", verbose_name="agence")
+
+    class Meta:
+        verbose_name = "membre"
+
+    def __str__(self):
+        return f"{self.utilisateur} · {self.organisation}"
+
+
+class Evenement(ParAgence):
+    """Ligne du journal de sécurité (voir core/journal.py). Sans agence pour
+    les connexions refusées et les gestes de l'exploitant : ces lignes ne se
+    lisent que dans la console."""
 
     CONSERVATION_JOURS = 365
+    chemins_agence = ("agence",)
+
+    agence = models.ForeignKey(
+        Organisation, on_delete=models.SET_NULL, null=True, blank=True, related_name="+", editable=False,
+    )
 
     date = models.DateTimeField(auto_now_add=True, db_index=True)
     utilisateur = models.ForeignKey(

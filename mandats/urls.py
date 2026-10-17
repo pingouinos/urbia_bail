@@ -14,6 +14,7 @@ urlpatterns = [
     path("<int:pk>/modifier/", RedirectView.as_view(pattern_name="mandats:mandat", query_string=True), name="modifier"),
     path("<int:pk>/signature/retirer/", views.retirer_signature, name="retirer_signature"),
     path("<int:pk>/fin/", views.fin, name="fin"),
+    path("<int:pk>/reconduction/", views.information_reconduction, name="information_reconduction"),
     path("<int:pk>/mandat.docx", views.telecharger, {"format_": "docx"}, name="word"),
     path("<int:pk>/mandat.pdf", views.telecharger, {"format_": "pdf"}, name="pdf"),
     path("<int:pk>/signe/", views.deposer_signe, name="deposer_signe"),

@@ -48,7 +48,8 @@ if HOTE_LOCATAIRES:
     CSRF_TRUSTED_ORIGINS.append(URL_LOCATAIRES)
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    # Console Django réservée au superutilisateur (voir config/admin.py).
+    "config.admin.ConsoleConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -78,6 +79,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.AgenceMiddleware",
     "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -85,7 +87,12 @@ MIDDLEWARE = [
     "axes.middleware.AxesMiddleware",
     # Enregistre l'auteur de chaque modification dans l'historique.
     "simple_history.middleware.HistoryRequestMiddleware",
+    "proprietes.middleware.ZonesTenduesMiddleware",
 ]
+
+# Téléchargement mensuel de la liste des communes en zone tendue
+# (proprietes.zones_tendues). Coupé pendant les tests.
+ZONES_TENDUES_AUTO = env.bool("ZONES_TENDUES_AUTO", default="test" not in sys.argv)
 
 ROOT_URLCONF = "config.urls"
 

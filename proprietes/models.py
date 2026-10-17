@@ -19,6 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from core.agence import ParAgence, RattacheAgence
 from core.champs import TelephoneField, code_postal_francais, siren_valide
 from core.fichiers import nom_aleatoire
 
@@ -69,7 +70,7 @@ class Horodatage(models.Model):
         abstract = True
 
 
-class Bailleur(Horodatage):
+class Bailleur(RattacheAgence, Horodatage):
     class Type(models.TextChoices):
         PERSONNE_PHYSIQUE = "physique", "Personne physique"
         SCI_FAMILIALE = "sci_familiale", "SCI familiale"
@@ -90,7 +91,7 @@ class Bailleur(Horodatage):
     conjoint_nom = models.CharField("nom du conjoint ou co-propriétaire", max_length=200, blank=True)
     conjoint_prenom = models.CharField("prénom du conjoint", max_length=100, blank=True)
     ref_ics = models.CharField(
-        "référence ICS", max_length=50, unique=True, null=True, blank=True
+        "référence ICS", max_length=50, null=True, blank=True
     )
     adresse = models.CharField(max_length=255, blank=True)
     code_postal = models.CharField("code postal", max_length=10, blank=True)
@@ -122,6 +123,10 @@ class Bailleur(Horodatage):
     class Meta:
         ordering = ["nom", "prenom"]
         verbose_name = "bailleur"
+        constraints = [models.UniqueConstraint(
+            fields=["agence", "ref_ics"], name="bailleur_ref_ics_par_agence",
+            violation_error_message="Un bailleur porte déjà cette référence ICS.",
+        )]
 
     @property
     def societe(self):
@@ -213,8 +218,10 @@ class Bailleur(Horodatage):
         return 6 if self.type == self.Type.PERSONNE_MORALE else 3
 
 
-class Associe(models.Model):
+class Associe(ParAgence):
     """Associé d'une société bailleresse (SCI, personne morale)."""
+
+    chemins_agence = ("bailleur__agence",)
 
     bailleur = models.ForeignKey(Bailleur, on_delete=models.CASCADE, related_name="associes")
     civilite = models.CharField("civilité", max_length=5, choices=Bailleur.Civilite.choices, blank=True)
@@ -246,7 +253,7 @@ class Associe(models.Model):
         super().save(*args, **kwargs)
 
 
-class Immeuble(Horodatage):
+class Immeuble(RattacheAgence, Horodatage):
     """Bâtiment dont l'agence gère plusieurs lots. Il regroupe des propriétés
     à la même adresse ; chaque lot garde son bailleur, car une copropriété
     réunit plusieurs propriétaires."""
@@ -268,7 +275,10 @@ class Immeuble(Horodatage):
     class Meta:
         ordering = ["ville", "adresse", "nom"]
         verbose_name = "immeuble"
-        constraints = [models.UniqueConstraint(fields=["cle"], name="immeuble_unique")]
+        constraints = [models.UniqueConstraint(
+            fields=["agence", "cle"], name="immeuble_unique",
+            violation_error_message="Cet immeuble existe déjà.",
+        )]
 
     def __str__(self):
         return self.nom or f"{self.adresse}, {self.code_postal} {self.ville}"
@@ -308,7 +318,7 @@ class Immeuble(Horodatage):
                 lot.save()
 
 
-class Propriete(Horodatage):
+class Propriete(RattacheAgence, Horodatage):
     class Usage(models.TextChoices):
         HABITATION = "habitation", "Habitation"
         PROFESSIONNEL = "professionnel", "Local professionnel"
@@ -346,7 +356,7 @@ class Propriete(Horodatage):
 
     # Identification
     ref_ics = models.CharField(
-        "référence ICS du lot", max_length=50, unique=True, null=True, blank=True
+        "référence ICS du lot", max_length=50, null=True, blank=True
     )
     bailleur = models.ForeignKey(Bailleur, on_delete=models.PROTECT, related_name="proprietes")
     immeuble = models.ForeignKey(
@@ -425,7 +435,13 @@ class Propriete(Horodatage):
     date_dpe = models.DateField("date du DPE", null=True, blank=True)
 
     # Loyer
-    zone_tendue = models.BooleanField("zone tendue", default=False)
+    zone_tendue = models.BooleanField(
+        "zone tendue", default=False,
+        help_text="Déduite de la commune. À cocher seulement si la commune est introuvable dans la liste officielle.",
+    )
+    # Vrai quand la zone tendue vient de la liste officielle des communes
+    # (proprietes.zones_tendues) et non d'une saisie.
+    commune_reconnue = models.BooleanField(default=False, editable=False)
     loyer_reference_majore = models.DecimalField(
         "loyer de référence majoré (€/m²)", max_digits=7, decimal_places=2, null=True, blank=True,
         help_text="Seulement si la commune applique l'encadrement des loyers.",
@@ -455,6 +471,31 @@ class Propriete(Horodatage):
     class Meta:
         ordering = ["ville", "adresse", "complement"]
         verbose_name = "propriété"
+        constraints = [models.UniqueConstraint(
+            fields=["agence", "ref_ics"], name="propriete_ref_ics_par_agence",
+            violation_error_message="Une propriété porte déjà cette référence ICS.",
+        )]
+
+    def save(self, *args, **kwargs):
+        self.appliquer_zone_tendue()
+        super().save(*args, **kwargs)
+
+    def appliquer_zone_tendue(self):
+        """La zone tendue suit la commune quand la liste officielle la
+        connaît ; sinon la saisie est gardée."""
+        from .zones_tendues import statut
+
+        tendue, _ = statut(self.code_postal, self.ville)
+        self.commune_reconnue = tendue is not None
+        if tendue is not None:
+            self.zone_tendue = tendue
+
+    @property
+    def commune_officielle(self):
+        """La commune de la liste officielle, ou None si elle est introuvable."""
+        from .zones_tendues import statut
+
+        return statut(self.code_postal, self.ville)[1]
 
     def __str__(self):
         morceaux = [self.adresse, self.complement, f"{self.code_postal} {self.ville}"]
@@ -559,7 +600,7 @@ def dossier_piece(piece, nom):
     return f"{'bailleurs' if piece.bailleur_id else 'proprietes'}/{nom_aleatoire(nom)}"
 
 
-class Piece(models.Model):
+class Piece(RattacheAgence):
     """Document attaché à une propriété (diagnostics, titre, assurance…) ou
     à un bailleur (pièce d'identité, RIB). Ce sont les pièces que le mandant
     fournit à la signature du mandat, et celles que l'on annexe au bail."""
@@ -645,3 +686,38 @@ class Piece(models.Model):
     def cible(self):
         """La propriété ou le bailleur auquel la pièce est attachée."""
         return self.propriete or self.bailleur
+
+
+class Commune(models.Model):
+    """Commune de la liste officielle des zones tendues, téléchargée depuis
+    data.gouv.fr (voir proprietes.zones_tendues). Commune à toutes les
+    agences."""
+
+    code_insee = models.CharField("code INSEE", max_length=5, primary_key=True)
+    nom = models.CharField(max_length=100)
+    departement = models.CharField("département", max_length=3)
+    cle = models.CharField(max_length=100, editable=False)
+    zone_tendue = models.BooleanField("zone tendue", default=False)
+
+    class Meta:
+        ordering = ["nom"]
+        indexes = [models.Index(fields=["departement", "cle"])]
+
+    def __str__(self):
+        return f"{self.nom} ({self.departement})"
+
+
+class ListeCommunes(models.Model):
+    """Chaque téléchargement de la liste des communes, réussi ou non."""
+
+    le = models.DateTimeField("téléchargée le", auto_now_add=True)
+    publiee_le = models.DateTimeField("publiée le", null=True, blank=True)
+    communes = models.PositiveIntegerField(default=0)
+    en_zone_tendue = models.PositiveIntegerField(default=0)
+    erreur = models.TextField(blank=True)
+    # Biens dont la zone tendue a changé : [{"id", "bien", "zone_tendue"}].
+    changements = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ["-le"]
+        verbose_name = "téléchargement de la liste des communes"

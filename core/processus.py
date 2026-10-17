@@ -138,14 +138,15 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
               lien=f"{reverse('candidatures:liste')}?propriete={propriete.pk}"),
         Etape("Bail", date=_date_redaction(bail) if bail else None,
               detail=_pluriel(len(alertes), "point") + " à vérifier" if alertes else (
-                  bail.noms_locataires if bail else (retenue.noms or "candidat retenu") if retenue else ""),
-              lien=f"{reverse('contrats:creer')}?candidature={retenue.pk}" if retenue else ""),
+                  bail.noms_locataires if bail else _retenue(retenue) if retenue else ""),
+              lien=(f"{retenue.get_absolute_url()}#lien" if retenue.lien_a_envoyer
+                    else f"{reverse('contrats:creer')}?candidature={retenue.pk}") if retenue else ""),
         Etape("Signature", date=bail.date_signature if bail else None,
               detail=("scan déposé" if bail.fichier_signe else "scan à déposer") if bail and bail.signe else ""),
         Etape("Entrée dans les lieux", date=(bail.edl_entree_le or bail.date_effet) if bail else None,
               prevue=bool(bail) and not bail.edl_entree_le and bail.date_effet > aujourd_hui,
               detail="état des lieux à enregistrer" if bail and bail.edl_entree_attendu else ""),
-        Etape("Location en cours", detail=f"{bail.total_mensuel} € par mois".replace(".", ",") if bail else ""),
+        Etape("Location en cours", detail=f"{bail.total_actuel} € par mois".replace(".", ",") if bail else ""),
         Etape("Sortie", date=_date_sortie(bail) if bail else None,
               prevue=bool(bail) and (not bail.date_fin_effective or bail.restitution_attendue),
               detail=_detail_sortie(bail) if bail else ""),
@@ -179,6 +180,13 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
 def processus_bail(bail, alertes=None):
     """La frise vue depuis un bail : celle de la location à son locataire."""
     return processus_location(bail.propriete, mandat=bail.mandat_id, bail=bail, alertes=alertes)
+
+
+def _retenue(candidature):
+    """« Lina ROUX · lien à envoyer » : le candidat retenu complète son
+    dossier par son lien avant la rédaction du bail."""
+    noms = candidature.noms or "candidat retenu"
+    return f"{noms} · lien à envoyer" if candidature.lien_a_envoyer else noms
 
 
 def _candidature(bail):

@@ -12,7 +12,9 @@ from mandats.models import Mandat
 from proprietes.models import Bailleur, Propriete
 
 from .management.commands.migrate import aligner_applications
-from .models import Organisation
+from .agence import activer
+from .forms import UtilisateurForm
+from .models import Membre, Organisation
 
 
 class AlignementApplicationsTests(TestCase):
@@ -47,6 +49,169 @@ class AlignementApplicationsTests(TestCase):
         self.assertEqual(applications, {"contrats", "proprietes"})
         # Rejouer l'alignement ne fait plus rien.
         self.assertEqual(aligner_applications(connection), [])
+
+
+@override_settings(MFA_OBLIGATOIRE=False)
+class AgencesTests(TestCase):
+    """Chaque compte appartient à une agence : il travaille sur sa fiche et
+    ne voit ni ne touche les comptes des autres agences."""
+
+    def setUp(self):
+        self.urbia = Organisation.objects.create(nom="URBIA Immobilier")
+        self.canal = Organisation.objects.create(nom="Agence du Canal")
+        self.admin_urbia = self.compte("admin-urbia", ADMINISTRATEURS)
+        with activer(self.canal):
+            self.admin_canal = self.compte("admin-canal", ADMINISTRATEURS)
+
+    @staticmethod
+    def compte(nom, role):
+        utilisateur = User.objects.create_user(nom, email=f"{nom}@example.com", password="x")
+        attribuer_role(utilisateur, role)
+        return utilisateur
+
+    def test_rattachement_des_comptes(self):
+        self.assertEqual(self.admin_urbia.membre.organisation, self.urbia)
+        self.assertEqual(self.admin_canal.membre.organisation, self.canal)
+        # Hors de toute requête (commande, création par la console), la première agence.
+        self.assertEqual(self.compte("sans-contexte", GESTIONNAIRES).membre.organisation, self.urbia)
+
+    def test_agence_du_compte_connecte(self):
+        self.client.force_login(self.admin_canal)
+        self.assertContains(self.client.get(reverse("accueil")), "<h1>Agence du Canal</h1>", html=True)
+        self.assertContains(self.client.get(reverse("agence")), "Agence du Canal")
+        self.client.force_login(self.admin_urbia)
+        self.assertContains(self.client.get(reverse("accueil")), "<h1>URBIA Immobilier</h1>", html=True)
+
+    def test_nouveau_compte_dans_l_agence_de_son_createur(self):
+        self.client.force_login(self.admin_canal)
+        reponse = self.client.post(reverse("utilisateur_creer"), {
+            "first_name": "Léa", "last_name": "Martin", "email": "lea@canal.example", "is_active": "on",
+            "role": GESTIONNAIRES,
+        })
+        self.assertRedirects(reponse, reverse("utilisateurs"))
+        self.assertEqual(User.objects.get(username="lea@canal.example").membre.organisation, self.canal)
+
+    def test_comptes_des_autres_agences_hors_d_atteinte(self):
+        self.client.force_login(self.admin_urbia)
+        liste = self.client.get(reverse("utilisateurs"))
+        self.assertContains(liste, "admin-urbia")
+        self.assertNotContains(liste, "admin-canal")
+        autre = self.admin_canal.pk
+        self.assertEqual(self.client.get(reverse("utilisateur_modifier", args=[autre])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("utilisateur_modifier", args=[autre]), {
+            "first_name": "X", "last_name": "Y", "email": "x@example.com", "role": GESTIONNAIRES,
+        }).status_code, 404)
+        self.assertEqual(self.client.post(reverse("utilisateur_mfa", args=[autre])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("utilisateur_debloquer", args=[autre])).status_code, 404)
+        self.assertTrue(est_administrateur(User.objects.get(pk=autre)))
+
+    def test_dernier_administrateur_compte_par_agence(self):
+        """Les administrateurs d'URBIA ne comptent pas pour l'agence du Canal."""
+        form = UtilisateurForm({
+            "first_name": "A", "last_name": "C", "email": "admin-canal@example.com", "role": GESTIONNAIRES,
+            "is_active": "on",
+        }, instance=self.admin_canal)
+        self.assertFalse(form.is_valid())
+        self.assertIn("dernier administrateur actif", str(form.errors))
+
+    def test_console_django_reservee_au_superutilisateur(self):
+        self.client.force_login(self.admin_urbia)
+        reponse = self.client.get(reverse("admin:index"))
+        self.assertEqual(reponse.status_code, 302)
+        self.assertTrue(reponse["Location"].startswith(reverse("admin:login")))
+        exploitant = User.objects.create_superuser("exploitant", password="x")
+        self.client.force_login(exploitant)
+        self.assertEqual(self.client.get(reverse("admin:index")).status_code, 200)
+
+    def test_superutilisateur_sans_agence(self):
+        """Le superutilisateur exploite la plateforme : il n'a pas d'agence et
+        ne voit les données d'aucune dans l'application."""
+        exploitant = User.objects.create_superuser("exploitant", password="x")
+        self.assertFalse(Membre.objects.filter(utilisateur=exploitant).exists())
+        self.client.force_login(exploitant)
+        for page in (reverse("accueil"), reverse("utilisateurs"), reverse("proprietes:liste")):
+            with self.subTest(page=page):
+                self.assertRedirects(self.client.get(page), reverse("plateforme"))
+        # Redevenu un compte ordinaire, il rejoint une agence.
+        exploitant.is_superuser = False
+        exploitant.save()
+        self.assertEqual(exploitant.membre.organisation, self.urbia)
+
+
+@override_settings(MFA_OBLIGATOIRE=False)
+class PlateformeTests(TestCase):
+    """L'exploitant crée, désactive et suit les agences, sans voir leurs
+    données ; personne d'autre n'entre dans l'espace Plateforme."""
+
+    def setUp(self):
+        self.urbia = Organisation.objects.create(nom="URBIA Immobilier", ville="Toulouse")
+        self.elodie = User.objects.create_user("elodie", password="x")
+        attribuer_role(self.elodie, ADMINISTRATEURS)
+        self.exploitant = User.objects.create_superuser("exploitant", password="x")
+
+    def test_reservee_a_l_exploitant(self):
+        self.client.force_login(self.elodie)
+        for page in (reverse("plateforme"), reverse("plateforme_agence_nouvelle"),
+                     reverse("plateforme_agence", args=[self.urbia.pk])):
+            with self.subTest(page=page):
+                self.assertEqual(self.client.get(page).status_code, 403)
+        self.assertEqual(self.client.post(reverse("plateforme_agence_etat", args=[self.urbia.pk]), {"active": "0"}).status_code, 403)
+        self.assertNotContains(self.client.get(reverse("accueil")), reverse("plateforme"))
+        self.urbia.refresh_from_db()
+        self.assertTrue(self.urbia.active)
+
+    def test_liste_et_fiche(self):
+        self.client.force_login(self.exploitant)
+        liste = self.client.get(reverse("plateforme"))
+        self.assertContains(liste, "URBIA Immobilier")
+        self.assertContains(liste, "1 compte actif")
+        # Son menu ne mène qu'à la Plateforme et à la console, jamais aux données des agences.
+        self.assertNotContains(liste, reverse("proprietes:liste"))
+        self.assertNotContains(liste, reverse("contrats:liste"))
+        fiche = self.client.get(reverse("plateforme_agence", args=[self.urbia.pk]))
+        self.assertContains(fiche, "elodie")
+        self.assertContains(fiche, "Désactiver l'agence")
+
+    def test_creer_une_agence_et_son_administrateur(self):
+        self.client.force_login(self.exploitant)
+        reponse = self.client.post(reverse("plateforme_agence_nouvelle"), {
+            "nom": "Agence des Carmes", "ville": "Toulouse", "prenom": "Claire", "nom_admin": "Dumas",
+            "email": "Claire@Carmes.example",
+        })
+        self.assertEqual(reponse.status_code, 200)
+        mot_de_passe = reponse.context["mot_de_passe"]
+        self.assertContains(reponse, mot_de_passe)
+        carmes = Organisation.objects.get(nom="Agence des Carmes")
+        claire = User.objects.get(username="claire@carmes.example")
+        self.assertEqual(claire.membre.organisation, carmes)
+        self.assertTrue(est_administrateur(claire))
+        self.assertTrue(claire.check_password(mot_de_passe))
+        # Connectée, elle travaille dans sa nouvelle agence et ne voit pas les comptes d'URBIA.
+        self.client.force_login(claire)
+        self.assertContains(self.client.get(reverse("accueil")), "<h1>Agence des Carmes</h1>", html=True)
+        self.assertNotContains(self.client.get(reverse("utilisateurs")), "elodie")
+        # Une adresse déjà prise est refusée.
+        self.client.force_login(self.exploitant)
+        reponse = self.client.post(reverse("plateforme_agence_nouvelle"), {
+            "nom": "Doublon", "prenom": "A", "nom_admin": "B", "email": "claire@carmes.example",
+        })
+        self.assertContains(reponse, "Un compte existe déjà avec cette adresse.")
+        self.assertFalse(Organisation.objects.filter(nom="Doublon").exists())
+
+    def test_desactiver_puis_reactiver(self):
+        self.client.force_login(self.exploitant)
+        self.client.post(reverse("plateforme_agence_etat", args=[self.urbia.pk]), {"active": "0"})
+        self.urbia.refresh_from_db()
+        self.assertFalse(self.urbia.active)
+        # Même déjà connectée, Elodie perd l'accès ; ses données restent.
+        self.client.force_login(self.elodie)
+        self.assertRedirects(self.client.get(reverse("accueil")), f"{reverse('connexion')}?agence=desactivee")
+        self.assertContains(self.client.get(reverse("connexion"), {"agence": "desactivee"}), "suspendu")
+        self.assertEqual(self.client.get(reverse("accueil")).status_code, 302)
+        self.client.force_login(self.exploitant)
+        self.client.post(reverse("plateforme_agence_etat", args=[self.urbia.pk]), {"active": "1"})
+        self.client.force_login(self.elodie)
+        self.assertEqual(self.client.get(reverse("accueil")).status_code, 200)
 
 
 @override_settings(MFA_OBLIGATOIRE=False)
@@ -279,6 +444,55 @@ class OrganisationTests(TestCase):
         Propriete.objects.create(bailleur=sci, adresse="5 rue du Taur", code_postal="31000", ville="Toulouse")
         sans_mandat = next(tache for tache in taches([]) if tache.titre == "Créer le mandat manquant")
         self.assertEqual(sans_mandat.detail, "1 propriété sans mandat en cours")
+
+    def test_parcours_candidature_au_tableau_de_bord(self):
+        """Une candidature enregistrée s'étudie depuis sa fiche (retenir, désistement) ;
+        retenue, son lien part au candidat avant la rédaction du bail."""
+        from candidatures.models import Candidat, Candidature
+
+        from .views import locations_en_cours
+
+        self.connecter(GESTIONNAIRES)
+        sci = Bailleur.objects.create(type="sci_familiale", nom="SCI ESGT")
+        propriete = Propriete.objects.create(
+            bailleur=sci, adresse="3 rue des Lois", code_postal="31000", ville="Toulouse", dernier_loyer=600,
+        )
+        Mandat.depuis_propriete(propriete).save()
+        candidature = Candidature.objects.create(propriete=propriete)
+        Candidat.objects.create(candidature=candidature, nom="Roux", prenom="Lina")
+
+        def ligne():
+            return locations_en_cours()[0]
+
+        self.assertEqual(ligne()["etape"], "Étudier la candidature de Lina ROUX")
+        self.assertEqual(ligne()["lien"], candidature.get_absolute_url())
+        self.assertEqual(ligne()["processus"].courante.libelle, "Candidatures")
+        candidature.decider(Candidature.Statut.RETENUE, None)
+        self.assertEqual(ligne()["etape"], "Envoyer le lien à Lina ROUX")
+        self.assertEqual(ligne()["lien"], f"{candidature.get_absolute_url()}#lien")
+        self.assertEqual(ligne()["processus"].courante.detail, "Lina ROUX · lien à envoyer")
+        fiche = self.client.get(propriete.get_absolute_url())
+        self.assertContains(fiche, "Envoyer le lien à Lina ROUX")
+        self.assertContains(self.client.get(candidature.get_absolute_url()), 'id="lien"')
+        candidature.creer_lien()
+        self.assertEqual(ligne()["etape"], "Rédiger le bail de Lina ROUX")
+        self.assertEqual(ligne()["detail"], "lien envoyé, dossier en attente du candidat")
+        self.assertContains(self.client.get(propriete.get_absolute_url()), "Rédiger le bail de Lina ROUX")
+        # Deux candidatures à l'étude : la liste du logement.
+        candidature.decider(Candidature.Statut.A_ETUDIER, None)
+        Candidature.objects.create(propriete=propriete)
+        self.assertEqual(ligne()["etape"], "Étudier 2 candidatures")
+        # Le bail d'un des candidats signé, les autres candidatures ne font plus revenir le logement.
+        import datetime as dt
+
+        from contrats.models import Bail
+
+        bail = Bail.depuis_propriete(propriete)
+        bail.date_effet, bail.date_signature = dt.date(2026, 11, 1), dt.date(2026, 10, 15)
+        bail.irl_trimestre, bail.irl_valeur = "2e trimestre 2023", "140.59"
+        bail.save()
+        Propriete.objects.filter(pk=propriete.pk).update(mise_en_location_le=None)
+        self.assertEqual(locations_en_cours(), [])
 
     def test_entetes_de_securite(self):
         reponse = self.client.get(reverse("connexion"))

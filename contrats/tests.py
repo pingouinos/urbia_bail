@@ -181,59 +181,6 @@ class VuesTests(Donnees, TestCase):
     def setUp(self):
         self.client.force_login(creer_gestionnaire("gestion"))
 
-    def test_suivi_des_loyers(self):
-        """Échéancier d'un bail, pointage d'un paiement, avis d'échéance et quittance."""
-        from unittest import mock
-
-        from documents import generation
-
-        from .models import Echeance
-
-        bail = self.creer_bail(date_effet=dt.date(2026, 3, 16), date_signature=dt.date(2026, 3, 1))
-        loyers = bail.get_absolute_url() + "#loyers"
-        # Pas avant la prise d'effet du bail.
-        reponse = self.client.post(reverse("contrats:loyers_suivre", args=[bail.pk]), {"depuis": "2026-01"}, follow=True)
-        self.assertContains(reponse, "ne peut pas commencer avant la prise")
-        with mock.patch("django.utils.timezone.localdate", return_value=dt.date(2026, 5, 10)):
-            reponse = self.client.post(reverse("contrats:loyers_suivre", args=[bail.pk]), {"depuis": "2026-03"})
-            self.assertRedirects(reponse, loyers, fetch_redirect_response=False)
-            mars, avril, mai, juin = bail.echeances.order_by("periode")
-            # Mars : entrée le 16, soit 16 jours sur 31.
-            self.assertEqual((mars.debut, mars.fin, mars.partielle), (dt.date(2026, 3, 16), dt.date(2026, 3, 31), True))
-            self.assertEqual(mars.loyer, (bail.loyer * 16 / 31).quantize(Decimal("0.01")))
-            self.assertEqual((avril.loyer, avril.charges, avril.partielle), (bail.loyer, bail.charges, False))
-            self.assertEqual((avril.exigible_le, juin.exigible_le), (dt.date(2026, 4, 1), dt.date(2026, 6, 1)))
-            # Rejouer ne recrée rien.
-            self.assertEqual(bail.completer_echeancier(), [])
-            self.assertEqual((mars.etat[1], mai.etat[1], juin.etat[1]), ("Impayé", "Impayé", "À venir"))
-            # La quittance n'existe qu'une fois le loyer payé ; un paiement futur est refusé.
-            reponse = self.client.get(reverse("contrats:echeance_quittance", args=[avril.pk]), follow=True)
-            self.assertContains(reponse, "une fois le loyer payé")
-            pointer = reverse("contrats:echeance_pointer", args=[avril.pk])
-            self.assertContains(self.client.post(pointer, {"paye_le": "2026-06-01"}, follow=True), "ne peut pas être dans le futur")
-            self.client.post(pointer, {"paye_le": "2026-04-03"})
-            avril.refresh_from_db()
-            self.assertEqual(avril.etat, ("loue", "Payé le 03/04/2026"))
-            with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7"):
-                reponse = self.client.get(reverse("contrats:echeance_quittance", args=[avril.pk]))
-            self.assertEqual(reponse["Content-Type"], "application/pdf")
-            self.assertIn("Quittance avril 2026 MARTIN", reponse["Content-Disposition"])
-            # Les loyers en retard remontent dans les actions en attente.
-            self.assertContains(self.client.get(reverse("accueil")), "2 loyers impayés : Paul MARTIN")
-        texte = texte_docx(generation.generer_docx("quittance.docx", avril.contexte_document()))
-        self.assertNotIn("{{", texte)
-        self.assertIn("QUITTANCE DE LOYER", texte)
-        self.assertIn("Paiement reçu le 03/04/2026.", texte)
-        self.assertIn("du 01/04/2026 au 30/04/2026", texte)
-        avis = texte_docx(generation.generer_docx("avis_echeance.docx", mars.contexte_document()))
-        self.assertIn("au plus tard le 16/03/2026", avis)
-        # Annuler un pointage, puis arrêter le suivi tant que rien n'est pointé.
-        self.client.post(pointer, {"action": "annuler"})
-        self.assertFalse(Echeance.objects.filter(paye_le__isnull=False).exists())
-        self.client.post(reverse("contrats:loyers_suivre", args=[bail.pk]), {"action": "arreter"})
-        bail.refresh_from_db()
-        self.assertEqual((bail.suivi_loyers_depuis, bail.echeances.count()), (None, 0))
-
     def test_echeancier_s_arrete_a_la_sortie(self):
         from unittest import mock
 

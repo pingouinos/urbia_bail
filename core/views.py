@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import connection
-from django.db.models import Exists, Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -23,7 +23,7 @@ from .forms import OrganisationForm, UtilisateurForm
 from .journal import noter
 from .models import Evenement, Organisation
 from .processus import processus_location
-from .taches import de, par_rubrique, taches
+from .taches import ECHEANCES, de, par_rubrique, taches
 
 
 def locations_en_cours():
@@ -33,16 +33,24 @@ def locations_en_cours():
     lignes = {}
 
     def ligne(propriete):
-        return lignes.setdefault(propriete.pk, {"propriete": propriete, "a_etudier": 0, "retenue": None, "a_signer": None, "preavis": None})
+        return lignes.setdefault(propriete.pk, {"propriete": propriete, "a_etudier": 0, "a_etudier_seule": None, "retenue": None, "a_signer": None, "preavis": None})
 
+    # Le logement a déjà son locataire (bail signé, sans congé) : les
+    # candidatures restées à l'étude ne relancent pas sa mise en location.
+    loue = Bail.objects.filter(
+        propriete=OuterRef("propriete"), date_signature__isnull=False,
+        date_fin_effective__isnull=True, conge_recu_le__isnull=True,
+    )
     candidatures = Candidature.objects.filter(
         bail__isnull=True, statut__in=[Candidature.Statut.A_ETUDIER, Candidature.Statut.RETENUE],
-    ).select_related("propriete").prefetch_related("candidats")
+    ).exclude(Exists(loue)).select_related("propriete").prefetch_related("candidats")
     for candidature in candidatures:
         if candidature.statut == Candidature.Statut.RETENUE:
             ligne(candidature.propriete)["retenue"] = candidature
         else:
-            ligne(candidature.propriete)["a_etudier"] += 1
+            l = ligne(candidature.propriete)
+            l["a_etudier"] += 1
+            l["a_etudier_seule"] = candidature if l["a_etudier"] == 1 else None
     baux = Bail.objects.filter(date_fin_effective__isnull=True).filter(
         Q(date_signature__isnull=True) | Q(conge_recu_le__isnull=False)
     ).select_related("propriete").prefetch_related("locataires")
@@ -73,13 +81,26 @@ def locations_en_cours():
             noms = l["a_signer"].noms_locataires
             l["etape"] = f"Faire signer le bail {de(noms)}" if noms else "Faire signer le bail"
             l["action"], l["lien"] = "Ouvrir le bail", l["a_signer"].get_absolute_url()
+        elif l["retenue"] and l["retenue"].lien_a_envoyer:
+            # Le candidat retenu complète d'abord son dossier par son lien :
+            # le bail se rédige ensuite, prérempli.
+            noms = l["retenue"].noms
+            l["etape"] = f"Envoyer le lien à {noms}" if noms else "Envoyer le lien au candidat retenu"
+            l["action"], l["lien"] = "Envoyer le lien", f"{l['retenue'].get_absolute_url()}#lien"
         elif l["retenue"]:
             noms = l["retenue"].noms
             l["etape"] = f"Rédiger le bail {de(noms)}" if noms else "Rédiger le bail"
             l["action"], l["lien"] = "Rédiger le bail", f"{reverse('contrats:creer')}?candidature={l['retenue'].pk}"
+            if not l["retenue"].rempli_le:
+                l["detail"] = "lien envoyé, dossier en attente du candidat"
+        elif l["a_etudier_seule"]:
+            # Une seule candidature : sa fiche, où on la retient ou non.
+            seule = l["a_etudier_seule"]
+            l["etape"] = f"Étudier la candidature {de(seule.noms)}" if seule.noms else "Étudier la candidature"
+            l["action"], l["lien"] = "Étudier", seule.get_absolute_url()
         elif l["a_etudier"]:
             nombre = l["a_etudier"]
-            l["etape"] = f"Étudier {nombre} candidature{'s' if nombre > 1 else ''}"
+            l["etape"] = f"Étudier {nombre} candidatures"
             l["action"], l["lien"] = "Étudier", f"{reverse('candidatures:liste')}?propriete={propriete.pk}&statut=a_etudier"
         elif propriete.a_louer:
             l["etape"] = "Enregistrer une candidature"
@@ -111,6 +132,7 @@ def accueil(request):
         "derniers_baux": Bail.objects.select_related("propriete__bailleur").prefetch_related("locataires").order_by("-modifie_le")[:5],
         "locations": locations, "taches": par_rubrique(a_faire), "nb_taches": len(a_faire),
         "nb_urgentes": sum(tache.urgent for tache in a_faire),
+        "nb_echeances": sum(tache.rubrique == ECHEANCES for tache in a_faire),
         "nb_geres": geres.count(), "nb_inoccupes": inoccupes.count(),
         "nb_sans_bail": inoccupes.filter(baux__isnull=True).count(),
         # Mandats en cours pas encore en gestion : signature ou dossier à finir.
@@ -123,19 +145,27 @@ def _administrateur(request):
         raise PermissionDenied
 
 
+def comptes_agence():
+    """Les comptes de l'agence courante : un administrateur ne voit ni ne
+    touche ceux des autres agences."""
+    return get_user_model().objects.filter(membre__organisation=Organisation.courante())
+
+
 def administration(request):
     """Accueil de l'administration : l'agence, les utilisateurs, les modèles."""
     _administrateur(request)
-    Utilisateur = get_user_model()
+    from documents.regles import registre, resume
+
     return render(request, "core/administration.html", {
+        "regles": resume(registre()),
         "organisation": Organisation.courante(),
-        "nb_utilisateurs": Utilisateur.objects.filter(is_active=True).count(),
+        "nb_utilisateurs": comptes_agence().filter(is_active=True).count(),
     })
 
 
 def utilisateurs(request):
     _administrateur(request)
-    comptes = list(get_user_model().objects.order_by("-is_active", "last_name", "first_name", "username"))
+    comptes = list(comptes_agence().order_by("-is_active", "last_name", "first_name", "username"))
     avec_mfa = set(TOTPDevice.objects.filter(confirmed=True).values_list("user_id", flat=True))
     for compte in comptes:
         compte.administrateur = est_administrateur(compte)
@@ -146,7 +176,7 @@ def utilisateurs(request):
 
 def utilisateur_editer(request, pk=None):
     _administrateur(request)
-    compte = get_object_or_404(get_user_model(), pk=pk) if pk else None
+    compte = get_object_or_404(comptes_agence(), pk=pk) if pk else None
     form = UtilisateurForm(request.POST or None, instance=compte, acteur=request.user)
     if form.is_valid():
         creation = compte is None
@@ -167,7 +197,7 @@ def utilisateur_action(request, pk, action):
     """Dépannage d'un compte : nouvelle double authentification, ou
     déblocage après trop d'essais de mot de passe."""
     _administrateur(request)
-    compte = get_object_or_404(get_user_model(), pk=pk)
+    compte = get_object_or_404(comptes_agence(), pk=pk)
     nom = compte.get_full_name() or compte.username
     if action == "mfa":
         TOTPDevice.objects.filter(user=compte).delete()
@@ -185,7 +215,7 @@ def journal(request):
     """Journal de sécurité : connexions, documents ouverts, exports,
     suppressions, changements de droits. Gardé un an."""
     _administrateur(request)
-    Evenement.objects.filter(date__lt=timezone.now() - timezone.timedelta(days=Evenement.CONSERVATION_JOURS)).delete()
+    Evenement.tous.filter(date__lt=timezone.now() - timezone.timedelta(days=Evenement.CONSERVATION_JOURS)).delete()
     evenements = Evenement.objects.select_related("utilisateur")
     action, q = request.GET.get("action", ""), request.GET.get("q", "").strip()
     if action:

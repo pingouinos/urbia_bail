@@ -22,6 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from contrats.models import Bail
+from core.agence import ParAgence, RattacheAgence
 from core.champs import TelephoneField
 from core.models import Organisation
 from proprietes.models import Bailleur, Propriete, Horodatage
@@ -40,7 +41,7 @@ def valider_lien_dossierfacile(valeur):
         raise ValidationError("Indiquer le lien de partage fourni par DossierFacile.")
 
 
-class Candidature(Horodatage):
+class Candidature(RattacheAgence, Horodatage):
     class Statut(models.TextChoices):
         A_ETUDIER = "a_etudier", "À étudier"
         RETENUE = "retenue", "Retenue"
@@ -185,6 +186,12 @@ class Candidature(Horodatage):
     def lien_valide(self):
         return bool(self.jeton and self.lien_possible and timezone.now() < self.lien_expire_le)
 
+    @property
+    def lien_a_envoyer(self):
+        """Candidat retenu qui n'a ni lien valable ni dossier complété : c'est
+        la prochaine chose à faire avant de rédiger son bail."""
+        return self.lien_possible and not self.lien_valide and not self.rempli_le
+
     def creer_lien(self):
         """Nouveau lien pour le candidat ; l'ancien cesse de fonctionner."""
         self.jeton = secrets.token_urlsafe(32)
@@ -194,7 +201,8 @@ class Candidature(Horodatage):
     @classmethod
     def par_jeton(cls, jeton):
         """Candidature dont le lien est encore valable, ou None."""
-        candidature = cls.objects.select_related("propriete").filter(jeton=jeton).first() if jeton else None
+        # Toutes agences : le lien est ouvert sans connexion, son jeton suffit.
+        candidature = cls.tous.select_related("propriete", "agence").filter(jeton=jeton).first() if jeton else None
         return candidature if candidature and candidature.lien_valide else None
 
     def texte_lien(self, lien, signataire=""):
@@ -262,7 +270,9 @@ class Candidature(Horodatage):
         )
 
 
-class Candidat(models.Model):
+class Candidat(ParAgence):
+    chemins_agence = ("candidature__agence",)
+
     class Situation(models.TextChoices):
         CDI = "cdi", "CDI"
         CDD = "cdd", "CDD"
@@ -310,9 +320,11 @@ class Candidat(models.Model):
         return f"{self.prenom} {self.nom.upper()}"
 
 
-class Garant(models.Model):
+class Garant(ParAgence):
     """Caution personne physique d'un candidat, déclarée par lui dans le
     formulaire reçu par lien. Ses pièces sont dans le dossier DossierFacile."""
+
+    chemins_agence = ("candidat__candidature__agence",)
 
     candidat = models.ForeignKey(Candidat, on_delete=models.CASCADE, related_name="garants")
     civilite = models.CharField("civilité", max_length=5, choices=Bailleur.Civilite.choices, blank=True)

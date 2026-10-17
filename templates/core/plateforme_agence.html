@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titre %}{{ agence.designation }} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'plateforme' %}">Plateforme</a><span aria-hidden="true">›</span><span class="fil-ici">{{ agence.designation }}</span></nav>
+<div class="titre-actions">
+  <h1>{{ agence.designation }}</h1>
+  {% if agence.active %}<span class="pastille pastille-loue">Active</span>{% else %}<span class="pastille pastille-libre">Désactivée</span>{% endif %}
+</div>
+<p class="discret">{{ agence.ville|default:"Ville non renseignée" }} · {{ agence.nb_comptes }} compte{{ agence.nb_comptes|pluralize }} actif{{ agence.nb_comptes|pluralize }} · dernière connexion {{ agence.derniere_connexion|date:"d/m/Y H:i"|default:"jamais" }} · créée le {{ agence.cree_le|date:"d/m/Y" }}</p>
+<section class="carte">
+  <h2>Comptes</h2>
+  {% if comptes %}
+  <table>
+    <thead><tr><th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Dernière connexion</th></tr></thead>
+    <tbody>
+    {% for compte in comptes %}
+      <tr{% if not compte.is_active %} class="inactif"{% endif %}>
+        <td>{{ compte.get_full_name|default:compte.username }}</td>
+        <td>{{ compte.username }}</td>
+        <td>{% if compte.administrateur %}Administrateur{% else %}Gestionnaire{% endif %}{% if not compte.is_active %} <span class="pastille pastille-libre">Désactivé</span>{% endif %}</td>
+        <td>{{ compte.last_login|date:"d/m/Y H:i"|default:"jamais" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="discret">Aucun compte.</p>{% endif %}
+</section>
+<section class="carte">
+  {% if agence.active %}
+  <h2>Désactiver l'agence</h2>
+  <p class="discret">Ses comptes ne pourront plus se connecter, y compris ceux déjà connectés. Ses données restent intactes et la réactivation rend l'accès.</p>
+  <form method="post" action="{% url 'plateforme_agence_etat' agence.pk %}" onsubmit="return confirm('Désactiver {{ agence.designation|escapejs }} ? Ses comptes ne pourront plus se connecter.');">
+    {% csrf_token %}<input type="hidden" name="active" value="0">
+    <button type="submit" class="secondaire">Désactiver l'agence</button>
+  </form>
+  {% else %}
+  <h2>Réactiver l'agence</h2>
+  <p class="discret">Ses comptes actifs retrouvent l'accès à leurs données.</p>
+  <form method="post" action="{% url 'plateforme_agence_etat' agence.pk %}">
+    {% csrf_token %}<input type="hidden" name="active" value="1">
+    <button type="submit" class="bouton-corail">Réactiver l'agence</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

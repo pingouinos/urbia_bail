@@ -153,3 +153,115 @@ class ModelesTests(Donnees, TestCase):
         self.client.force_login(creer_gestionnaire("gestion"))
         self.assertEqual(self.reprendre(modele_mandat()).status_code, 403)
         self.assertEqual(self.client.get(reverse("documents:essai", args=["mandat_gestion.docx"])).status_code, 403)
+
+
+class ReglesTests(TestCase):
+    def setUp(self):
+        dossier = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, dossier)
+        reglage = override_settings(MEDIA_ROOT=dossier)
+        reglage.enable()
+        self.addCleanup(reglage.disable)
+        self.admin = User.objects.create_user("admin", first_name="Élodie")
+        attribuer_role(self.admin, ADMINISTRATEURS)
+        self.client.force_login(self.admin)
+
+    def test_modeles_d_origine_respectent_toutes_les_regles(self):
+        from .regles import A_CORRIGER, registre
+        lignes = [ligne for groupe in registre().values() for ligne in groupe]
+        self.assertEqual([ligne["regle"].libelle for ligne in lignes if ligne["etat"] == A_CORRIGER], [])
+
+    def test_modele_depose_avec_clause_perimee_est_a_corriger(self):
+        from .regles import A_CORRIGER, registre
+        depose = Path(settings.MEDIA_ROOT) / "modeles" / "bail_habitation.docx"
+        depose.parent.mkdir(parents=True)
+        document = Document(MODELES_PAR_DEFAUT / "bail_habitation.docx")
+        document.add_paragraph("Résiliation de plein droit deux mois après un commandement de payer.")
+        document.save(depose)
+        etats = {ligne["regle"].libelle: ligne["etat"] for ligne in registre()["Bail"]}
+        self.assertEqual(etats["Clause résolutoire"], A_CORRIGER)
+        reponse = self.client.get(reverse("administration"))
+        self.assertContains(reponse, "1 à corriger")
+
+    def test_regle_verifiee_il_y_a_plus_d_un_an_est_a_reverifier(self):
+        from datetime import timedelta
+        from .regles import A_REVERIFIER, REGLES, etat
+        regle = REGLES[1]
+        self.assertEqual(etat(regle, {}, regle.verifiee_le + timedelta(days=366))[0], A_REVERIFIER)
+
+    def test_page_reservee_aux_administrateurs(self):
+        self.assertContains(self.client.get(reverse("documents:regles")), "Dépôt de garantie maximal")
+        self.client.force_login(creer_gestionnaire("gestion"))
+        self.assertEqual(self.client.get(reverse("documents:regles")).status_code, 403)
+
+    def test_marquer_un_modele_relu(self):
+        url = reverse("documents:relu", args=["mandat_gestion.docx"])
+        self.client.post(url, {"reference": "  "})
+        self.assertFalse(Modele.objects.filter(relu_le__isnull=False).exists())
+        self.client.post(url, {"reference": "la loi Hoguet et le décret 72-678"})
+        modele = Modele.objects.get(nom="mandat_gestion.docx")
+        self.assertEqual((modele.relu_par, modele.relu_reference), (self.admin, "la loi Hoguet et le décret 72-678"))
+        page = self.client.get(reverse("documents:modeles"))
+        self.assertContains(page, "d'après la loi Hoguet et le décret 72-678")
+        self.assertContains(page, "Pas encore relu")  # le bail
+
+
+class CorrectionTests(TestCase):
+    def setUp(self):
+        dossier = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, dossier)
+        reglage = override_settings(MEDIA_ROOT=dossier)
+        reglage.enable()
+        self.addCleanup(reglage.disable)
+        self.admin = User.objects.create_user("admin", first_name="Élodie")
+        attribuer_role(self.admin, ADMINISTRATEURS)
+        self.client.force_login(self.admin)
+        # Modèle de l'agence déposé avant que la clause ne soit périmée, la
+        # phrase répartie sur deux morceaux de mise en forme.
+        document = Document(MODELES_PAR_DEFAUT / "bail_habitation.docx")
+        paragraphe = document.add_paragraph("Résilié de plein droit deux ")
+        paragraphe.add_run("mois").bold = True
+        paragraphe.add_run(" après un commandement de payer resté sans effet.")
+        self.depose = Path(settings.MEDIA_ROOT) / "modeles" / "bail_habitation.docx"
+        self.depose.parent.mkdir(parents=True)
+        document.save(self.depose)
+        self.page = reverse("documents:corriger", args=["bail_habitation.docx"])
+        self.appliquer = reverse("documents:appliquer_correction", args=["bail_habitation.docx"])
+
+    def test_regle_propose_la_correction(self):
+        self.assertContains(self.client.get(reverse("documents:regles")), self.page)
+        page = self.client.get(self.page)
+        self.assertContains(page, "<del>deux mois après un commandement de payer</del>", html=False)
+        self.assertContains(page, "<ins>six semaines après un commandement de payer</ins>", html=False)
+        self.assertContains(page, "disabled")
+
+    def test_mise_en_service_exige_l_essai(self):
+        self.client.post(self.appliquer)
+        self.assertIn("deux mois après", texte_docx(self.depose.read_bytes()))
+        self.client.get(reverse("documents:essai_correction", args=["bail_habitation.docx"]))
+        self.assertNotContains(self.client.get(self.page), "disabled")
+        self.client.post(self.appliquer)
+        texte = texte_docx(self.depose.read_bytes())
+        self.assertIn("Résilié de plein droit six semaines après un commandement de payer resté sans effet.", texte)
+        self.assertNotIn("deux mois après", texte)
+        modele = Modele.objects.get(nom="bail_habitation.docx")
+        self.assertEqual(modele.relu_par, self.admin)
+        self.assertIn("six semaines", modele.relu_reference)
+        precedent = Path(settings.MEDIA_ROOT) / "modeles" / "precedent" / "bail_habitation.docx"
+        self.assertIn("deux mois après", texte_docx(precedent.read_bytes()))
+
+    def test_essai_perime_si_le_modele_change(self):
+        self.client.get(reverse("documents:essai_correction", args=["bail_habitation.docx"]))
+        document = Document(self.depose)
+        document.add_paragraph("Ajout de l'agence.")
+        document.save(self.depose)
+        self.client.post(self.appliquer)
+        self.assertIn("deux mois après", texte_docx(self.depose.read_bytes()))
+
+    def test_sans_clause_perimee_rien_a_corriger(self):
+        self.depose.unlink()
+        self.assertRedirects(self.client.get(self.page), reverse("documents:regles"))
+
+    def test_reserve_aux_administrateurs(self):
+        self.client.force_login(creer_gestionnaire("gestion"))
+        self.assertEqual(self.client.get(self.page).status_code, 403)

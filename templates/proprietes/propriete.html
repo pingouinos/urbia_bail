@@ -88,6 +88,9 @@
   <div class="actions-location">
     {% if situation.a_venir %}
       <a class="bouton" href="{{ situation.a_venir.get_absolute_url }}">{% if situation.a_venir.date_signature %}Ouvrir le bail{% else %}Faire signer le bail{% endif %}</a>
+    {% elif retenue and retenue.lien_a_envoyer %}
+      <a class="bouton" href="{{ retenue.get_absolute_url }}#lien">Envoyer le lien à {{ retenue.noms|default:"la candidature retenue" }}</a>
+      <a class="bouton secondaire" href="{% url 'contrats:creer' %}?candidature={{ retenue.pk }}">Rédiger le bail</a>
     {% elif retenue %}
       <a class="bouton" href="{% url 'contrats:creer' %}?candidature={{ retenue.pk }}">Rédiger le bail de {{ retenue.noms|default:"la candidature retenue" }}</a>
       {% if propriete.est_habitation %}<a class="bouton secondaire" href="{% url 'candidatures:creer' %}?propriete={{ propriete.pk }}">Enregistrer une candidature</a>{% endif %}
@@ -125,7 +128,7 @@
     <dl>
       <dt>Classe DPE</dt><dd>{{ propriete.get_classe_dpe_display|default:"—" }}{% if propriete.date_dpe %} ({{ propriete.date_dpe }}){% endif %}{% if piece_dpe %} · <a href="{% url 'proprietes:piece' piece_dpe.pk %}" target="_blank" rel="noopener">ouvrir le DPE</a>{% if piece_dpe.perime %} <span class="pastille pastille-libre">Périmé</span>{% endif %}{% else %} · <a href="?onglet=documents">déposer le DPE</a>{% endif %}</dd>
       <dt>Dépenses d'énergie</dt><dd>{% if propriete.depenses_energie_min %}{{ propriete.depenses_energie_min }} à {{ propriete.depenses_energie_max }} € par an{% else %}—{% endif %}</dd>
-      <dt>Zone tendue</dt><dd>{{ propriete.zone_tendue|yesno:"oui,non" }}</dd>
+      <dt>Zone tendue</dt><dd>{{ propriete.zone_tendue|yesno:"oui,non" }}{% with commune=propriete.commune_officielle %}<br><span class="discret">{% if commune %}{{ commune.nom }} {% if propriete.zone_tendue %}figure{% else %}ne figure pas{% endif %} sur la liste officielle{% else %}Saisie à la main : commune introuvable dans la liste officielle{% endif %}</span>{% endwith %}</dd>
       <dt>Dernier loyer HC</dt><dd>{% if propriete.dernier_loyer %}{{ propriete.dernier_loyer }} €{% else %}—{% endif %}</dd>
       <dt>Charges</dt><dd>{% if propriete.charges %}{{ propriete.charges }} €{% else %}—{% endif %}</dd>
       {% if propriete.dispositif_fiscal %}<dt>Dispositif fiscal</dt><dd>{{ propriete.dispositif_fiscal }}</dd>{% endif %}

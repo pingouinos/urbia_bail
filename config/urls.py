@@ -6,7 +6,7 @@ from django.views.generic import RedirectView
 
 from candidatures import views as candidatures_views
 from comptes import views as comptes_views
-from core import views
+from core import plateforme, views
 
 admin.site.site_header = f"{settings.NOM_APPLICATION} · administration"
 admin.site.site_title = settings.NOM_APPLICATION
@@ -23,6 +23,11 @@ urlpatterns = [
     path("administration/utilisateurs/<int:pk>/mfa/", views.utilisateur_action, {"action": "mfa"}, name="utilisateur_mfa"),
     path("administration/utilisateurs/<int:pk>/debloquer/", views.utilisateur_action, {"action": "debloquer"},
          name="utilisateur_debloquer"),
+    # Espace de l'exploitant (superutilisateur) : les agences, jamais leurs données.
+    path("plateforme/", plateforme.plateforme, name="plateforme"),
+    path("plateforme/agences/nouvelle/", plateforme.agence_nouvelle, name="plateforme_agence_nouvelle"),
+    path("plateforme/agences/<int:pk>/", plateforme.agence_fiche, name="plateforme_agence"),
+    path("plateforme/agences/<int:pk>/etat/", plateforme.agence_etat, name="plateforme_agence_etat"),
     path("agence/", RedirectView.as_view(pattern_name="agence")),
     path("logo-agence/", views.logo_agence, name="logo_agence"),
     path("proprietes/", include("proprietes.urls")),

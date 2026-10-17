@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("contrats", "0011_durcissement"),
+        ("contrats", "0015_agence_obligatoire"),
     ]
 
     operations = [

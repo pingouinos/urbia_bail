@@ -45,9 +45,17 @@ def noter(request, action, objet="", detail="", identifiant=""):
     ip = adresse_ip(request) if request is not None else ""
     journal.info("%s | %s | %s | %s | %s", action, identifiant or "-", ip or "-", objet, detail)
     try:
-        Evenement.objects.create(
-            utilisateur=utilisateur, identifiant=identifiant[:150], ip=ip, action=action[:40],
+        # `tous` : la ligne s'écrit aussi pour un visiteur sans agence (connexion refusée).
+        Evenement.tous.create(
+            agence=_agence(utilisateur), utilisateur=utilisateur, identifiant=identifiant[:150], ip=ip, action=action[:40],
             objet=str(objet)[:200], detail=str(detail)[:300],
         )
     except Exception:  # la base indisponible ne doit pas bloquer l'utilisateur
         journal.exception("Événement non enregistré : %s", action)
+
+
+def _agence(utilisateur):
+    from .agence import agence_active
+
+    membre = getattr(utilisateur, "membre", None) if utilisateur is not None else None
+    return membre.organisation if membre else agence_active()

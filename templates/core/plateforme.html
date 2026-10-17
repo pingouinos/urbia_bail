@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titre %}Plateforme · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<div class="titre-actions">
+  <h1>Plateforme</h1>
+  <div class="actions"><a class="bouton-petit bouton-corail" href="{% url 'plateforme_agence_nouvelle' %}">+ Nouvelle agence</a></div>
+</div>
+<p class="discret">{{ agences|length }} agence{{ agences|length|pluralize }}, dont {{ nb_actives }} active{{ nb_actives|pluralize }} · {{ nb_comptes }} compte{{ nb_comptes|pluralize }} actif{{ nb_comptes|pluralize }}</p>
+<table>
+  <thead><tr><th>Agence</th><th>Ville</th><th>Comptes actifs</th><th>Dernière connexion</th><th>État</th></tr></thead>
+  <tbody>
+  {% for agence in agences %}
+    <tr{% if not agence.active %} class="inactif"{% endif %}>
+      <td><a href="{% url 'plateforme_agence' agence.pk %}">{{ agence.designation }}</a></td>
+      <td>{{ agence.ville|default:"—" }}</td>
+      <td>{{ agence.nb_comptes }}</td>
+      <td>{{ agence.derniere_connexion|date:"d/m/Y H:i"|default:"jamais" }}</td>
+      <td>{% if agence.active %}<span class="pastille pastille-loue">Active</span>{% else %}<span class="pastille pastille-libre">Désactivée</span>{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" class="discret">Aucune agence pour l'instant.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="discret">Dépannage technique : <a href="{% url 'admin:index' %}">console Django</a>, à n'utiliser que pour une intervention sur les données.</p>
+{% endblock %}
