@@ -1,14 +1,18 @@
 """Carnet des contacts : une fiche par personne ou entreprise."""
 
 from django.contrib import messages
+from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
 from core.journal import noter
-from proprietes.models import Bailleur, Propriete
+from proprietes.forms import ImportForm
+from proprietes.models import Propriete
+from proprietes.views import XLSX, garder_import, reprendre_import
 
+from . import tableur
 from .forms import ContactForm
 from .models import Contact, normaliser
 
@@ -62,30 +66,8 @@ def contact_editer(request, pk=None):
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
             objet = form.save()
-            if objet.categorie == Contact.Categorie.BAILLEUR and not objet.bailleurs.exists():
-                # Un propriétaire a aussi sa fiche de bailleur, à laquelle se
-                # rattachent ses propriétés et ses mandats.
-                Bailleur.objects.create(
-                    type=Bailleur.Type.PERSONNE_MORALE if objet.entreprise else Bailleur.Type.PERSONNE_PHYSIQUE,
-                    civilite=objet.civilite, nom=objet.nom, prenom=objet.prenom, adresse=objet.adresse,
-                    code_postal=objet.code_postal, ville=objet.ville, email=objet.email, telephone=objet.telephone,
-                )
-            else:
-                # L'identité et les coordonnées à jour suivent sur la fiche du bailleur.
-                for bailleur in objet.bailleurs.all():
-                    for champ in ("civilite", "nom", "prenom", "email", "telephone", "adresse", "code_postal", "ville"):
-                        setattr(bailleur, champ, getattr(objet, champ))
-                    # La nature choisie ici vaut aussi pour la fiche du bailleur ; sans cela, son
-                    # type (société ou personne) reprendrait le dessus à l'enregistrement.
-                    if objet.entreprise and not bailleur.societe:
-                        bailleur.type = Bailleur.Type.PERSONNE_MORALE
-                    elif not objet.entreprise and bailleur.societe:
-                        bailleur.type = Bailleur.Type.PERSONNE_PHYSIQUE
-                        bailleur.representant_civilite = bailleur.representant_nom = ""
-                        bailleur.representant_prenom = bailleur.representant_qualite = bailleur.siren = ""
-                        bailleur.associes.all().delete()
-                    bailleur.save()
-                Contact.effacer_orphelins()
+            objet.reporter_sur_bailleurs()
+            Contact.effacer_orphelins()
         messages.success(request, "Contact enregistré.")
         return redirect(objet)
     return render(request, "contacts/contact_form.html", {
@@ -106,4 +88,47 @@ def supprimer(request, pk):
     objet.delete()
     noter(request, "suppression", f"Contact · {nom}")
     messages.success(request, f"Contact supprimé : {nom}.")
+    return redirect("contacts:liste")
+
+
+CLE_SESSION_IMPORT = "import_contacts"
+
+
+def modele(request):
+    reponse = HttpResponse(tableur.classeur(), content_type=XLSX)
+    reponse["Content-Disposition"] = 'attachment; filename="modele-contacts-urbia-gestion.xlsx"'
+    return reponse
+
+
+def importer(request):
+    """Étape 1 : dépôt du fichier et vérification, sans rien enregistrer."""
+    form = ImportForm(request.POST or None, request.FILES or None)
+    rapport = None
+    if form.is_valid():
+        fichier = form.cleaned_data["fichier"]
+        contenu = fichier.read()
+        try:
+            rapport = tableur.importer(fichier.name, contenu, simulation=True)
+        except Exception:  # fichier illisible ou corrompu
+            form.add_error("fichier", "Impossible de lire ce fichier. Vérifiez qu'il s'agit bien d'un .xlsx ou d'un .csv.")
+        else:
+            garder_import(request, CLE_SESSION_IMPORT, fichier, contenu)
+    return render(request, "contacts/import.html", {"form": form, "rapport": rapport})
+
+
+@require_POST
+def importer_confirmer(request):
+    """Étape 2 : import réel du fichier vérifié juste avant."""
+    depot = reprendre_import(request, CLE_SESSION_IMPORT)
+    if depot is None:
+        messages.error(request, "Aucun fichier en attente : déposez-le à nouveau.")
+        return redirect("contacts:importer")
+    nom, contenu = depot
+    rapport = tableur.importer(nom, contenu)
+    noter(request, "import", nom, f"{rapport.crees} contacts créés, {rapport.completes} complétés")
+    messages.success(
+        request,
+        f"Import terminé : {rapport.crees} contact(s) créé(s), {rapport.completes} complété(s), "
+        f"{len(rapport.erreurs)} ligne(s) ignorée(s).",
+    )
     return redirect("contacts:liste")

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block titre %}Importer des contacts · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'contacts:liste' %}">Contacts</a><span aria-hidden="true">›</span><span class="fil-ici">Importer</span></nav>
+<h1>Importer des contacts</h1>
+{% if not rapport %}
+<section class="carte">
+  <p>Partez du <a href="{% url 'contacts:modele' %}">modèle Excel</a> : une ligne par personne ou entreprise, avec sa catégorie (propriétaire, locataire ou garant). Un contact déjà au carnet (même nom et même prénom) est complété ; une cellule vide n'efface rien.</p>
+  <p>Le fichier est d'abord vérifié sans rien enregistrer ; vous confirmez ensuite l'import.</p>
+  <form method="post" enctype="multipart/form-data" class="formulaire">
+    {% csrf_token %}
+    {% with champ=form.fichier %}{% include "proprietes/_champ.html" %}{% endwith %}
+    <button type="submit">Vérifier le fichier</button>
+  </form>
+</section>
+{% else %}
+<section class="carte">
+  <h2>Résultat de la vérification</h2>
+  <ul>
+    <li>{{ rapport.crees }} contact(s) à créer</li>
+    <li>{{ rapport.completes }} contact(s) déjà connus, à compléter</li>
+    <li>{{ rapport.erreurs|length }} ligne(s) en erreur, qui seront ignorées</li>
+  </ul>
+  {% if rapport.colonnes_ignorees %}<p class="discret">Colonnes non reconnues, ignorées : {{ rapport.colonnes_ignorees|join:", " }}.</p>{% endif %}
+  {% if rapport.erreurs %}
+  <table>
+    <thead><tr><th>Ligne</th><th>Problème</th></tr></thead>
+    <tbody>{% for ligne, message in rapport.erreurs %}<tr><td>{{ ligne }}</td><td>{{ message }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+  {% if rapport.total %}
+  <form method="post" action="{% url 'contacts:importer_confirmer' %}">
+    {% csrf_token %}
+    <button type="submit">Importer {{ rapport.total }} contact(s)</button>
+  </form>
+  {% endif %}
+  <p><a href="{% url 'contacts:importer' %}">Déposer un autre fichier</a></p>
+</section>
+{% endif %}
+{% endblock %}
