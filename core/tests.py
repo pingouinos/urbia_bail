@@ -387,7 +387,11 @@ class OrganisationTests(TestCase):
             (parc["geres"], parc["loues"], parc["preavis"], parc["libres"], parc["sans_bail"]), (5, 1, 1, 3, 1),
         )
         self.assertEqual(parc["prochain_depart"], depart)
-        self.assertEqual((parc["part_loues"], parc["part_preavis"]), (20, 20))
+        self.assertEqual(parc["part_loues"], 20)
+        self.assertEqual(
+            [(part["code"], part["nombre"], part["libelle"]) for part in parc["barre"]],
+            [("loue", 1, "loué"), ("preavis", 1, "préavis"), ("libre", 2, "libres"), ("sans-bail", 1, "sans bail")],
+        )
         page = self.client.get(reverse("accueil"))
         self.assertContains(page, "dont 1 sans bail enregistré")
         self.assertContains(page, f"premier départ le {depart:%d/%m}")

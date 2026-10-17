@@ -145,10 +145,22 @@ def accueil(request):
         "prochain_depart": Bail.objects.filter(
             propriete__in=en_preavis, conge_recu_le__isnull=False, date_depart_prevue__gte=timezone.localdate(),
         ).order_by("date_depart_prevue").values_list("date_depart_prevue", flat=True).first(),
-        # Parts de la barre d'occupation, en pourcentage.
         "part_loues": round(100 * nb_loues / nb_geres) if nb_geres else 0,
-        "part_preavis": round(100 * nb_preavis / nb_geres) if nb_geres else 0,
     }
+    # Barre d'occupation et sa légende : seules les situations présentes. Les
+    # biens sans bail enregistré sont à part (gris) : souvent loués par un bail
+    # pas encore saisi, ils ne sont pas forcément libres.
+    nb_sans_bail = parc["sans_bail"]
+    parc["barre"] = [
+        {"code": code, "nombre": nombre, "libelle": libelle, "part": 100 * nombre / nb_geres}
+        for code, nombre, libelle in (
+            ("loue", nb_loues, f"loué{'s' if nb_loues > 1 else ''}"),
+            ("preavis", nb_preavis, "préavis"),
+            ("libre", nb_libres - nb_sans_bail, f"libre{'s' if nb_libres - nb_sans_bail > 1 else ''}"),
+            ("sans-bail", nb_sans_bail, "sans bail"),
+        )
+        if nombre
+    ]
     return render(request, "core/accueil.html", {
         "est_admin": est_admin,
         "agence_manquants": Organisation.courante().manquants if est_admin else [],
