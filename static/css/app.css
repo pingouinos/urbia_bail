@@ -572,6 +572,12 @@ button.secondaire.bouton-danger[type=submit]:hover { background: var(--erreur-cl
 .puce b { font-variant-numeric: tabular-nums; }
 .puce-ok { border-color: var(--vert); background: var(--vert-clair); }
 .puce-retard { border-color: #f3c3bf; background: var(--erreur-clair); color: var(--erreur); }
+/* Le parc (biens gérés, inoccupés) en gris, à part des actions à faire. */
+.puce-parc { border-color: var(--bord); background: #eef0f5; color: var(--texte); }
+a.puce-parc:hover { border-color: var(--corail); color: var(--texte); }
+.puce .discret { font-weight: 400; }
+.puces-separateur { width: 1px; margin: 2px 4px; background: #fbd9cb; }
+@media (max-width: 520px) { .puces-separateur { display: none; } }
 .titre-compte { display: flex; align-items: center; gap: 8px; }
 .lignes-taches { margin: 0; padding: 0; list-style: none; }
 .lignes-taches > li + li { border-top: 1px solid var(--bord); }

@@ -15,7 +15,6 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from contrats.models import Bail
 from candidatures.models import Candidature
 from contacts.models import Contact
 from core.fichiers import servir
@@ -28,7 +27,7 @@ from .forms import (
     AssociesForms, BailleurForm, ImmeubleForm, ImportForm, LotFormSet, LotsCommunsForm, MiseEnLocationForm,
     NouveauBailleurForm, PieceForm, ProprieteForm,
 )
-from .models import Bailleur, Immeuble, Piece, Propriete
+from .models import Bailleur, Immeuble, Piece, Propriete, baux_en_place
 
 # Ce qu'un nouveau lot reprend d'un lot déjà saisi dans le même immeuble.
 COMMUNS_IMMEUBLE = (
@@ -68,10 +67,7 @@ def _proprietes_filtres(request):
         proprietes = proprietes.filter(~Exists(Mandat.objects.filter(propriete=OuterRef("pk"), date_fin__isnull=True)))
     situation = request.GET.get("situation")
     if situation in dict(SITUATIONS):
-        aujourd_hui = timezone.localdate()
-        en_place = Bail.objects.filter(propriete=OuterRef("pk"), date_effet__lte=aujourd_hui).filter(
-            Q(date_fin_effective__isnull=True) | Q(date_fin_effective__gt=aujourd_hui)
-        )
+        en_place = baux_en_place()
         if situation == "a_louer":
             proprietes = proprietes.filter(mise_en_location_le__isnull=False)
         elif situation == "libre":
