@@ -6,8 +6,8 @@ from .models import Bailleur, Propriete
 
 @admin.register(Bailleur)
 class BailleurAdmin(SimpleHistoryAdmin):
-    list_display = ["nom", "prenom", "type", "ref_ics", "ville"]
-    search_fields = ["nom", "prenom", "ref_ics"]
+    list_display = ["nom", "prenom", "type", "ville"]
+    search_fields = ["nom", "prenom", "email"]
 
 
 @admin.register(Propriete)

@@ -16,7 +16,7 @@ import tempfile
 from .models import Bailleur, Immeuble, Piece, Propriete
 
 ENTETES = [
-    "N° de lot", "Réf. ICS bailleur", "Type de bailleur", "Bailleur (nom ou raison sociale)",
+    "N° de lot", "Type de bailleur", "Bailleur (nom ou raison sociale)",
     "Bailleur prénom", "Usage", "Adresse", "Complément", "Code postal", "Ville",
     "Surface (m²)", "Pièces principales", "Classe DPE", "Zone tendue", "Date DPE",
 ]
@@ -24,7 +24,7 @@ ENTETES = [
 
 def ligne(ref="L001", **autres):
     valeurs = {
-        "N° de lot": ref, "Réf. ICS bailleur": "B01", "Type de bailleur": "Personne physique",
+        "N° de lot": ref, "Type de bailleur": "Personne physique",
         "Bailleur (nom ou raison sociale)": "Durand", "Bailleur prénom": "Anne",
         "Usage": "Habitation", "Adresse": "12 rue des Lois", "Complément": "Bât. A, 2e étage",
         "Code postal": "31000", "Ville": "Toulouse", "Surface (m²)": 45.5,
@@ -53,13 +53,13 @@ class ImportTests(TestCase):
         self.assertEqual(propriete.classe_dpe, "D")
         self.assertTrue(propriete.zone_tendue)
         self.assertEqual(str(propriete.date_dpe), "2024-03-15")
-        self.assertEqual(propriete.bailleur.ref_ics, "B01")
+        self.assertEqual(propriete.bailleur.nom, "Durand")
 
-    def test_import_sans_reference_ics(self):
-        """La référence ICS est facultative : le lot se retrouve alors par
+    def test_import_sans_numero_de_lot(self):
+        """Le n° de lot est facultatif : le lot se retrouve alors par
         son adresse, son complément et son code postal."""
         rapport = tableur.importer("proprietes.xlsx", xlsx(
-            ligne(None), ligne(None, **{"Complément": "Bât. B", "Réf. ICS bailleur": None})))
+            ligne(None), ligne(None, **{"Complément": "Bât. B"})))
         self.assertEqual((rapport.erreurs, rapport.crees), ([], 2))
         self.assertEqual(Propriete.objects.filter(numero_lot__isnull=True).count(), 2)
         rapport = tableur.importer("proprietes.xlsx", xlsx(ligne(None, **{"Classe DPE": "C"})))
@@ -69,6 +69,14 @@ class ImportTests(TestCase):
         rapport = tableur.importer("proprietes.xlsx", xlsx(ligne("L001")))
         self.assertEqual((rapport.crees, rapport.mis_a_jour), (0, 1))
         self.assertEqual(Propriete.objects.get(numero_lot="L001").complement, "Bât. A, 2e étage")
+
+    def test_ancienne_colonne_ref_ics_bailleur_ignoree(self):
+        """Un fichier préparé avec l'ancienne colonne « Réf. ICS bailleur »
+        s'importe toujours : la colonne est simplement ignorée."""
+        entetes = [*ENTETES, "Réf. ICS bailleur"]
+        rapport = tableur.importer("proprietes.xlsx", xlsx([*ligne("L001"), "0033"], entetes=entetes))
+        self.assertEqual((rapport.crees, rapport.erreurs), (1, []))
+        self.assertEqual(Bailleur.objects.get().nom, "Durand")
 
     def test_ancienne_colonne_ref_ics_lot(self):
         """Un fichier préparé avant le renommage garde sa colonne « Réf. ICS lot »."""
@@ -125,7 +133,7 @@ class ImportTests(TestCase):
     def test_bailleur_retrouve_par_nom_sans_reference(self):
         Bailleur.objects.create(nom="Martin", prenom="Paul")
         tableur.importer("proprietes.xlsx", xlsx(ligne(**{
-            "Réf. ICS bailleur": None, "Bailleur (nom ou raison sociale)": "MARTIN", "Bailleur prénom": "paul",
+            "Bailleur (nom ou raison sociale)": "MARTIN", "Bailleur prénom": "paul",
         })))
         self.assertEqual(Bailleur.objects.count(), 1)
 
@@ -208,7 +216,7 @@ class VuesTests(TestCase):
         for nom in ("Durand", "Martin"):
             reponse = self.client.post(reverse("proprietes:bailleur_creer"), {"type": "physique", "nom": nom})
             self.assertEqual(reponse.status_code, 302)
-        self.assertEqual(Bailleur.objects.filter(ref_ics__isnull=True).count(), 2)
+        self.assertEqual(Bailleur.objects.count(), 2)
 
         bailleur = Bailleur.objects.first()
         reponse = self.client.post(reverse("proprietes:propriete_creer"), {

@@ -94,9 +94,6 @@ class Bailleur(RattacheAgence, Horodatage):
     )
     conjoint_nom = models.CharField("nom du conjoint ou co-propriétaire", max_length=200, blank=True)
     conjoint_prenom = models.CharField("prénom du conjoint", max_length=100, blank=True)
-    ref_ics = models.CharField(
-        "référence ICS", max_length=50, null=True, blank=True
-    )
     adresse = models.CharField(max_length=255, blank=True)
     code_postal = models.CharField("code postal", max_length=10, blank=True)
     ville = models.CharField(max_length=100, blank=True)
@@ -132,10 +129,6 @@ class Bailleur(RattacheAgence, Horodatage):
     class Meta:
         ordering = ["nom", "prenom"]
         verbose_name = "bailleur"
-        constraints = [models.UniqueConstraint(
-            fields=["agence", "ref_ics"], name="bailleur_ref_ics_par_agence",
-            violation_error_message="Un bailleur porte déjà cette référence ICS.",
-        )]
 
     @property
     def societe(self):
