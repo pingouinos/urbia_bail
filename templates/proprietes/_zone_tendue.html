@@ -1,0 +1,7 @@
+{# Zone tendue : déduite de la commune pendant la saisie (static/js/zone_tendue.js). La case ne sert que si la commune est introuvable. #}
+<div class="champ pleine-largeur zone-tendue{% if champ.errors %} en-erreur{% endif %}" data-zone-tendue="{% url 'proprietes:zone_tendue' %}">
+  <p class="message" data-zone-deduite hidden><strong data-zone-titre></strong><br><span class="discret" data-zone-detail></span></p>
+  <p class="message alerte-fond" data-zone-inconnue hidden><strong>Commune introuvable dans la liste officielle.</strong><br>Vérifiez l'orthographe de la ville, ou indiquez vous-même :</p>
+  <label class="case" data-zone-case>{{ champ }} {{ champ.label }}</label>
+  {% for erreur in champ.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
+</div>

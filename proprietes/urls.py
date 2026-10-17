@@ -26,6 +26,7 @@ urlpatterns = [
     path("bailleurs/<int:pk>/supprimer/", views.bailleur_supprimer, name="bailleur_supprimer"),
     path("import/", views.importer, name="importer"),
     path("import/confirmer/", views.importer_confirmer, name="importer_confirmer"),
+    path("zone-tendue/", views.zone_tendue, name="zone_tendue"),
     path("modele.xlsx", views.modele, name="modele"),
     path("export.xlsx", views.exporter, name="exporter"),
 ]
