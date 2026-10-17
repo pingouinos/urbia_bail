@@ -607,8 +607,9 @@ button.secondaire.bouton-danger[type=submit]:hover { background: var(--erreur-cl
 .parc-loue { background: var(--vert); }
 .parc-preavis { background: var(--melon); }
 .parc-libre { background: var(--corail); }
-/* La part restante de la barre, en corail, est celle des biens libres. */
-.barre-parc { display: flex; height: 6px; margin-top: 6px; border-radius: 3px; overflow: hidden; background: var(--corail); }
+/* Biens sans bail enregistré : en gris, ils ne sont pas forcément libres. */
+.parc-sans-bail { background: #d5d8e2; }
+.barre-parc { display: flex; height: 6px; margin-top: 6px; border-radius: 3px; overflow: hidden; background: var(--bord); }
 .barre-parc i { display: block; }
 .tuiles-parc + .carte { margin-top: 16px; }
 @media (max-width: 760px) {
