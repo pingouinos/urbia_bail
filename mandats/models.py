@@ -297,6 +297,33 @@ class Mandat(Contrat):
         return [str(self._meta.get_field(champ).verbose_name) for champ in self.A_COMPLETER
                 if getattr(self, champ) in (None, "")]
 
+    HONORAIRES = ["honoraires_bail_bailleur", "honoraires_bail_locataire",
+                  "honoraires_edl_bailleur", "honoraires_edl_locataire"]
+
+    def reprendre_propriete(self):
+        """Avant la signature, ce que la fiche du bien apprend après coup
+        (surface, loyer) complète le mandat, sans rien écraser : les
+        honoraires s'il sont tous à zéro, la désignation et le loyer s'ils
+        sont vides."""
+        if self.signe or not self.en_cours:
+            return
+        propriete, champs = self.propriete, []
+        plafonds = plafonds_locataire(propriete)
+        if plafonds and not any(getattr(self, champ) for champ in self.HONORAIRES):
+            bail, edl = (plafond.quantize(Decimal("0.01")) for plafond in plafonds)
+            for champ, valeur in zip(self.HONORAIRES, (bail, bail, edl, edl)):
+                setattr(self, champ, valeur)
+            champs += self.HONORAIRES
+        if not self.designation and propriete.surface:
+            self.designation = propriete.designation
+            champs.append("designation")
+        if self.loyer_cc is None and propriete.dernier_loyer:
+            self.loyer_cc = propriete.dernier_loyer + (propriete.charges or 0)
+            self.charges = propriete.charges or 0
+            champs += ["loyer_cc", "charges"]
+        if champs:
+            self.save(update_fields=[*champs, "modifie_le"])
+
     def reprendre_mandant(self):
         """Avant la signature, le mandat suit la fiche du bailleur."""
         if self.signe:
