@@ -84,7 +84,7 @@ Pour une correction urgente, sans attendre la nuit (une fois l'image publiée pa
 cd /srv/clefaria && ./maj.sh
 ```
 
-`https://app.clefaria.fr/sante/` donne la version en ligne : les 7 premiers caractères du commit et sa date. `journalctl -u clefaria-maj` liste les passages du minuteur. Les mises à jour de sécurité d'Ubuntu s'installent seules.
+`maj.sh` se renouvelle seul : chaque nouvelle image porte sa dernière version. `https://app.clefaria.fr/sante/` donne la version en ligne : les 7 premiers caractères du commit et sa date. `journalctl -u clefaria-maj` liste les passages du minuteur. Les mises à jour de sécurité d'Ubuntu s'installent seules.
 
 Pour être prévenu si l'application ne répond plus (après une mise à jour ratée ou une panne), créer une sonde gratuite chez un service de surveillance (UptimeRobot par exemple) sur `https://app.clefaria.fr/sante/`, avec alerte par e-mail.
 

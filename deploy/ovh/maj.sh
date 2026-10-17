@@ -48,7 +48,18 @@ fi
 avant="$(docker inspect -f '{{.Image}}' "$(docker compose ps -q web)" 2> /dev/null || true)"
 echo "1/4 Téléchargement de la nouvelle version…"
 docker compose pull --quiet
-attendue="$(docker image inspect -f '{{.Id}}' "$(docker compose config --images | grep clefaria-loc | head -1)")"
+image="$(docker compose config --images | grep clefaria-loc | head -1)"
+# Ce script se tient à jour : la nouvelle image en porte la dernière version.
+if [ -z "${MAJ_RELANCE:-}" ] \
+  && docker run --rm --entrypoint cat "$image" /app/deploy/ovh/maj.sh > maj.sh.nouveau 2> /dev/null \
+  && [ -s maj.sh.nouveau ] && ! cmp -s maj.sh.nouveau maj.sh; then
+  chmod +x maj.sh.nouveau
+  mv maj.sh.nouveau maj.sh
+  echo "Script de mise à jour renouvelé, relance."
+  MAJ_RELANCE=1 exec ./maj.sh "$@"
+fi
+rm -f maj.sh.nouveau
+attendue="$(docker image inspect -f '{{.Id}}' "$image")"
 if [ "${1:-}" = "--auto" ] && [ "$avant" = "$attendue" ]; then
   echo "Déjà à jour."
   exit 0
