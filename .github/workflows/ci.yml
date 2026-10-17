@@ -55,7 +55,7 @@ jobs:
           import datetime as dt
           from decimal import Decimal
           from contrats.models import Bail, Locataire
-          from documents.generation import convertir_pdf, generer_docx
+          from documents.generation import convertir_pdf, generer_html
           from mandats.models import Mandat
           from proprietes.models import Bailleur, Propriete
           bailleur = Bailleur.objects.create(civilite='M.', nom='Essai', prenom='Jean', adresse='1 rue de la Paix',
@@ -71,8 +71,8 @@ jobs:
           bail.date_effet, bail.irl_trimestre, bail.irl_valeur = dt.date(2026, 11, 1), '2e trimestre 2026', Decimal('146.68')
           bail.save()
           Locataire.objects.create(bail=bail, civilite='Mme', nom='Martin', prenom='Julie')
-          for nom, objet, modele in [('mandat', mandat, 'mandat_gestion.docx'), ('bail', bail, 'bail_habitation.docx')]:
-              pdf = convertir_pdf(generer_docx(modele, objet.contexte_document()))
+          for nom, objet, modele in [('mandat', mandat, 'mandat_gestion'), ('bail', bail, 'bail_habitation')]:
+              pdf = convertir_pdf(generer_html(modele, objet.contexte_document()).encode('utf-8'))
               assert pdf.startswith(b'%PDF'), pdf[:200]
               open(f'/tmp/{nom}.pdf', 'wb').write(pdf)
               print(nom, len(pdf), 'octets')

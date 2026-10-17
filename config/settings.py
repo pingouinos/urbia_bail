@@ -179,7 +179,7 @@ CSRF_COOKIE_SAMESITE = "Lax"
 LIMITE_FORMULAIRE_PUBLIC = 0 if "test" in sys.argv else env.int("LIMITE_FORMULAIRE_PUBLIC", default=40)
 SESSION_COOKIE_AGE = 60 * 60 * 10  # une journée de travail
 
-# Service de conversion Word vers PDF (utilisé à l'étape « Baux »).
+# Service d'impression des documents en PDF (Gotenberg).
 GOTENBERG_URL = env("GOTENBERG_URL", default="http://gotenberg:3000")
 
 # Envoi des e-mails (réponses aux candidats). Sans EMAIL_URL, l'application

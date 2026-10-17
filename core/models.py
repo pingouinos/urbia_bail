@@ -129,7 +129,7 @@ class Organisation(Horodatage):
         return [str(self._meta.get_field(champ).verbose_name) for champ in champs if not getattr(self, champ)]
 
     def contexte_document(self):
-        """Valeurs de l'agence pour les modèles Word, sous {{ agence.… }}."""
+        """Valeurs de l'agence pour les modèles des documents (données « agence · … »)."""
         from documents.generation import montant
 
         return {

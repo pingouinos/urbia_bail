@@ -21,7 +21,7 @@ from .models import Evenement, Organisation
 
 # Ce qui n'appartient à aucune agence : les agences elles-mêmes, les indices
 # publiés par l'INSEE, la liste officielle des communes en zone tendue, et
-# les modèles Word (rattachés en PR 4).
+# les modèles des documents (rattachés en PR 4).
 COMMUNS = {"Organisation", "Membre", "IndiceIRL", "Commune", "ListeCommunes", "Modele"}
 APPLICATIONS = {"proprietes", "contacts", "contrats", "mandats", "candidatures", "documents", "core"}
 
@@ -35,7 +35,7 @@ class CloisonnementTests(Donnees, TestCase):
             self.lea = creer_gestionnaire("lea")
             remplir_agence()
             self.propriete_canal = self.creer_propriete(adresse="3 quai de Brienne")
-            self.bail_canal = self.creer_bail(self.propriete_canal, locataires=("Garnier",))
+            self.bail_canal = self.creer_bail(self.propriete_canal, locataires=("Garnier",), sans_mandat=True)
             self.mandat_canal = Mandat.depuis_propriete(self.propriete_canal)
             self.mandat_canal.conclusion = Mandat.Conclusion.AGENCE
             self.mandat_canal.save()
@@ -70,7 +70,7 @@ class CloisonnementTests(Donnees, TestCase):
             reverse("proprietes:propriete_modifier", args=[self.propriete_canal.pk]),
             reverse("proprietes:bailleur", args=[self.propriete_canal.bailleur.pk]),
             reverse("contrats:bail", args=[self.bail_canal.pk]),
-            reverse("contrats:word", args=[self.bail_canal.pk]),
+            reverse("contrats:pdf", args=[self.bail_canal.pk]),
             reverse("mandats:mandat", args=[self.mandat_canal.pk]),
             reverse("candidatures:candidature", args=[self.candidature_canal.pk]),
             reverse("contacts:contact", args=[self.contact_canal.pk]),

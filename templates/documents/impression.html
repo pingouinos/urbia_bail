@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>{{ titre }}</title>
+<style>
+  @page { size: A4; margin: 16mm 16mm 24mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font-family: "Noto Sans", "DejaVu Sans", Arial, sans-serif; font-size: 9.5pt; line-height: 1.42; color: #24283a; }
+  .entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 12mm; border-bottom: 2px solid #f8756e; padding-bottom: 3mm; margin-bottom: 6mm; }
+  .entete img { max-height: 22mm; max-width: 62mm; }
+  .entete .nom { font-size: 14pt; font-weight: 700; color: #3c425e; }
+  .coordonnees { text-align: right; color: #3c425e; font-size: 8.5pt; line-height: 1.35; }
+  .corps p { margin: 0 0 3pt; text-align: justify; }
+  .corps p:empty::before { content: "\00a0"; }
+  .corps h2 { color: #3c425e; background: #fff1eb; border-left: 3px solid #f8756e; padding: 3pt 6pt; font-size: 10.5pt; margin: 11pt 0 5pt; break-after: avoid; }
+  .corps h3 { color: #3c425e; font-size: 9.5pt; margin: 8pt 0 3pt; text-decoration: underline; text-decoration-color: #f8756e; text-underline-offset: 2pt; break-after: avoid; }
+  .corps hr { break-after: page; border: 0; margin: 0; height: 0; }
+  .corps ul, .corps ol { margin: 2pt 0 5pt; padding-left: 16pt; }
+  .corps li p { margin: 0 0 2pt; }
+  .corps table { border-collapse: collapse; width: 100%; margin: 4pt 0 8pt; }
+  .corps tr { break-inside: avoid; }
+  .corps td, .corps th { border: 0.6pt solid #b9b6c3; padding: 2.5pt 5pt; vertical-align: top; }
+  .corps td p { text-align: left; margin: 0; }
+  .corps table[data-bordure="non"] td { border: 0; width: 50%; padding: 0 0 2pt; }
+  .corps strong { color: #24283a; }
+</style>
+</head>
+<body>
+<header class="entete">
+  {% if logo %}<img src="{{ logo }}" alt="{{ agence.nom }}">{% else %}<span class="nom">{{ agence.nom|upper }}</span>{% endif %}
+  <div class="coordonnees">
+    {% if logo %}<strong>{{ agence.nom|upper }}</strong><br>{% endif %}
+    {{ agence.adresse }}<br>
+    {{ agence.code_postal }} {{ agence.ville|upper }}
+    {% if agence.telephone %}<br>Tél. {{ agence.telephone }}{% endif %}
+    {% if agence.email %}<br>{{ agence.email }}{% endif %}
+    {% if agence.carte_pro %}<br>Carte professionnelle {{ agence.carte_pro }}{% endif %}
+  </div>
+</header>
+<main class="corps">
+{{ corps|safe }}
+</main>
+<template id="pied-de-page"><div style="width: 100%; margin: 0 16mm; font-family: 'Noto Sans', 'DejaVu Sans', Arial, sans-serif; font-size: 7.5pt; color: #3c425e; border-top: 0.6pt solid #f8756e; padding-top: 2mm; -webkit-print-color-adjust: exact;">
+  <div style="display: flex; justify-content: space-between;"><span>Paraphes : ________ / ________</span><span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span></div>
+  {% if agence.raison_sociale or agence.siren %}<div style="margin-top: 1mm; color: #666b80; font-size: 6.5pt; text-align: center;">{{ agence.raison_sociale|default:agence.nom }}{% if agence.forme_juridique %} – {{ agence.forme_juridique }}{% endif %}{% if agence.capital %} au capital de {{ agence.capital }} €{% endif %}{% if agence.siren %} – {{ agence.siren }} R.C.S. {{ agence.rcs_ville|upper }}{% endif %} – siège : {{ agence.adresse }}, {{ agence.code_postal }} {{ agence.ville|upper }}</div>{% endif %}
+</div></template>
+</body>
+</html>

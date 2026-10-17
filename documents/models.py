@@ -7,8 +7,8 @@ from core.agence import ParAgence
 
 
 class Modele(models.Model):
-    """État d'un modèle Word : d'où vient la version en service, et le Google
-    Doc dont l'agence le reprend."""
+    """État d'un modèle de document : d'où vient la version en service et sa
+    relecture. Le lien Google Doc date des modèles Word (plus utilisé)."""
 
     class Origine(models.TextChoices):
         ORIGINE = "origine", "Modèle d'origine"
@@ -73,6 +73,11 @@ class VersionContrat(ParAgence):
             condition=(Q(bail__isnull=False, mandat__isnull=True) | Q(bail__isnull=True, mandat__isnull=False)),
             name="archive_un_seul_contrat",
         )]
+
+    @property
+    def est_word(self):
+        """Archive d'avant le passage des modèles au HTML."""
+        return bytes(self.docx).startswith(b"PK")
 
     def save(self, *args, **kwargs):
         if not self._state.adding:

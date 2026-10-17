@@ -1,48 +1,79 @@
-"""Production des documents à partir des modèles Word de l'agence.
+"""Production des documents à partir des modèles HTML de l'agence.
 
-Les modèles sont des fichiers .docx ordinaires dans lesquels les parties
-variables sont écrites entre doubles accolades ({{ mandant }}), comme le
-permet docxtpl. Le PDF est obtenu en confiant le .docx à Gotenberg
-(LibreOffice dans un conteneur à part).
+Un modèle est un fragment HTML restreint (voir ``gabarits``) dont les parties
+variables sont des données nommées. Le document rempli est une page HTML
+complète, mise en page aux couleurs de l'agence (logo, coordonnées, pied de
+page), que Gotenberg imprime en PDF A4 avec Chromium. Les anciennes archives
+Word restent converties par LibreOffice.
 """
 
+import base64
+import html
 import io
 import logging
 import re
 import struct
 import time
 import uuid
-import zipfile
 import urllib.error
 import urllib.request
+import zipfile
 from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
-from docxtpl import DocxTemplate
-from jinja2.sandbox import SandboxedEnvironment
+from django.contrib.staticfiles import finders
+from django.template.loader import render_to_string
+
+from . import gabarits
 
 journal = logging.getLogger(__name__)
 
 MODELES_PAR_DEFAUT = Path(__file__).resolve().parent / "modeles"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+HTML = "text/html"
 
 
 class ConversionImpossible(Exception):
     """La conversion en PDF a échoué ; le message dit pourquoi, en clair."""
 
 
+def fichier(nom):
+    return f"{nom}.html"
+
+
+def convertir_ancien(chemin):
+    """Un modèle Word déposé avant le passage au HTML (``chemin`` en .html,
+    son ancien fichier en .docx à côté) est converti une fois ; le Word est
+    gardé à côté sous un autre nom. Sans conversion possible, il reste."""
+    ancien = chemin.with_suffix(".docx")
+    if chemin.exists() or not ancien.exists():
+        return
+    try:
+        contenu = gabarits.depuis_docx(ancien.read_bytes())
+    except Exception:
+        journal.exception("Conversion impossible de l'ancien modèle Word %s", ancien)
+        return
+    chemin.write_text(contenu, encoding="utf-8")
+    ancien.rename(ancien.with_suffix(".docx.avant-html"))
+
+
 def chemin_modele(nom):
-    """Modèle déposé par un administrateur s'il existe, sinon celui livré
-    avec l'application."""
-    depose = Path(settings.MEDIA_ROOT) / "modeles" / nom
-    return depose if depose.exists() else MODELES_PAR_DEFAUT / nom
+    """Modèle mis en service par un administrateur s'il existe, sinon celui
+    livré avec l'application."""
+    depose = Path(settings.MEDIA_ROOT) / "modeles" / fichier(nom)
+    convertir_ancien(depose)
+    return depose if depose.exists() else MODELES_PAR_DEFAUT / fichier(nom)
+
+
+def lire_modele(nom):
+    return chemin_modele(nom).read_text(encoding="utf-8")
 
 
 # Clauses que la loi a rendues fausses : un modèle qui les contient encore ne
 # sert plus à produire un contrat.
 CLAUSES_PERIMEES = {
-    "bail_habitation.docx": {
+    "bail_habitation": {
         "deux mois après un commandement de payer": (
             "La clause résolutoire du modèle de bail prévoit encore « deux mois après un commandement de "
             "payer » : c'est six semaines depuis la loi du 27 juillet 2023 (article 24 de la loi du "
@@ -55,77 +86,45 @@ CLAUSES_PERIMEES = {
 # Correction validée de chaque clause périmée, proposée à l'administrateur
 # depuis la page Règles légales (jamais appliquée sans son clic).
 REMPLACEMENTS = {
-    "bail_habitation.docx": {
+    "bail_habitation": {
         "deux mois après un commandement de payer": "six semaines après un commandement de payer",
     },
 }
 
 
-def _paragraphes(document):
-    """Paragraphes du corps et des tableaux, imbriqués compris."""
-    def parcourir(conteneur):
-        yield from conteneur.paragraphs
-        for tableau in getattr(conteneur, "tables", []):
-            for ligne in tableau.rows:
-                for cellule in ligne.cells:
-                    yield from parcourir(cellule)
-    yield from parcourir(document)
-
-
-def _remplacer(paragraphe, extrait, remplacement):
-    """Remplace la première occurrence de l'extrait dans le paragraphe, même
-    répartie sur plusieurs morceaux de mise en forme : le remplacement prend
-    la mise en forme du morceau où commence l'extrait."""
-    morceaux = paragraphe.runs
-    texte = "".join(morceau.text for morceau in morceaux)
-    debut = texte.find(extrait)
-    if debut < 0:
-        return False
-    fin, position = debut + len(extrait), 0
-    for morceau in morceaux:
-        longueur = len(morceau.text)
-        a, b = max(debut - position, 0), min(fin - position, longueur)
-        if a < b:
-            premier = position <= debut
-            morceau.text = morceau.text[:a] + (remplacement if premier else "") + morceau.text[b:]
-        position += longueur
-    return True
-
-
 def corriger_modele(nom, contenu=None):
-    """(contenu corrigé, [(avant, après)]) : le modèle en service avec les
-    clauses périmées remplacées par leur correction validée ; liste vide si
-    rien n'est à corriger."""
-    from docx import Document
-
-    remplacements = REMPLACEMENTS.get(nom, {})
+    """(contenu corrigé, [(extrait, remplacement, avant, après)]) : le modèle
+    en service avec les clauses périmées remplacées par leur correction
+    validée ; liste vide si rien n'est à corriger."""
     if contenu is None:
-        contenu = chemin_modele(nom).read_bytes()
-    document = Document(io.BytesIO(contenu))
-    changements = []
-    for paragraphe in _paragraphes(document):
-        for extrait, remplacement in remplacements.items():
-            avant = paragraphe.text
-            if extrait in avant and _remplacer(paragraphe, extrait, remplacement):
-                changements.append((extrait, remplacement, avant, paragraphe.text))
-    if not changements:
-        return contenu, []
-    flux = io.BytesIO()
-    document.save(flux)
-    return flux.getvalue(), changements
+        contenu = lire_modele(nom)
+    corrige, changements = gabarits.remplacer(contenu, REMPLACEMENTS.get(nom, {}))
+    return (corrige, changements) if changements else (contenu, [])
 
 
 def texte_docx(contenu):
-    """Texte brut du corps d'un .docx, paragraphe par paragraphe."""
+    """Texte brut du corps d'un .docx (anciennes archives), paragraphe par paragraphe."""
     with zipfile.ZipFile(io.BytesIO(contenu)) as archive:
         xml = archive.read("word/document.xml").decode("utf-8")
     paragraphes = re.findall(r"<w:p[ >].*?</w:p>", xml, flags=re.S)
     return "\n".join("".join(re.findall(r"<w:t(?: [^>]*)?>([^<]*)</w:t>", p)) for p in paragraphes)
 
 
+def texte_document(contenu):
+    """Texte lisible d'un document rempli (page HTML), un bloc par ligne."""
+    if isinstance(contenu, bytes):
+        contenu = contenu.decode("utf-8")
+    corps = re.sub(r"<(template|style|head)\b.*?</\1>", "", contenu, flags=re.S)
+    corps = re.sub(r"<br\s*/?>", "\n", corps)
+    corps = re.sub(r"</(p|h1|h2|h3|li|td|th|div)>", "\n", corps)
+    # Les espaces insécables du texte (« Adresse du bien : ») sont gardées.
+    lignes = html.unescape(re.sub(r"<[^>]+>", "", corps)).splitlines()
+    return "\n".join(re.sub(r"[ \t\r\f\v]+", " ", ligne).strip(" ") for ligne in lignes if ligne.strip())
+
+
 # Balises sans lesquelles le document omet une mention obligatoire.
 BALISES_REQUISES = {
-    "mandat_gestion.docx": {
+    "mandat_gestion": {
         "retractation": "le droit de rétractation du mandant particulier",
         "formulaire_retractation": "le formulaire de rétractation",
         "agence.mediateur": "le médiateur de la consommation",
@@ -141,17 +140,17 @@ def defauts_modele(nom, contenu=None):
     if not clauses and not balises:
         return []
     if contenu is None:
-        contenu = chemin_modele(nom).read_bytes()
+        contenu = lire_modele(nom)
     try:
-        texte = " ".join(texte_docx(contenu).split())
-    except (KeyError, zipfile.BadZipFile):
+        texte = " ".join(gabarits.texte(gabarits.nettoyer(contenu)).split())
+    except gabarits.ModeleInvalide:
         return []
     defauts = [message for extrait, message in clauses.items() if extrait in texte]
     absentes = [libelle for balise, libelle in balises.items()
-                if not re.search(r"[{%]\s*p?\s*(if|for \w+ in)?\s*" + re.escape(balise) + r"\b", texte)]
+                if not re.search(r"[{%]\s*(if|for \w+ in)?\s*" + re.escape(balise) + r"\b", texte)]
     if absentes:
         defauts.append(
-            "Le modèle ne contient pas " + ", ni ".join(absentes) + " : reprendre ces balises du modèle "
+            "Le modèle ne contient pas " + ", ni ".join(absentes) + " : reprendre ces données du modèle "
             "d'origine dans « Modèles des documents »."
         )
     return defauts
@@ -166,24 +165,44 @@ def montant(valeur):
     return texte.replace(",", " ").replace(".", ",")
 
 
-def remplir(document, contexte):
-    """Remplit les balises d'un modèle dans un environnement Jinja protégé :
-    un modèle venu d'un Google Doc ou d'un fichier déposé ne peut ni atteindre
-    les rouages de Python ni exécuter de code sur le serveur."""
-    document.render(contexte, jinja_env=SandboxedEnvironment(), autoescape=True)
+def logo_agence():
+    """Logo de la fiche agence en adresse data: (PNG ou JPEG), sinon le logo
+    URBIA livré avec l'application pour l'agence URBIA, sinon rien."""
+    from core.models import Organisation
+
+    organisation = Organisation.courante()
+    image = b""
+    if organisation.logo:
+        try:
+            with organisation.logo.open("rb") as contenu:
+                image = contenu.read()
+        except OSError:
+            image = b""
+    if dimensions_image(image) is None:
+        image = b""
+        if "urbia" in (organisation.nom or "").lower():
+            chemin = finders.find("img/logo-urbia-gestion.png")
+            image = Path(chemin).read_bytes() if chemin else b""
+    dimensions = dimensions_image(image)
+    if dimensions is None:
+        return ""
+    return f"data:image/{dimensions[0]};base64,{base64.b64encode(image).decode()}"
 
 
-def generer_docx(nom_modele, contexte, source=None):
-    document = DocxTemplate(io.BytesIO(source) if source is not None else chemin_modele(nom_modele))
-    remplir(document, contexte)
-    flux = io.BytesIO()
-    document.save(flux)
-    return placer_logo(flux.getvalue())
+def generer_html(nom_modele, contexte, source=None):
+    """Page HTML complète du document : le modèle (celui en service, ou
+    ``source``) rempli, dans la mise en page d'impression. Ses octets sont
+    ce qu'archive un contrat préparé."""
+    corps = gabarits.remplir(source if source is not None else lire_modele(nom_modele), contexte)
+    return render_to_string("documents/impression.html", {
+        "corps": corps, "agence": contexte.get("agence") or {}, "logo": logo_agence(),
+        "titre": nom_modele.replace("_", " "),
+    })
 
 
 def dimensions_image(contenu):
-    """(type, largeur, hauteur) d'une image PNG ou JPEG, ou None : ce sont les
-    deux formats qu'un document Word sait afficher partout."""
+    """(type, largeur, hauteur) d'une image PNG ou JPEG, ou None : les deux
+    formats que tous les lecteurs de PDF affichent."""
     if contenu.startswith(b"\x89PNG\r\n\x1a\n") and len(contenu) >= 24:
         return "png", *struct.unpack(">II", contenu[16:24])
     if contenu.startswith(b"\xff\xd8"):
@@ -198,111 +217,45 @@ def dimensions_image(contenu):
     return None
 
 
-EMPLACEMENT = re.compile(r'<wp:docPr[^>]*(?:descr|title)="logo"', re.I)
+PIED = re.compile(rb'<template id="pied-de-page">(.*?)</template>', re.S)
 
 
-def retirer_emplacement(contenu_docx):
-    """Sans logo d'agence, retire de l'en-tête l'image d'emplacement (celle
-    dont le texte de remplacement est « logo »). Un vrai logo placé dans un
-    modèle sans ce texte de remplacement est laissé tel quel."""
-    with zipfile.ZipFile(io.BytesIO(contenu_docx)) as source:
-        parties = {nom: source.read(nom) for nom in source.namelist()}
-    retire = False
-    for nom in [n for n in parties if re.fullmatch(r"word/header\d*\.xml", n)]:
-        xml = parties[nom].decode("utf-8")
-        nouveau = re.sub(
-            r"<w:drawing>.*?</w:drawing>", lambda d: "" if EMPLACEMENT.search(d.group(0)) else d.group(0), xml, flags=re.S,
-        )
-        if nouveau != xml:
-            parties[nom], retire = nouveau.encode("utf-8"), True
-    if not retire:
-        return contenu_docx
-    sortie = io.BytesIO()
-    with zipfile.ZipFile(sortie, "w", zipfile.ZIP_DEFLATED) as cible:
-        for nom, donnees in parties.items():
-            cible.writestr(nom, donnees)
-    return sortie.getvalue()
-
-
-def placer_logo(contenu_docx):
-    """Remplace le logo de l'en-tête par celui que l'agence a déposé sur sa
-    fiche. L'emplacement du logo dans un modèle est l'image dont le texte de
-    remplacement est « logo » (les modèles livrés portent une image neutre
-    marquée LOGO), sinon la première image de l'en-tête. Le logo garde la
-    place prévue par le modèle, sans être déformé."""
-    from core.models import Organisation
-
-    logo, image, dimensions = Organisation.courante().logo, b"", None
-    if logo:
-        try:
-            with logo.open("rb") as fichier:
-                image = fichier.read()
-        except OSError:
-            image = b""
-        dimensions = dimensions_image(image)
-    if dimensions is None or not all(dimensions[1:]):
-        # Pas de logo utilisable : l'image d'emplacement ne doit pas s'imprimer.
-        return retirer_emplacement(contenu_docx)
-    extension, largeur, hauteur = dimensions
-    media = f"media/logo-agence.{extension}"
-    sortie = io.BytesIO()
-    with zipfile.ZipFile(io.BytesIO(contenu_docx)) as source, zipfile.ZipFile(sortie, "w", zipfile.ZIP_DEFLATED) as cible:
-        parties = {nom: source.read(nom) for nom in source.namelist()}
-        place = False
-        for nom in [n for n in parties if re.fullmatch(r"word/header\d*\.xml", n)]:
-            liens = f"word/_rels/{nom[5:]}.rels"
-            if liens not in parties:
-                continue
-            xml = parties[nom].decode("utf-8")
-            images = [d for d in re.finditer(r"<w:drawing>.*?</w:drawing>", xml, re.S) if "r:embed=" in d.group(0)]
-            choisie = next((d for d in images if EMPLACEMENT.search(d.group(0))), images[0] if images else None)
-            if choisie is None:
-                continue
-            dessin = choisie.group(0)
-            identifiant = re.search(r'r:embed="([^"]+)"', dessin).group(1)
-            cadre = re.search(r'<wp:extent cx="(\d+)" cy="(\d+)"', dessin)
-            if cadre:
-                # Le logo tient dans le cadre du modèle en gardant ses proportions.
-                cx, cy = int(cadre.group(1)), int(cadre.group(2))
-                echelle = min(cx / largeur, cy / hauteur)
-                taille = f'cx="{round(largeur * echelle)}" cy="{round(hauteur * echelle)}"'
-                dessin = re.sub(r'(<(?:wp:extent|a:ext)) cx="\d+" cy="\d+"', rf"\1 {taille}", dessin)
-            parties[nom] = (xml[:choisie.start()] + dessin + xml[choisie.end():]).encode("utf-8")
-            relations = parties[liens].decode("utf-8")
-            relations = re.sub(
-                rf'(<Relationship\b[^>]*\bId="{re.escape(identifiant)}"[^>]*?)\bTarget="[^"]*"', rf'\1Target="{media}"', relations,
-            )
-            relations = re.sub(
-                rf'(<Relationship\b[^>]*?)\bTarget="[^"]*"([^>]*\bId="{re.escape(identifiant)}")', rf'\1Target="{media}"\2', relations,
-            )
-            parties[liens] = relations.encode("utf-8")
-            place = True
-        if not place:
-            return contenu_docx
-        parties[f"word/{media}"] = image
-        types = parties["[Content_Types].xml"].decode("utf-8")
-        if f'Extension="{extension}"' not in types:
-            types = types.replace("<Default ", f'<Default Extension="{extension}" ContentType="image/{extension}"/><Default ', 1)
-            parties["[Content_Types].xml"] = types.encode("utf-8")
-        for nom, donnees in parties.items():
-            cible.writestr(nom, donnees)
-    return sortie.getvalue()
-
-
-def convertir_pdf(contenu_docx, nom="document.docx"):
+def _formulaire(fichiers, champs=()):
     frontiere = uuid.uuid4().hex
-    corps = (
-        f"--{frontiere}\r\n"
-        f'Content-Disposition: form-data; name="files"; filename="{nom}"\r\n'
-        f"Content-Type: {DOCX}\r\n\r\n"
-    ).encode() + contenu_docx + f"\r\n--{frontiere}--\r\n".encode()
+    corps = b""
+    for nom, valeur in champs:
+        corps += (f"--{frontiere}\r\nContent-Disposition: form-data; name=\"{nom}\"\r\n\r\n{valeur}\r\n").encode()
+    for nom, type_, contenu in fichiers:
+        corps += (
+            f"--{frontiere}\r\n"
+            f'Content-Disposition: form-data; name="files"; filename="{nom}"\r\n'
+            f"Content-Type: {type_}\r\n\r\n"
+        ).encode() + contenu + b"\r\n"
+    return corps + f"--{frontiere}--\r\n".encode(), frontiere
+
+
+def convertir_pdf(contenu, nom="document"):
+    """PDF d'un document : une page HTML (imprimée par Chromium, avec son
+    pied de page sur chaque feuille) ou une ancienne archive Word
+    (LibreOffice)."""
+    if contenu.startswith(b"PK"):
+        corps, frontiere = _formulaire([(f"{Path(nom).stem}.docx", DOCX, contenu)])
+        route = "/forms/libreoffice/convert"
+    else:
+        fichiers = [("index.html", HTML, contenu)]
+        pied = PIED.search(contenu)
+        if pied:
+            fichiers.append(("footer.html", HTML, b"<!doctype html><html><head><meta charset=\"utf-8\"></head><body>"
+                             + pied.group(1) + b"</body></html>"))
+        corps, frontiere = _formulaire(fichiers, [("preferCssPageSize", "true"), ("printBackground", "true")])
+        route = "/forms/chromium/convert/html"
     requete = urllib.request.Request(
-        f"{settings.GOTENBERG_URL}/forms/libreoffice/convert",
+        f"{settings.GOTENBERG_URL}{route}",
         data=corps,
         headers={"Content-Type": f"multipart/form-data; boundary={frontiere}"},
         method="POST",
     )
-    # Une seconde tentative si LibreOffice n'était pas encore prêt (erreur 503).
+    # Une seconde tentative si le service n'était pas encore prêt (erreur 503).
     for tentative in (1, 2):
         try:
             with urllib.request.urlopen(requete, timeout=60) as reponse:

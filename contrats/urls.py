@@ -23,7 +23,6 @@ urlpatterns = [
     path("<int:pk>/revision/", views.reviser, name="reviser"),
     path("<int:pk>/assurance/", views.assurance, name="assurance"),
     path("<int:pk>/supprimer/", views.supprimer, name="supprimer"),
-    path("<int:pk>/bail.docx", views.telecharger, {"format_": "docx"}, name="word"),
     path("<int:pk>/bail.pdf", views.telecharger, {"format_": "pdf"}, name="pdf"),
     path("<int:pk>/signe/", views.deposer_signe, name="deposer_signe"),
     path("<int:pk>/signe/fichier", views.fichier_signe, name="fichier_signe"),
