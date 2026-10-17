@@ -88,6 +88,9 @@
   <div class="actions-location">
     {% if situation.a_venir %}
       <a class="bouton" href="{{ situation.a_venir.get_absolute_url }}">{% if situation.a_venir.date_signature %}Ouvrir le bail{% else %}Faire signer le bail{% endif %}</a>
+    {% elif retenue and retenue.lien_a_envoyer %}
+      <a class="bouton" href="{{ retenue.get_absolute_url }}#lien">Envoyer le lien à {{ retenue.noms|default:"la candidature retenue" }}</a>
+      <a class="bouton secondaire" href="{% url 'contrats:creer' %}?candidature={{ retenue.pk }}">Rédiger le bail</a>
     {% elif retenue %}
       <a class="bouton" href="{% url 'contrats:creer' %}?candidature={{ retenue.pk }}">Rédiger le bail de {{ retenue.noms|default:"la candidature retenue" }}</a>
       {% if propriete.est_habitation %}<a class="bouton secondaire" href="{% url 'candidatures:creer' %}?propriete={{ propriete.pk }}">Enregistrer une candidature</a>{% endif %}
