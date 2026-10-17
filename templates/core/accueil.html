@@ -19,10 +19,11 @@
 
 {% if parc.geres %}{% url 'proprietes:liste' as biens %}
 <section class="tuiles-parc" aria-label="Le parc">
-  <a class="tuile-parc" href="{{ biens }}">
+  <a class="tuile-parc tuile-parc-geres" href="{{ biens }}">
     <span class="tuile-chiffre">{{ parc.geres }}</span>
     <span class="tuile-libelle">Bien{{ parc.geres|pluralize }} géré{{ parc.geres|pluralize }}</span>
-    <span class="barre-parc" role="img" aria-label="{{ parc.loues }} loués, {{ parc.preavis }} en préavis, {{ parc.libres }} libres"><i class="parc-loue" style="width: {{ parc.part_loues }}%"></i><i class="parc-preavis" style="width: {{ parc.part_preavis }}%"></i></span>
+    <span class="camembert-parc" style="background: {{ parc.camembert }}" aria-hidden="true"></span>
+    <span class="legende-parc">{% for part in parc.barre %}<span><i class="parc-pastille parc-{{ part.code }}" aria-hidden="true"></i>{{ part.nombre }} {{ part.libelle }}</span>{% endfor %}</span>
     {% if parc.sans_mandat %}<span class="discret">dont {{ parc.sans_mandat }} sans mandat</span>{% endif %}
   </a>
   <a class="tuile-parc" href="{{ biens }}?situation=loue">
