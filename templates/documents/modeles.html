@@ -8,7 +8,7 @@
     <thead><tr><th>Modèle</th><th>État légal</th><th>Relecture</th><th><span class="masque">Action</span></th></tr></thead>
     <tbody>{% for modele in modeles %}<tr>
       <td><a href="{% url 'documents:modele' modele.nom %}"><strong>{{ modele.libelle }}</strong></a><br><span class="discret">{% if modele.etat.mis_en_service_le %}{{ modele.etat.get_origine_display }}, le {{ modele.etat.mis_en_service_le|date:"d/m/Y" }}{% elif modele.personnalise %}Modèle déposé par l'agence{% else %}Modèle d'origine{% endif %}</span></td>
-      <td>{% if modele.legal.a_corriger %}<span class="pastille pastille-a_corriger">À corriger</span><br><span class="discret">{{ modele.legal.raison }}</span>{% else %}<span class="pastille pastille-a_jour">Conforme</span>{% endif %}</td>
+      <td>{% if modele.legal.a_corriger %}<span class="pastille pastille-a_corriger">À corriger</span><br><span class="discret">{{ modele.legal.raison }}</span>{% else %}<span class="pastille pastille-a_jour">Contrôles OK</span>{% endif %}</td>
       <td class="nombre">{% if modele.a_relire %}<span class="pastille pastille-a_reverifier">À relire</span>{% if modele.etat.relu_le %}<br><span class="discret">dernière le {{ modele.etat.relu_le|date:"d/m/Y" }}</span>{% endif %}{% else %}{{ modele.etat.relu_le|date:"d/m/Y" }}{% if modele.etat.relu_par %}, {{ modele.etat.relu_par.get_full_name|default:modele.etat.relu_par.username }}{% endif %}{% endif %}</td>
       <td><a class="bouton{% if not modele.legal.a_corriger %} secondaire{% endif %}" href="{% url 'documents:modele' modele.nom %}">{% if modele.legal.a_corriger %}Corriger{% else %}Ouvrir{% endif %}</a></td>
     </tr>{% endfor %}</tbody>
