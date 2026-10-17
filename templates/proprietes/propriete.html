@@ -93,7 +93,7 @@
       <a class="bouton secondaire" href="{% url 'contrats:creer' %}?candidature={{ retenue.pk }}">Rédiger le bail</a>
     {% elif retenue %}
       <a class="bouton" href="{% url 'contrats:creer' %}?candidature={{ retenue.pk }}">Rédiger le bail de {{ retenue.noms|default:"la candidature retenue" }}</a>
-      {% if propriete.est_habitation %}<a class="bouton secondaire" href="{% url 'candidatures:creer' %}?propriete={{ propriete.pk }}">Enregistrer une candidature</a>{% endif %}
+      {% if propriete.est_habitation and not fermeture %}<a class="bouton secondaire" href="{% url 'candidatures:creer' %}?propriete={{ propriete.pk }}">Enregistrer une candidature</a>{% endif %}
     {% elif not mandat %}
       <a class="bouton" href="{% url 'mandats:creer' %}?propriete={{ propriete.pk }}">Créer le mandat</a>
       {% if not propriete.a_louer %}<a class="bouton secondaire" href="{% url 'proprietes:mettre_en_location' propriete.pk %}">Mettre en location</a>{% endif %}
@@ -153,8 +153,9 @@
 <section class="carte">
   <div class="titre-actions">
     <h2>Candidatures</h2>
-    {% if propriete.est_habitation %}<a class="bouton-petit" href="{% url 'candidatures:creer' %}?propriete={{ propriete.pk }}">Enregistrer une candidature</a>{% endif %}
+    {% if propriete.est_habitation and not fermeture %}<a class="bouton-petit" href="{% url 'candidatures:creer' %}?propriete={{ propriete.pk }}">Enregistrer une candidature</a>{% endif %}
   </div>
+  {% if propriete.est_habitation and fermeture %}{% include "candidatures/_fermees.html" %}{% endif %}
   {% if toutes_candidatures %}
   <table>
     <thead><tr><th>Candidats</th><th>Revenus nets</th><th>Taux d'effort</th><th>Reçue le</th><th>Statut</th></tr></thead>

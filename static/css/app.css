@@ -101,6 +101,7 @@ button.danger[type=submit] { background: var(--erreur); border-color: var(--erre
 .actions { display: flex; gap: 16px; align-items: center; }
 .message { padding: 10px 14px; background: var(--vert-clair); border: 1px solid var(--vert); border-radius: 8px; }
 .message-erreur, .alerte-fond { background: var(--erreur-clair); border-color: #f6c9c6; color: var(--erreur); }
+.message-info { background: var(--melon-clair); border-color: var(--melon); }
 .succes { display: inline-block; margin: 0 0 8px; padding: 4px 12px; border-radius: 999px; background: var(--vert); font-weight: 600; }
 
 /* Situation locative d'un bien */

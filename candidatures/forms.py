@@ -28,6 +28,14 @@ class CandidatureForm(forms.ModelForm):
         if self.instance.pk:
             self.fields["propriete"].disabled = True
 
+    def clean_propriete(self):
+        propriete = self.cleaned_data["propriete"]
+        # Les candidatures déjà enregistrées restent modifiables.
+        fermeture = None if self.instance.pk else propriete.candidatures_fermees
+        if fermeture:
+            raise forms.ValidationError(fermeture[0])
+        return propriete
+
 
 class CandidatForm(forms.ModelForm):
     # De quoi identifier le candidat et lui envoyer son lien ; il complète

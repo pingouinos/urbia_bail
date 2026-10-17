@@ -4,8 +4,9 @@
 <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span>{% if propriete %}<a href="{{ propriete.get_absolute_url }}">{{ propriete.adresse }}</a><span aria-hidden="true">›</span>{% endif %}<span class="fil-ici">Candidatures</span></nav>
 <div class="titre-actions">
   <h1>Candidatures</h1>
-  <div class="actions"><a class="bouton-petit" href="{% url 'candidatures:creer' %}{% if propriete %}?propriete={{ propriete.pk }}{% endif %}">Nouvelle candidature</a></div>
+  {% if not fermeture %}<div class="actions"><a class="bouton-petit" href="{% url 'candidatures:creer' %}{% if propriete %}?propriete={{ propriete.pk }}{% endif %}">Nouvelle candidature</a></div>{% endif %}
 </div>
+{% if fermeture %}{% include "candidatures/_fermees.html" %}{% endif %}
 {% if propriete %}<p>Pour <a href="{{ propriete.get_absolute_url }}">{{ propriete }}</a> · <a href="{% url 'candidatures:liste' %}">tous les logements</a></p>{% endif %}
 <form class="filtres" method="get">
   {% if propriete %}<input type="hidden" name="propriete" value="{{ propriete.pk }}">{% endif %}

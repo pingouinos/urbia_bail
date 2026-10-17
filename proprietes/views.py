@@ -125,6 +125,7 @@ def propriete(request, pk):
             [*objet.baux.all(), *mandats], key=lambda contrat: contrat.debut or contrat.cree_le.date(), reverse=True,
         ),
         "etape": etape, "nouveau_bail": nouveau_bail, "location": location,
+        "fermeture": objet.candidatures_fermees,
         "processus_bail": processus_bail(situation.bail) if situation.bail else None,
         "pieces": pieces, "piece_dpe": next((piece for piece in pieces if piece.type == Piece.Type.DPE), None),
         "form_piece": PieceForm() if onglet == "documents" else None,
