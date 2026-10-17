@@ -15,6 +15,9 @@ from django.core.exceptions import ImproperlyConfigured
 # d'authentification. Les noms techniques (base urbiabail, image urbia_bail)
 # ne changent pas.
 NOM_APPLICATION = "Urbia Gestion"
+# Dépôt GitHub du backlog : un ticket y devient une issue préremplie que
+# l'exploitant relit. Vide, le bouton disparaît.
+TICKETS_DEPOT_GITHUB = "pingouinos/urbia_bail"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -68,6 +71,7 @@ INSTALLED_APPS = [
     "contrats",
     "candidatures",
     "contacts",
+    "tickets",
 ]
 
 MIDDLEWARE = [

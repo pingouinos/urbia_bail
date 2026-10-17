@@ -7,6 +7,7 @@ from django.views.generic import RedirectView
 from candidatures import views as candidatures_views
 from comptes import views as comptes_views
 from core import plateforme, views
+from tickets import views as tickets_views
 
 admin.site.site_header = f"{settings.NOM_APPLICATION} · administration"
 admin.site.site_title = settings.NOM_APPLICATION
@@ -28,6 +29,11 @@ urlpatterns = [
     path("plateforme/agences/nouvelle/", plateforme.agence_nouvelle, name="plateforme_agence_nouvelle"),
     path("plateforme/agences/<int:pk>/", plateforme.agence_fiche, name="plateforme_agence"),
     path("plateforme/agences/<int:pk>/etat/", plateforme.agence_etat, name="plateforme_agence_etat"),
+    path("plateforme/tickets/", tickets_views.plateforme_tickets, name="plateforme_tickets"),
+    path("plateforme/tickets/<int:pk>/", tickets_views.plateforme_ticket, name="plateforme_ticket"),
+    path("plateforme/tickets/<int:pk>/capture/", tickets_views.plateforme_ticket_capture,
+         name="plateforme_ticket_capture"),
+    path("tickets/", include("tickets.urls")),
     path("agence/", RedirectView.as_view(pattern_name="agence")),
     path("logo-agence/", views.logo_agence, name="logo_agence"),
     path("proprietes/", include("proprietes.urls")),

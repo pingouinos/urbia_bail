@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titre %}Ouvrir un ticket · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<h1>Ouvrir un ticket</h1>
+<p class="discret">Un bug, une idée, une question sur l'application : écris-le ici. La page d'où tu viens et ton appareil sont joints automatiquement.</p>
+<form method="post" enctype="multipart/form-data" class="formulaire">
+  {% csrf_token %}
+  {{ form.page }}
+  <fieldset>
+    <legend>Ton ticket</legend>
+    <div class="champ pleine-largeur obligatoire{% if form.type.errors %} en-erreur{% endif %}">
+      <span class="libelle">C'est…</span>
+      <div class="choix-radio">{% for radio in form.type %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
+    </div>
+    <div class="champ pleine-largeur obligatoire{% if form.texte.errors %} en-erreur{% endif %}">
+      <label for="{{ form.texte.id_for_label }}">En une ou deux phrases</label>
+      {{ form.texte }}
+      {% for erreur in form.texte.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
+    </div>
+    <div class="champ pleine-largeur{% if form.capture.errors %} en-erreur{% endif %}">
+      <label for="{{ form.capture.id_for_label }}">Capture d'écran (facultatif)</label>
+      {{ form.capture }}
+      {% for erreur in form.capture.errors %}<small class="erreur">{{ erreur }}</small>{% endfor %}
+    </div>
+    {% if form.page.value %}<p class="discret pleine-largeur">Page jointe : {{ form.page.value }}</p>{% endif %}
+  </fieldset>
+  <div class="actions"><button type="submit" class="bouton-corail">Envoyer</button> <a href="{{ retour }}">Annuler</a></div>
+</form>
+{% endblock %}
