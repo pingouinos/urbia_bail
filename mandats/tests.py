@@ -11,7 +11,6 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from docx import Document
 from openpyxl import load_workbook
 
 from proprietes.models import Bailleur, Propriete
@@ -22,8 +21,11 @@ from documents.generation import ConversionImpossible
 from .models import Mandat
 
 
-def texte_docx(contenu):
-    return "\n".join(p.text for p in Document(io.BytesIO(contenu)).paragraphs)
+def texte_telecharge(client, url):
+    """Texte du document que le téléchargement envoie à l'impression PDF."""
+    with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7") as convertir:
+        client.get(url)
+    return generation.texte_document(convertir.call_args.args[0])
 
 
 class Donnees:
@@ -101,7 +103,7 @@ class MandatTests(Donnees, TestCase):
         propriete = self.creer_propriete(usage=Propriete.Usage.STATIONNEMENT, surface=None)
         self.assertEqual(self.creer_mandat(propriete, honoraires_bail_locataire=50).alertes, [])
 
-    def test_document_word(self):
+    def test_document(self):
         mandat = self.creer_mandat(
             date_signature="2026-07-20", assurance_loyers_impayes=True,
             base_gestion=Mandat.BaseGestion.HORS_CHARGES,
@@ -109,7 +111,7 @@ class MandatTests(Donnees, TestCase):
             honoraires_edl_bailleur=Decimal("58.50"), honoraires_edl_locataire=Decimal("58.50"),
         )
         mandat.refresh_from_db()
-        texte = texte_docx(generation.generer_docx("mandat_gestion.docx", mandat.contexte_document()))
+        texte = generation.texte_document(generation.generer_html("mandat_gestion", mandat.contexte_document()))
         self.assertNotIn("{{", texte)
         self.assertIn("MANDAT DE GESTION N° 1", texte)
         self.assertIn("Monsieur DURAND Paul et Madame MARTIN Anne", texte)
@@ -176,27 +178,37 @@ class VuesTests(Donnees, TestCase):
         # Un bien sous mandat n'est plus proposé pour un nouveau mandat.
         self.assertNotContains(self.client.get(reverse("mandats:creer")), str(propriete))
 
-    def test_telechargement_word_et_pdf(self):
+    def test_telechargement_pdf(self):
         mandat = self.creer_mandat()
-        reponse = self.client.get(reverse("mandats:word", args=[mandat.pk]))
-        self.assertIn("Monsieur DURAND Paul", texte_docx(reponse.content))
         with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7") as convertir:
             reponse = self.client.get(reverse("mandats:pdf", args=[mandat.pk]))
         self.assertEqual(reponse["Content-Type"], "application/pdf")
         self.assertEqual(reponse.content, b"%PDF-1.7")
-        self.assertTrue(convertir.call_args.args[0].startswith(b"PK"))
+        page = convertir.call_args.args[0]
+        self.assertTrue(page.startswith(b"<!doctype html>"))
+        self.assertIn("Monsieur DURAND Paul", generation.texte_document(page))
+        self.assertIn(b'<template id="pied-de-page">', page)
 
     def test_pdf_indisponible(self):
         mandat = self.creer_mandat()
         with mock.patch("documents.views.convertir_pdf", side_effect=ConversionImpossible("hors service")):
             reponse = self.client.get(reverse("mandats:pdf", args=[mandat.pk]), follow=True)
-        self.assertContains(reponse, "téléchargez la version Word")
+        self.assertContains(reponse, "Le PDF n&#x27;a pas pu être produit (hors service)")
 
     def test_conversion_gotenberg(self):
         reponse = mock.MagicMock()
         reponse.__enter__.return_value.read.return_value = b"%PDF"
+        page = b'<!doctype html><p>Mandat</p><template id="pied-de-page">Page <span class="pageNumber"></span></template>'
         with mock.patch("urllib.request.urlopen", return_value=reponse) as urlopen:
-            self.assertEqual(generation.convertir_pdf(b"docx", "m.docx"), b"%PDF")
+            self.assertEqual(generation.convertir_pdf(page, "mandat_gestion"), b"%PDF")
+        requete = urlopen.call_args.args[0]
+        self.assertTrue(requete.full_url.endswith("/forms/chromium/convert/html"))
+        self.assertIn(b'filename="index.html"', requete.data)
+        self.assertIn(b'filename="footer.html"', requete.data)
+        self.assertIn(b'<body>Page <span class="pageNumber"></span></body>', requete.data)
+        # Une ancienne archive Word passe toujours par LibreOffice.
+        with mock.patch("urllib.request.urlopen", return_value=reponse) as urlopen:
+            self.assertEqual(generation.convertir_pdf(b"PK\x03\x04docx", "m.docx"), b"%PDF")
         requete = urlopen.call_args.args[0]
         self.assertTrue(requete.full_url.endswith("/forms/libreoffice/convert"))
         self.assertIn(b'filename="m.docx"', requete.data)
@@ -222,7 +234,7 @@ class VuesTests(Donnees, TestCase):
         mandat = self.creer_mandat()
         with mock.patch("documents.views.convertir_pdf", side_effect=ConversionImpossible("le service ne répond pas")):
             reponse = self.client.get(reverse("mandats:pdf", args=[mandat.pk]), follow=True)
-        self.assertContains(reponse, "indisponible (le service ne répond pas)")
+        self.assertContains(reponse, "pas pu être produit (le service ne répond pas)")
 
     def test_signature_du_mandat(self):
         """La date de signature ne se saisit pas à la rédaction : elle
@@ -337,38 +349,29 @@ class VuesTests(Donnees, TestCase):
         self.assertEqual(Piece.objects.filter(type="identite").count(), 1)
 
     def test_logo_de_l_agence_sur_le_document(self):
-        """Le logo déposé sur la fiche de l'agence prend la place de celui de
-        l'en-tête du modèle, sans être déformé."""
-        import re
+        """Le logo déposé sur la fiche de l'agence est en tête du document ;
+        sans logo, le nom de l'agence (le logo URBIA pour l'agence URBIA)."""
+        import base64
         import struct
-        import zipfile
 
         from core.models import Organisation
 
         mandat = self.creer_mandat()
-        sans_logo = generation.generer_docx("mandat_gestion.docx", mandat.contexte_document())
-        self.assertNotIn("word/media/logo-agence.png", zipfile.ZipFile(io.BytesIO(sans_logo)).namelist())
-        # Le modèle livré porte une image d'emplacement marquée LOGO ; sans logo d'agence elle ne s'imprime pas.
-        modele = zipfile.ZipFile(generation.MODELES_PAR_DEFAUT / "mandat_gestion.docx").read("word/header1.xml").decode()
-        self.assertIn('descr="logo"', modele)
-        self.assertNotIn('descr="logo"', zipfile.ZipFile(io.BytesIO(sans_logo)).read("word/header1.xml").decode())
-        # Un PNG carré de 400 × 400 points, dans un cadre prévu pour un logo large.
+        sans_logo = generation.generer_html("mandat_gestion", mandat.contexte_document())
+        self.assertNotIn("<img", sans_logo)
+        self.assertIn('<span class="nom">AGENCE DU CANAL</span>', sans_logo)
         png = b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" + struct.pack(">II", 400, 400) + b"\x08\x06\x00\x00\x00"
         self.assertEqual(generation.dimensions_image(png), ("png", 400, 400))
         organisation = Organisation.courante()
         organisation.logo.save("logo.png", SimpleUploadedFile("logo.png", png), save=True)
-        archive = zipfile.ZipFile(io.BytesIO(generation.generer_docx("mandat_gestion.docx", mandat.contexte_document())))
-        self.assertEqual(archive.read("word/media/logo-agence.png"), png)
-        self.assertIn('Target="media/logo-agence.png"', archive.read("word/_rels/header1.xml.rels").decode())
-        entete = archive.read("word/header1.xml").decode()
-        cx, cy = map(int, re.search(r'<wp:extent cx="(\d+)" cy="(\d+)"', entete).groups())
-        self.assertEqual((cx, cy), (883920, 883920))
-        # Les autres images du document ne sont pas touchées.
-        self.assertIn("word/media/image8.png", archive.namelist())
-        # Un format que Word n'affiche pas laisse le logo du modèle.
+        page = generation.generer_html("mandat_gestion", mandat.contexte_document())
+        self.assertIn(f'<img src="data:image/png;base64,{base64.b64encode(png).decode()}"', page)
+        # Un format que les lecteurs de PDF n'affichent pas tous est ignoré.
         organisation.logo.save("logo.webp", SimpleUploadedFile("logo.webp", b"RIFF0000WEBPVP8 "), save=True)
-        archive = zipfile.ZipFile(io.BytesIO(generation.generer_docx("mandat_gestion.docx", mandat.contexte_document())))
-        self.assertNotIn("word/media/logo-agence.png", archive.namelist())
+        self.assertNotIn("<img", generation.generer_html("mandat_gestion", mandat.contexte_document()))
+        organisation.nom = "Urbia Gestion"
+        organisation.save()
+        self.assertIn('<img src="data:image/png;base64,', generation.generer_html("mandat_gestion", mandat.contexte_document()))
 
     def test_registre_et_export(self):
         self.creer_mandat()
@@ -394,32 +397,25 @@ class VuesTests(Donnees, TestCase):
         admin = User.objects.create_user("admin")
         attribuer_role(admin, ADMINISTRATEURS)
         self.client.force_login(admin)
-        self.assertContains(self.client.get(reverse("documents:modele", args=["mandat_gestion.docx"])), "mandant_adresse")
+        self.assertContains(self.client.get(reverse("documents:texte", args=["mandat_gestion"])), "mandant adresse")
 
-        modele = Document(generation.MODELES_PAR_DEFAUT / "mandat_gestion.docx")
-        modele.add_paragraph("Ligne ajoutée par l'agence pour {{ mandant }}.")
-        flux = io.BytesIO()
-        modele.save(flux)
-        url = reverse("documents:deposer", args=["mandat_gestion.docx"])
-        self.client.post(url, {"fichier": SimpleUploadedFile("m.docx", flux.getvalue())})
+        modele = generation.lire_modele("mandat_gestion") + "<p>Ligne ajoutée par l'agence pour <span data-donnee=\"mandant\"></span>.</p>"
+        url = reverse("documents:texte", args=["mandat_gestion"])
+        self.client.post(url, {"texte": modele})
         mandat = self.creer_mandat()
-        # Le fichier déposé attend son essai, puis la mise en service.
-        self.assertNotIn("Ligne ajoutée", texte_docx(self.client.get(reverse("mandats:word", args=[mandat.pk])).content))
+        pdf = reverse("mandats:pdf", args=[mandat.pk])
+        # Le texte modifié attend son essai, puis la mise en service.
+        self.assertNotIn("Ligne ajoutée", texte_telecharge(self.client, pdf))
         with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7"):
-            self.client.get(reverse("documents:essai_version", args=["mandat_gestion.docx"]))
-        self.client.post(reverse("documents:mettre_en_service", args=["mandat_gestion.docx"]))
-        texte = texte_docx(self.client.get(reverse("mandats:word", args=[mandat.pk])).content)
-        self.assertIn("Ligne ajoutée par l'agence pour Monsieur DURAND", texte)
+            self.client.get(reverse("documents:essai_version", args=["mandat_gestion"]))
+        self.client.post(reverse("documents:mettre_en_service", args=["mandat_gestion"]))
+        self.assertIn("Ligne ajoutée par l'agence pour Monsieur DURAND", texte_telecharge(self.client, pdf))
 
-        modele.add_paragraph("{{ balise_inconnue }}")
-        flux = io.BytesIO()
-        modele.save(flux)
-        reponse = self.client.post(url, {"fichier": SimpleUploadedFile("m.docx", flux.getvalue())}, follow=True)
-        self.assertContains(reponse, "Balises inconnues : balise_inconnue")
+        reponse = self.client.post(url, {"texte": modele + '<p><span data-donnee="balise_inconnue"></span></p>'}, follow=True)
+        self.assertContains(reponse, "Données inconnues ou placées hors de leur bloc « Pour chaque » : balise inconnue.")
 
-        self.client.post(reverse("documents:retablir", args=["mandat_gestion.docx"]))
-        texte = texte_docx(self.client.get(reverse("mandats:word", args=[mandat.pk])).content)
-        self.assertNotIn("Ligne ajoutée", texte)
+        self.client.post(reverse("documents:retablir", args=["mandat_gestion"]))
+        self.assertNotIn("Ligne ajoutée", texte_telecharge(self.client, pdf))
 
 
 @override_settings(MFA_OBLIGATOIRE=False)
@@ -545,7 +541,7 @@ class ConformiteTests(Donnees, TestCase):
         self.assertContains(reponse, "Mentions légales de l&#x27;agence à compléter")
         self.assertContains(reponse, "médiateur de la consommation")
         self.assertFalse(mandat.versions_document.exists())
-        self.assertEqual(self.client.get(reverse("mandats:word", args=[mandat.pk])).status_code, 302)
+        self.assertEqual(self.client.get(reverse("mandats:pdf", args=[mandat.pk])).status_code, 302)
 
     def test_assurance_loyers_impayes_sans_orias(self):
         mandat = self.creer_mandat(assurance_loyers_impayes=True)
@@ -567,14 +563,14 @@ class ConformiteTests(Donnees, TestCase):
         self.assertEqual(Mandat.depuis_propriete(propriete).conclusion, Mandat.Conclusion.PROFESSIONNEL)
 
     def test_retractation_hors_agence(self):
-        en_agence = texte_docx(self.client.get(reverse("mandats:word", args=[self.creer_mandat().pk])).content)
+        en_agence = texte_telecharge(self.client, reverse("mandats:pdf", args=[self.creer_mandat().pk]))
         self.assertNotIn("Droit de rétractation", en_agence)
         self.assertNotIn("FORMULAIRE DE RÉTRACTATION", en_agence)
         self.assertIn("médiateur de la consommation", en_agence)
         self.assertIn("article 78 du décret", en_agence)
         mandat = self.creer_mandat(self.creer_propriete(adresse="4 rue du Taur"),
                                    conclusion=Mandat.Conclusion.HORS_ETABLISSEMENT, lieu_signature="Frouzins")
-        texte = texte_docx(self.client.get(reverse("mandats:word", args=[mandat.pk])).content)
+        texte = texte_telecharge(self.client, reverse("mandats:pdf", args=[mandat.pk]))
         self.assertIn("Droit de rétractation", texte)
         self.assertIn("quatorze jours à compter de la signature", texte)
         self.assertIn("FORMULAIRE DE RÉTRACTATION", texte)
@@ -583,17 +579,12 @@ class ConformiteTests(Donnees, TestCase):
     def test_modele_sans_les_mentions_obligatoires(self):
         from documents.views import verifier_modele
 
-        document = Document(generation.MODELES_PAR_DEFAUT / "mandat_gestion.docx")
+        import re
+
         # Ancien modèle de l'agence : les blocs de rétractation n'existent pas.
-        dans_bloc = False
-        for paragraphe in document.paragraphs:
-            dans_bloc = dans_bloc or "if retractation" in paragraphe.text or "if formulaire_retractation" in paragraphe.text
-            if dans_bloc:
-                fin = "endif" in paragraphe.text
-                paragraphe.text = ""
-                dans_bloc = not fin
-        flux = io.BytesIO()
-        document.save(flux)
-        message = verifier_modele("mandat_gestion.docx", flux.getvalue())
+        ancien = re.sub(r'<div data-si="(formulaire_)?retractation">.*?\n</div>\n</div>\n', "",
+                        generation.lire_modele("mandat_gestion"), flags=re.S)
+        self.assertNotIn("retractation", ancien)
+        message = verifier_modele("mandat_gestion", ancien)
         self.assertIn("le droit de rétractation du mandant particulier", message)
-        self.assertEqual(generation.defauts_modele("mandat_gestion.docx"), [])
+        self.assertEqual(generation.defauts_modele("mandat_gestion"), [])

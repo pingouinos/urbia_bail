@@ -19,7 +19,6 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
       <p class="discret">{{ mandat.mandant }} · <a href="{{ mandat.propriete.get_absolute_url }}">{{ mandat.adresse_bien }}</a></p>
     </div>
     <nav class="actions-document" aria-label="Documents du mandat">
-      <a href="{% url 'mandats:word' mandat.pk %}">Word</a>
       <a href="{% url 'mandats:pdf' mandat.pk %}">PDF</a>
       {% if mandat.fichier_signe %}<a href="{% url 'mandats:fichier_signe' mandat.pk %}" target="_blank" rel="noopener">Mandat signé</a>{% endif %}
       <a href="#historique">Historique</a>
@@ -66,7 +65,7 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
 
   {% elif numero == 2 %}
   {% if mode == "ouverte" %}
-  <p class="ligne-etape">Le mandat à faire signer : <a href="{% url 'mandats:pdf' mandat.pk %}">PDF</a> ou <a href="{% url 'mandats:word' mandat.pk %}">Word</a>. La date s'enregistre une fois le mandat signé par le mandant ; le scan peut attendre.</p>
+  <p class="ligne-etape">Le mandat à faire signer : <a href="{% url 'mandats:pdf' mandat.pk %}">PDF</a>. La date s'enregistre une fois le mandat signé par le mandant ; le scan peut attendre.</p>
   <form method="post" enctype="multipart/form-data" action="{% url 'mandats:deposer_signe' mandat.pk %}" id="form-signature">
     {% csrf_token %}
     <div class="champs-etape">

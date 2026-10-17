@@ -23,7 +23,7 @@ from documents.archives import verrouiller, assurer_historique, creer, motif_cor
 from .forms import FinMandatForm, MandatForm, SignatureForm
 from .models import Mandat
 
-MODELE = "mandat_gestion.docx"
+MODELE = "mandat_gestion"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 

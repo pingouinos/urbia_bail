@@ -680,18 +680,29 @@ table.liste-modeles td:last-child { text-align: right; }
 .sommaire-modele { grid-row: 1 / span 2; position: sticky; top: 12px; display: grid; gap: 2px; font-size: 0.85rem; max-height: calc(100vh - 24px); overflow-y: auto; }
 .sommaire-modele a { padding: 5px 8px; border-radius: 6px; color: var(--discret); }
 .sommaire-modele a:hover { background: var(--melon-clair); color: var(--texte); }
-.outils-editeur { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 0 10px; background: var(--carte); border-bottom: 1px solid var(--bord); margin-bottom: 12px; }
-.outils-editeur button { padding: 4px 12px; }
+.outils-editeur { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 8px 0 10px; background: var(--carte); border-bottom: 1px solid var(--bord); margin-bottom: 12px; }
+.groupe-outils { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.outils-editeur button { padding: 4px 10px; }
+.outils-editeur button[aria-pressed="true"] { background: var(--acier); color: var(--fond); border-color: var(--acier); }
 .outils-editeur select { width: auto; max-width: 100%; }
-.texte-modele .ProseMirror { outline: none; max-width: 75ch; line-height: 1.6; }
+.texte-modele .ProseMirror { outline: none; max-width: 78ch; line-height: 1.6; }
 .texte-modele .ProseMirror p { margin: 0 0 6px; padding: 2px 6px; border-radius: 4px; min-height: 1.6em; }
 .texte-modele .ProseMirror p:hover { background: var(--fond); }
-.texte-modele .titre-modele { margin-top: 18px; font-weight: 700; scroll-margin-top: 70px; }
+.texte-modele .ProseMirror h2 { margin: 20px 0 8px; padding: 4px 8px; font-size: 1.05rem; background: var(--melon-clair, #fff1eb); border-left: 3px solid var(--corail); scroll-margin-top: 90px; }
+.texte-modele .ProseMirror h3 { margin: 14px 0 6px; font-size: 1rem; text-decoration: underline; text-decoration-color: var(--corail); }
+.texte-modele .ProseMirror ul, .texte-modele .ProseMirror ol { padding-left: 24px; }
+.texte-modele .ProseMirror hr { border: 0; border-top: 2px dashed var(--bord); margin: 18px 0; position: relative; overflow: visible; }
+.texte-modele .ProseMirror hr::after { content: "Saut de page"; position: absolute; left: 50%; top: -0.8em; transform: translateX(-50%); padding: 0 8px; background: var(--carte); color: var(--discret); font-size: 0.8rem; }
+.texte-modele .ProseMirror table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.texte-modele .ProseMirror td, .texte-modele .ProseMirror th { border: 1px solid var(--bord); padding: 2px 6px; vertical-align: top; }
+.texte-modele .ProseMirror table[data-bordure="non"] td { border-style: dashed; border-color: var(--bord); }
+.texte-modele .ProseMirror td p { margin: 0; }
 .texte-modele .alerte-modele { background: var(--erreur-clair); outline: 1px solid #f6c9c6; }
 .puce-donnee { display: inline-block; padding: 0 8px; margin: 0 1px; border-radius: 999px; background: var(--vert-clair); border: 1px solid var(--vert); font-size: 0.85em; font-weight: 600; line-height: 1.5; user-select: all; }
 .puce-donnee.ProseMirror-selectednode { outline: 2px solid var(--acier); }
-.bloc-controle, .bloc-tableau { margin: 4px 0; padding: 2px 10px; border-left: 3px dashed var(--bord); color: var(--discret); font-size: 0.85rem; user-select: none; }
-.bloc-tableau { border-left-style: solid; }
+.bloc-condition { margin: 6px 0; padding: 4px 8px 2px 10px; border-left: 3px solid var(--corail); border-radius: 0 6px 6px 0; background: var(--fond); }
+.bloc-condition::before { content: attr(data-libelle); display: block; color: var(--discret); font-size: 0.8rem; font-weight: 600; margin-bottom: 2px; user-select: none; }
+.bloc-condition[data-pour] { border-left-style: dashed; }
 .barre-enregistrer { position: sticky; bottom: 0; background: var(--fond); padding: 10px 0; margin: 0; }
 @media (max-width: 760px) { .editeur-modele { grid-template-columns: 1fr; } .editeur-modele > .carte, .editeur-modele > .barre-enregistrer { grid-column: 1; } .sommaire-modele { grid-row: auto; position: static; grid-auto-flow: column; overflow-x: auto; max-height: none; } .sommaire-modele a { white-space: nowrap; } }
 .etapes-modele { display: grid; gap: 16px; }

@@ -392,7 +392,7 @@ class Mandat(Contrat):
         return version.contexte if version else self.contexte_courant()
 
     def contexte_courant(self):
-        """Valeurs à placer dans le modèle Word du mandat."""
+        """Valeurs à placer dans le modèle du mandat."""
         from documents.generation import montant
 
         base = {
