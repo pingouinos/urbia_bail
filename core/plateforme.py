@@ -5,12 +5,14 @@ usage, sans jamais voir leurs biens, leurs baux ni leurs candidats."""
 import secrets
 
 from django import forms
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, Max, Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST
 
 from comptes.roles import ADMINISTRATEURS, attribuer_role, est_administrateur
@@ -36,10 +38,24 @@ def plateforme(request):
     _exploitant(request)
     agences = list(agences_avec_usage().order_by("-active", "nom", "pk"))
     return render(request, "core/plateforme.html", {
+        "version": version_en_ligne(),
         "agences": agences,
         "nb_actives": sum(agence.active for agence in agences),
         "nb_comptes": sum(agence.nb_comptes for agence in agences if agence.active),
     })
+
+
+def version_en_ligne():
+    """Commit et date de l'image en service, posés par GitHub à la construction."""
+    commit = settings.VERSION
+    if commit == "dev":
+        return {"court": "dev"}
+    depot = settings.TICKETS_DEPOT_GITHUB
+    return {
+        "court": commit[:7],
+        "lien": f"https://github.com/{depot}/commit/{commit}" if depot else "",
+        "date": parse_datetime(settings.DATE_VERSION) if settings.DATE_VERSION else None,
+    }
 
 
 class NouvelleAgenceForm(forms.Form):

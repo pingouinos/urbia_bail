@@ -172,6 +172,15 @@ class PlateformeTests(TestCase):
         self.assertContains(fiche, "elodie")
         self.assertContains(fiche, "Désactiver l'agence")
 
+    @override_settings(VERSION="d7a2ec308ab02b28c4daf85053947f58d86e564b", DATE_VERSION="2026-10-17T18:24:07+02:00")
+    def test_version_en_ligne(self):
+        self.client.force_login(self.exploitant)
+        liste = self.client.get(reverse("plateforme"))
+        self.assertContains(liste, "Version en ligne")
+        self.assertContains(liste, 'href="https://github.com/pingouinos/clefaria-loc/commit/d7a2ec308ab02b28c4daf85053947f58d86e564b"')
+        self.assertContains(liste, "<code>d7a2ec3</code>")
+        self.assertContains(liste, "17/10/2026 à 18:24")
+
     def test_console_en_lecture_seule(self):
         """Les agences et leurs membres se consultent dans la console, mais ne
         s'y modifient pas : tout passe par Plateforme."""
