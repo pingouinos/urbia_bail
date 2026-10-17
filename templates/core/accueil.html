@@ -6,11 +6,6 @@
     <h1>{{ agence.designation }}</h1>
     <p class="accroche-salut">Bonjour {{ user.get_full_name|default:user.username }}</p>
     <p class="puces">
-      {% if nb_geres %}
-      <a class="puce puce-parc" href="{% url 'proprietes:liste' %}"><b>{{ nb_geres }}</b> bien{{ nb_geres|pluralize }} géré{{ nb_geres|pluralize }}</a>
-      <a class="puce puce-parc" href="{% url 'proprietes:liste' %}?situation=libre"><b>{{ nb_inoccupes }}</b> inoccupé{{ nb_inoccupes|pluralize }}{% if nb_sans_bail %} <span class="discret">dont {{ nb_sans_bail }} sans bail enregistré</span>{% endif %}</a>
-      <span class="puces-separateur" aria-hidden="true"></span>
-      {% endif %}
       {% if nb_taches %}
       {% if locations %}<span class="puce"><b>{{ locations|length }}</b> mise{{ locations|length|pluralize }} en location</span>{% endif %}
       {% if nb_echeances %}<span class="puce"><b>{{ nb_echeances }}</b> échéance{{ nb_echeances|pluralize }}</span>{% endif %}
@@ -21,6 +16,32 @@
   </div>
 </section>
 {% if agence_manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ agence_manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux. <a href="{% url 'agence' %}">Compléter la fiche</a></p>{% endif %}
+
+{% if parc.geres %}{% url 'proprietes:liste' as biens %}
+<section class="tuiles-parc" aria-label="Le parc">
+  <a class="tuile-parc" href="{{ biens }}">
+    <span class="tuile-chiffre">{{ parc.geres }}</span>
+    <span class="tuile-libelle">Bien{{ parc.geres|pluralize }} géré{{ parc.geres|pluralize }}</span>
+    <span class="barre-parc" role="img" aria-label="{{ parc.loues }} loués, {{ parc.preavis }} en préavis, {{ parc.libres }} libres"><i class="parc-loue" style="width: {{ parc.part_loues }}%"></i><i class="parc-preavis" style="width: {{ parc.part_preavis }}%"></i></span>
+    {% if parc.sans_mandat %}<span class="discret">dont {{ parc.sans_mandat }} sans mandat</span>{% endif %}
+  </a>
+  <a class="tuile-parc" href="{{ biens }}?situation=loue">
+    <span class="tuile-chiffre">{{ parc.loues }}</span>
+    <span class="tuile-libelle"><i class="parc-pastille parc-loue" aria-hidden="true"></i>Loué{{ parc.loues|pluralize }}</span>
+    <span class="discret">{{ parc.part_loues }} %</span>
+  </a>
+  <a class="tuile-parc" href="{{ biens }}?situation=preavis">
+    <span class="tuile-chiffre">{{ parc.preavis }}</span>
+    <span class="tuile-libelle"><i class="parc-pastille parc-preavis" aria-hidden="true"></i>En préavis</span>
+    {% if parc.prochain_depart %}<span class="discret">premier départ le {{ parc.prochain_depart|date:"d/m" }}</span>{% endif %}
+  </a>
+  <a class="tuile-parc{% if parc.libres %} tuile-parc-libre{% endif %}" href="{{ biens }}?situation=libre">
+    <span class="tuile-chiffre">{{ parc.libres }}</span>
+    <span class="tuile-libelle"><i class="parc-pastille parc-libre" aria-hidden="true"></i>Libre{{ parc.libres|pluralize }}</span>
+    {% if parc.sans_bail %}<span class="discret">dont {{ parc.sans_bail }} sans bail enregistré</span>{% endif %}
+  </a>
+</section>
+{% endif %}
 
 <section class="carte">
   <h2 class="titre-compte">À faire{% if nb_taches %} <span class="compteur">{{ nb_taches }}<span class="masque"> action{{ nb_taches|pluralize }}</span></span>{% endif %}</h2>
