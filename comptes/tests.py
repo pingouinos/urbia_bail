@@ -100,7 +100,7 @@ class DoubleAuthentificationTests(TestCase):
 
     def test_sonde_sante_publique(self):
         reponse = self.client.get(reverse("sante"))
-        self.assertEqual(reponse.json(), {"statut": "ok"})
+        self.assertEqual(reponse.json(), {"statut": "ok", "version": "dev", "date": ""})
 
 
 def code_courant(appareil):
@@ -153,7 +153,13 @@ class DoubleAuthentificationTests(TestCase):
 
     def test_sonde_sante_publique(self):
         reponse = self.client.get(reverse("sante"))
-        self.assertEqual(reponse.json(), {"statut": "ok"})
+        self.assertEqual(reponse.json()["statut"], "ok")
+
+    @override_settings(VERSION="d7a2ec308ab02b28c4daf85053947f58d86e564b", DATE_VERSION="2026-10-17T18:24:07+02:00")
+    def test_sonde_sante_donne_la_version_en_ligne(self):
+        reponse = self.client.get(reverse("sante"))
+        self.assertEqual(reponse.json()["version"], "d7a2ec3")
+        self.assertEqual(reponse.json()["date"], "2026-10-17T18:24:07+02:00")
 
 
 class VerrouillageTests(TestCase):

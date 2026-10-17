@@ -4,6 +4,7 @@ Toute la configuration propre à un déploiement passe par des variables
 d'environnement (fichier .env en local, voir .env.example).
 """
 
+import os
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -18,6 +19,10 @@ NOM_APPLICATION = "Clefaria Loc"
 # Dépôt GitHub du backlog : un ticket y devient une issue préremplie que
 # l'exploitant relit. Vide, le bouton disparaît.
 TICKETS_DEPOT_GITHUB = "pingouinos/clefaria-loc"
+
+# Version en ligne : SHA du commit et date, posés par GitHub dans l'image.
+VERSION = os.environ.get("VERSION", "dev")
+DATE_VERSION = os.environ.get("DATE_VERSION", "")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

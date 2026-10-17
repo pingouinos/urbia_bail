@@ -8,6 +8,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=urbiabail . .
+# Version publiée (SHA du commit et date de construction), passée par GitHub.
+ARG VERSION=dev
+ARG DATE_VERSION=
+ENV VERSION=$VERSION \
+    DATE_VERSION=$DATE_VERSION
 RUN SECRET_KEY=build python manage.py collectstatic --noinput \
     && mkdir /documents && chown urbiabail /documents
 USER urbiabail
