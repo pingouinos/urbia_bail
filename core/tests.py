@@ -368,6 +368,55 @@ class OrganisationTests(TestCase):
         sans_mandat = next(tache for tache in taches([]) if tache.titre == "Créer le mandat manquant")
         self.assertEqual(sans_mandat.detail, "1 propriété sans mandat en cours")
 
+    def test_parcours_candidature_au_tableau_de_bord(self):
+        """Une candidature enregistrée s'étudie depuis sa fiche (retenir, désistement) ;
+        retenue, son lien part au candidat avant la rédaction du bail."""
+        from candidatures.models import Candidat, Candidature
+
+        from .views import locations_en_cours
+
+        self.connecter(GESTIONNAIRES)
+        sci = Bailleur.objects.create(type="sci_familiale", nom="SCI ESGT")
+        propriete = Propriete.objects.create(
+            bailleur=sci, adresse="3 rue des Lois", code_postal="31000", ville="Toulouse", dernier_loyer=600,
+        )
+        Mandat.depuis_propriete(propriete).save()
+        candidature = Candidature.objects.create(propriete=propriete)
+        Candidat.objects.create(candidature=candidature, nom="Roux", prenom="Lina")
+
+        def ligne():
+            return locations_en_cours()[0]
+
+        self.assertEqual(ligne()["etape"], "Étudier la candidature de Lina ROUX")
+        self.assertEqual(ligne()["lien"], candidature.get_absolute_url())
+        self.assertEqual(ligne()["processus"].courante.libelle, "Candidatures")
+        candidature.decider(Candidature.Statut.RETENUE, None)
+        self.assertEqual(ligne()["etape"], "Envoyer le lien à Lina ROUX")
+        self.assertEqual(ligne()["lien"], f"{candidature.get_absolute_url()}#lien")
+        self.assertEqual(ligne()["processus"].courante.detail, "Lina ROUX · lien à envoyer")
+        fiche = self.client.get(propriete.get_absolute_url())
+        self.assertContains(fiche, "Envoyer le lien à Lina ROUX")
+        self.assertContains(self.client.get(candidature.get_absolute_url()), 'id="lien"')
+        candidature.creer_lien()
+        self.assertEqual(ligne()["etape"], "Rédiger le bail de Lina ROUX")
+        self.assertEqual(ligne()["detail"], "lien envoyé, dossier en attente du candidat")
+        self.assertContains(self.client.get(propriete.get_absolute_url()), "Rédiger le bail de Lina ROUX")
+        # Deux candidatures à l'étude : la liste du logement.
+        candidature.decider(Candidature.Statut.A_ETUDIER, None)
+        Candidature.objects.create(propriete=propriete)
+        self.assertEqual(ligne()["etape"], "Étudier 2 candidatures")
+        # Le bail d'un des candidats signé, les autres candidatures ne font plus revenir le logement.
+        import datetime as dt
+
+        from contrats.models import Bail
+
+        bail = Bail.depuis_propriete(propriete)
+        bail.date_effet, bail.date_signature = dt.date(2026, 11, 1), dt.date(2026, 10, 15)
+        bail.irl_trimestre, bail.irl_valeur = "2e trimestre 2023", "140.59"
+        bail.save()
+        Propriete.objects.filter(pk=propriete.pk).update(mise_en_location_le=None)
+        self.assertEqual(locations_en_cours(), [])
+
     def test_entetes_de_securite(self):
         reponse = self.client.get(reverse("connexion"))
         self.assertIn("frame-ancestors 'none'", reponse["Content-Security-Policy"])

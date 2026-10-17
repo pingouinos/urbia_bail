@@ -73,7 +73,7 @@
 </section>
 
 {% if candidature.lien_possible %}
-<section class="carte">
+<section class="carte" id="lien">
   <h2>Informations du candidat</h2>
   {% if candidature.rempli_le %}<p class="succes">Complétées par le candidat le {{ candidature.rempli_le|date:"d/m/Y à H:i" }}</p>{% endif %}
   {% if candidature.lien_valide %}
