@@ -1,4 +1,5 @@
 from axes.utils import reset
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
@@ -299,4 +300,4 @@ def sante(request):
             cursor.execute("SELECT 1")
     except Exception:
         return JsonResponse({"statut": "base indisponible"}, status=503)
-    return JsonResponse({"statut": "ok"})
+    return JsonResponse({"statut": "ok", "version": settings.VERSION[:7], "date": settings.DATE_VERSION})

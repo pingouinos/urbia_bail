@@ -72,13 +72,21 @@ docker compose exec web python manage.py createsuperuser
 
 ## Mise à jour
 
-Après une fusion sur `main` (attendre que GitHub ait publié l'image, quelques minutes) :
+Chaque nuit à 3 h (heure de Paris), après la sauvegarde de 2 h, un minuteur regarde si GitHub a publié une nouvelle image depuis une fusion sur `main`. Seulement dans ce cas, il sauvegarde la base (`sauvegardes/base-avant-maj-….dump`), redémarre l'application (les migrations s'appliquent au démarrage) et vérifie qu'elle répond. Le minuteur s'installe une fois :
+
+```bash
+cd /srv/clefaria && curl -fsSLO https://raw.githubusercontent.com/pingouinos/clefaria-loc/main/deploy/ovh/maj.sh && chmod +x maj.sh && sudo ./maj.sh --installer
+```
+
+Pour une correction urgente, sans attendre la nuit (une fois l'image publiée par GitHub, quelques minutes après la fusion) :
 
 ```bash
 cd /srv/clefaria && ./maj.sh
 ```
 
-Le script sauvegarde la base (`sauvegardes/base-avant-maj-….dump`), télécharge la nouvelle image, redémarre (les migrations s'appliquent au démarrage) et vérifie que l'application répond ; sinon il affiche le journal. Les mises à jour de sécurité d'Ubuntu s'installent seules.
+`maj.sh` se renouvelle seul : chaque nouvelle image porte sa dernière version. `https://app.clefaria.fr/sante/` donne la version en ligne : les 7 premiers caractères du commit et sa date. `journalctl -u clefaria-maj` liste les passages du minuteur. Les mises à jour de sécurité d'Ubuntu s'installent seules.
+
+Pour être prévenu si l'application ne répond plus (après une mise à jour ratée ou une panne), créer une sonde gratuite chez un service de surveillance (UptimeRobot par exemple) sur `https://app.clefaria.fr/sante/`, avec alerte par e-mail.
 
 ## Sauvegardes
 
