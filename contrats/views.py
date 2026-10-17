@@ -1,4 +1,3 @@
-import datetime as dt
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -24,7 +23,7 @@ from django.utils import timezone
 from .forms import (
     BailForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm, SignatureForm, initial_fin,
 )
-from .models import Bail, Echeance
+from .models import Bail
 
 MODELE = "bail_habitation.docx"
 # Logements proposés à la fois à l'étape « Logement ».
@@ -67,96 +66,6 @@ def liste(request):
     return render(request, "contrats/liste.html", {
         "page": page, "parametres": parametres.urlencode(), "types": TYPES,
     })
-
-
-def _echeances(bail):
-    """Les douze derniers mois du suivi des loyers, échéancier mis à jour."""
-    if not bail.suivi_loyers_depuis:
-        return []
-    bail.completer_echeancier()
-    return list(bail.echeances.all()[:12])
-
-
-@require_POST
-def loyers_suivre(request, pk):
-    """Démarre (ou arrête) le suivi des loyers d'un bail. On choisit le
-    premier mois suivi : un bail ancien ne fait pas naître des années
-    d'échéances à pointer."""
-    objet = get_object_or_404(Bail, pk=pk)
-    if request.POST.get("action") == "arreter":
-        if objet.echeances.filter(paye_le__isnull=False).exists():
-            messages.error(request, "Des loyers sont déjà pointés sur ce bail : le suivi ne s'arrête plus.")
-        else:
-            objet.echeances.all().delete()
-            objet.suivi_loyers_depuis = None
-            objet.save(update_fields=["suivi_loyers_depuis", "modifie_le"])
-            messages.success(request, "Suivi des loyers arrêté pour ce bail.")
-        return redirect(f"{objet.get_absolute_url()}#loyers")
-    try:
-        depuis = dt.datetime.strptime(request.POST.get("depuis", ""), "%Y-%m").date()
-    except ValueError:
-        messages.error(request, "Indiquer le premier mois à suivre.")
-        return redirect(f"{objet.get_absolute_url()}#loyers")
-    if depuis < objet.date_effet.replace(day=1):
-        messages.error(request, "Le suivi ne peut pas commencer avant la prise d'effet du bail.")
-        return redirect(f"{objet.get_absolute_url()}#loyers")
-    objet.suivi_loyers_depuis = depuis
-    objet.save(update_fields=["suivi_loyers_depuis", "modifie_le"])
-    nombre = len(objet.completer_echeancier())
-    messages.success(request, f"Suivi des loyers démarré : {nombre} échéance{'s' if nombre > 1 else ''} créée{'s' if nombre > 1 else ''}.")
-    return redirect(f"{objet.get_absolute_url()}#loyers")
-
-
-@require_POST
-def echeance_pointer(request, pk):
-    """Pointe le paiement d'un loyer (ou l'annule, en cas d'erreur)."""
-    objet = get_object_or_404(Echeance.objects.select_related("bail"), pk=pk)
-    if request.POST.get("action") == "annuler":
-        objet.paye_le = None
-        objet.save(update_fields=["paye_le", "modifie_le"])
-        messages.success(request, f"Paiement de {objet.libelle} annulé.")
-        return redirect(objet)
-    try:
-        paye_le = dt.date.fromisoformat(request.POST.get("paye_le", ""))
-    except ValueError:
-        messages.error(request, "Indiquer la date du paiement.")
-        return redirect(objet)
-    if paye_le > timezone.localdate():
-        messages.error(request, "La date du paiement ne peut pas être dans le futur.")
-        return redirect(objet)
-    objet.paye_le = paye_le
-    objet.save(update_fields=["paye_le", "modifie_le"])
-    messages.success(request, f"Loyer de {objet.libelle} pointé : la quittance est disponible.")
-    return redirect(objet)
-
-
-def echeance_document(request, pk, type_):
-    """Avis d'échéance tant que le loyer n'est pas payé, quittance ensuite."""
-    objet = get_object_or_404(Echeance.objects.select_related("bail__propriete__bailleur"), pk=pk)
-    if type_ == "quittance" and not objet.payee:
-        messages.error(request, "La quittance n'est délivrée qu'une fois le loyer payé.")
-        return redirect(objet)
-    modele = "quittance.docx" if type_ == "quittance" else "avis_echeance.docx"
-    return documents.document(request, DocumentLoyer(objet, type_), modele, request.GET.get("format", "pdf"))
-
-
-class DocumentLoyer:
-    """Une échéance vue comme l'un de ses deux documents."""
-
-    def __init__(self, echeance, type_):
-        self.echeance, self.type = echeance, type_
-
-    def contexte_document(self):
-        return self.echeance.contexte_document()
-
-    def get_absolute_url(self):
-        return self.echeance.get_absolute_url()
-
-    @property
-    def nom_fichier(self):
-        noms = " ".join(locataire.nom.upper() for locataire in self.echeance.bail.locataires.all())
-        titre = "Quittance" if self.type == "quittance" else "Avis d'échéance"
-        return f"{titre} {self.echeance.libelle} {noms}".strip()[:120]
 
 
 def choisir(request):

@@ -35,8 +35,6 @@ from .models import Modele
 MODELES = {
     "mandat_gestion.docx": ("Mandat de gestion", "mandats.Mandat"),
     "bail_habitation.docx": ("Bail d'habitation (nu ou meublé)", "contrats.Bail"),
-    "avis_echeance.docx": ("Avis d'échéance de loyer", "contrats.Echeance"),
-    "quittance.docx": ("Quittance de loyer", "contrats.Echeance"),
 }
 TAILLE_MAX = 10 * 1024 * 1024
 
