@@ -501,6 +501,8 @@ button.bouton-petit.bouton-supprimer[type=submit]:hover { background: var(--erre
 a.fleche-frise:hover { border-color: var(--melon); background: var(--melon-clair); color: var(--acier); }
 .fleche-frise[aria-disabled=true] { opacity: 0.35; cursor: not-allowed; }
 .frise-choisie .frise-point { outline: 2px solid var(--acier); outline-offset: 3px; }
+.frise-sortie { max-width: 640px; margin: 0 auto; width: 100%; }
+.frise-sortie .frise { --point: 26px; margin: 0; }
 .etape-ici { display: none; margin: 6px 0 0; text-align: center; font-weight: 600; }
 .etapes-bail { display: grid; gap: 12px; margin: 16px 0; }
 .etape-bail { scroll-margin-top: 16px; display: grid; gap: 12px; min-width: 0; padding: 16px 20px; border: 1px solid var(--bord); border-radius: var(--rayon); background: var(--carte); }
@@ -606,3 +608,13 @@ a.puce-parc:hover { border-color: var(--corail); color: var(--texte); }
 .derniers-contrats > li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 0; }
 .derniers-contrats > li > a:first-child { display: grid; min-width: 0; color: var(--texte); }
 .derniers-contrats > li > a:first-child:hover strong { color: var(--lien-survol); }
+
+@media (max-width: 760px) {
+  /* La petite frise de la sortie reste horizontale : trois points tiennent. */
+  .frise-sortie .frise { grid-template-columns: repeat(var(--etapes), minmax(0, 1fr)); }
+  .frise-sortie .frise li { flex-direction: column; align-items: center; gap: 6px; padding: 0 2px; text-align: center; }
+  .frise-sortie .frise li::before { display: block; }
+  .frise-sortie .frise li:first-child::before { display: none; }
+  .frise-sortie .frise li::after { display: none; }
+  .frise-sortie .frise .frise-texte { padding-top: 0; }
+}

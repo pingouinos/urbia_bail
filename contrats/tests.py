@@ -7,6 +7,7 @@ from core.testing import creer_gestionnaire
 from comptes.roles import ADMINISTRATEURS, attribuer_role
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -16,7 +17,7 @@ from proprietes.models import Bailleur, Propriete
 from documents import generation
 from mandats.models import Mandat
 
-from .models import Bail, Locataire, ajouter_mois
+from .models import SUIVI_EDL_DEPUIS, Bail, Locataire, ajouter_mois
 
 
 def texte_docx(contenu):
@@ -704,6 +705,14 @@ class EtapesTests(Donnees, TestCase):
         page = self.client.get(bail.get_absolute_url(), parametres)
         return page, {section["numero"]: section["mode"] for section in page.context["sections"]}
 
+    def dossier_temporaire(self):
+        import shutil
+        import tempfile
+
+        dossier = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, dossier, ignore_errors=True)
+        return dossier
+
     def crayons(self, page):
         return [section["numero"] for section in page.context["sections"] if section["crayon"]]
 
@@ -832,13 +841,98 @@ class EtapesTests(Donnees, TestCase):
             "conge_origine": "locataire", "conge_recu_le": self.aujourd_hui.isoformat(),
             "date_depart_prevue": depart.isoformat(), "etapes": "1",
         })
+        # Le congé fait, la petite frise de la sortie passe à l'état des lieux ;
+        # le congé se rouvre d'un clic, avec son annulation.
         page, modes = self.etapes(bail)
-        self.assertEqual(modes[7], "ouverte")
+        self.assertEqual((modes[7], page.context["sortie"]["ouverte"]), ("ouverte", 2))
+        self.assertContains(page, "Clés rendues et EDL le")
+        page, _ = self.etapes(bail, etape=7, sous=1)
+        self.assertEqual(page.context["sortie"]["ouverte"], 1)
         self.assertContains(page, "Annuler le congé…")
         # Annuler le congé : la location continue.
         self.assertRedirects(self.client.post(reverse("contrats:annuler_conge", args=[bail.pk])), self.url_etapes(bail, "#etape-6"))
         bail.refresh_from_db()
         self.assertEqual((bail.conge_origine, bail.conge_recu_le, bail.date_depart_prevue), ("", None, None))
+
+    def test_etat_des_lieux_d_entree(self):
+        """Un bail signé qui prend effet après la mise en service attend son
+        état des lieux d'entrée, même la date d'effet passée."""
+        debut = max(SUIVI_EDL_DEPUIS, self.aujourd_hui - dt.timedelta(days=3))
+        bail = self.bail_avec_mandat(date_effet=debut, date_signature=debut - dt.timedelta(days=10))
+        page, modes = self.etapes(bail)
+        self.assertEqual(modes[5], "ouverte")
+        self.assertContains(page, "Enregistrer et passer à la location ›")
+        pdf = SimpleUploadedFile("edl.pdf", b"%PDF-1.4 edl", content_type="application/pdf")
+        faux = SimpleUploadedFile("edl.pdf", b"pas un pdf", content_type="application/pdf")
+        url = reverse("contrats:entree", args=[bail.pk])
+        with override_settings(MEDIA_ROOT=self.dossier_temporaire()):
+            self.client.post(url, {"edl_entree_le": debut.isoformat(), "edl_entree": faux})
+            bail.refresh_from_db()
+            self.assertIsNone(bail.edl_entree_le)
+            demain = self.aujourd_hui + dt.timedelta(days=1)
+            self.client.post(url, {"edl_entree_le": demain.isoformat(), "edl_entree": pdf})
+            bail.refresh_from_db()
+            self.assertIsNone(bail.edl_entree_le)
+            pdf.seek(0)
+            self.client.post(url, {"edl_entree_le": debut.isoformat(), "edl_entree": pdf, "cles_remises": "3"})
+            bail.refresh_from_db()
+            self.assertEqual((bail.edl_entree_le, bail.cles_remises), (debut, 3))
+            page, modes = self.etapes(bail)
+            self.assertEqual((modes[5], modes[6]), ("grisee", "ouverte"))
+            self.assertIn(5, self.crayons(page))
+            self.assertEqual(self.client.get(reverse("contrats:fichier_edl", args=[bail.pk, "edl_entree"])).status_code, 200)
+        self.assertEqual(self.client.get(reverse("contrats:fichier_edl", args=[bail.pk, "fichier_signe"])).status_code, 404)
+
+    def test_sortie_etat_des_lieux_puis_restitution(self):
+        """Clés rendues : le logement est libre, mais le bail ne se termine
+        qu'à la restitution du dépôt, sous un mois (conforme) ou deux."""
+        bail = self.bail_avec_mandat(
+            date_effet=dt.date(2025, 2, 1), date_signature=dt.date(2025, 1, 20), depot_garantie=Decimal("800"),
+            conge_origine="locataire", conge_recu_le=self.aujourd_hui - dt.timedelta(days=40),
+            date_depart_prevue=self.aujourd_hui - dt.timedelta(days=1),
+        )
+        cles = max(SUIVI_EDL_DEPUIS, self.aujourd_hui - dt.timedelta(days=1))
+        Propriete.objects.filter(pk=bail.propriete_id).update(mise_en_location_le=self.aujourd_hui)
+        self.client.post(reverse("contrats:edl_sortie", args=[bail.pk]), {
+            "date_fin_effective": cles.isoformat(), "edl_sortie_conforme": "False",
+        })
+        bail.refresh_from_db()
+        self.assertEqual(bail.date_fin_effective, cles)
+        self.assertFalse(bail.en_cours)
+        self.assertTrue(bail.restitution_attendue)
+        self.assertEqual(bail.restitution_avant, ajouter_mois(cles, 2))
+        from core.taches import taches
+
+        titres = {tache.titre: tache for tache in taches([])}
+        self.assertEqual(next(t for t in titres.values() if t.titre.startswith("Dépôt de garantie à restituer")).detail, f"avant le {ajouter_mois(cles, 2):%d/%m/%Y}")
+        page, modes = self.etapes(bail)
+        self.assertEqual((modes[7], page.context["sortie"]["ouverte"]), ("ouverte", 3))
+        self.assertContains(page, "Enregistrer et terminer le bail")
+        self.assertEqual(page.context["processus"].termine, False)
+        url = reverse("contrats:restitution", args=[bail.pk])
+        jour = self.aujourd_hui.isoformat()
+        # Des retenues sans motif, ou plus fortes que le dépôt, sont refusées.
+        self.client.post(url, {"depot_retenues": "100", "depot_motif": "", "depot_restitue_le": jour})
+        self.client.post(url, {"depot_retenues": "900", "depot_motif": "Travaux", "depot_restitue_le": jour})
+        bail.refresh_from_db()
+        self.assertIsNone(bail.depot_restitue_le)
+        self.client.post(url, {"depot_retenues": "150", "depot_motif": "Plan de travail brûlé", "depot_restitue_le": jour})
+        bail.refresh_from_db()
+        self.assertEqual((bail.depot_a_rendre, bail.termine), (Decimal("650"), True))
+        page, modes = self.etapes(bail, etape=7)
+        self.assertEqual(set(modes.values()), {"grisee"})
+        self.assertContains(page, "dépôt restitué le")
+        # Terminé : un gestionnaire ne corrige plus la restitution.
+        self.client.post(url, {"depot_retenues": "0", "depot_restitue_le": jour})
+        bail.refresh_from_db()
+        self.assertEqual(bail.depot_retenues, Decimal("150"))
+
+    def test_sortie_ancienne_sans_restitution(self):
+        """Un départ antérieur au suivi des dépôts termine le bail comme avant."""
+        bail = self.bail_avec_mandat(date_effet=dt.date(2025, 2, 1), date_signature=dt.date(2025, 1, 20),
+                                     depot_garantie=Decimal("800"), date_fin_effective=dt.date(2026, 1, 31))
+        self.assertTrue(bail.termine)
+        self.assertFalse(bail.edl_entree_attendu)
 
     def test_bail_termine(self):
         bail = self.bail_avec_mandat(date_effet=dt.date(2025, 2, 1), date_signature=dt.date(2025, 1, 20),

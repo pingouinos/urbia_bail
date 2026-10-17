@@ -114,9 +114,22 @@ sur une ligne.
 
   {% elif numero == 5 %}
   {% if mode == "ouverte" %}
-  <p class="ligne-etape">Entrée prévue le {{ bail.date_effet|date:"d/m/Y" }}, date d'effet du bail. Rien à saisir : l'étape se clôt d'elle-même ce jour-là.</p>
+  {% if etape.etat == "alerte" %}<p class="alerte">Entrée prévue le {{ bail.date_effet|date:"d/m/Y" }} : l'état des lieux d'entrée n'est pas encore enregistré.</p>
+  {% else %}<p class="ligne-etape">Entrée prévue le {{ bail.date_effet|date:"d/m/Y" }}, date d'effet du bail. L'état des lieux d'entrée clôt l'étape.</p>{% endif %}
+  <form method="post" enctype="multipart/form-data" action="{% url 'contrats:entree' bail.pk %}" id="form-entree">
+    {% csrf_token %}
+    <div class="champs-etape">
+      {% include "proprietes/_champ.html" with champ=form_entree.edl_entree_le %}
+      {% include "proprietes/_champ.html" with champ=form_entree.edl_entree %}
+      {% include "proprietes/_champ.html" with champ=form_entree.cles_remises %}
+    </div>
+  </form>
+  <div class="boutons-etape">
+    {% if processus.rang != 5 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
+    <button type="submit" form="form-entree" class="pousse">{% if processus.rang == 5 %}Enregistrer et passer à la location ›{% else %}Enregistrer{% endif %}</button>
+  </div>
   {% elif mode == "grisee" %}
-  <p class="ligne-etape">Entrée {% if numero == processus.rang %}prévue {% endif %}le {{ bail.date_effet|date:"d/m/Y" }}</p>
+  <p class="ligne-etape">{% if bail.edl_entree_le %}État des lieux d'entrée le {{ bail.edl_entree_le|date:"d/m/Y" }}{% if bail.cles_remises %} · {{ bail.cles_remises }} clé{{ bail.cles_remises|pluralize }} remise{{ bail.cles_remises|pluralize }}{% endif %}{% if bail.edl_entree %} · <a href="{% url 'contrats:fichier_edl' bail.pk 'edl_entree' %}" target="_blank" rel="noopener">ouvrir le PDF</a>{% endif %}{% else %}Entrée {% if numero == processus.rang %}prévue {% endif %}le {{ bail.date_effet|date:"d/m/Y" }}{% endif %}</p>
   {% else %}
   <p class="ligne-etape">Entrée prévue le {{ bail.date_effet|date:"d/m/Y" }}, date d'effet du bail.</p>
   {% endif %}
@@ -135,6 +148,8 @@ sur une ligne.
 
   {% elif numero == 7 %}
   {% if mode == "ouverte" %}
+  <div class="frise-sortie">{% include "_frise.html" with processus=sortie.processus choisie=sortie.ouverte %}</div>
+  {% if sortie.ouverte == 1 %}
   <form method="post" action="{% url 'contrats:fin' bail.pk %}" id="form-fin">
     {% csrf_token %}<input type="hidden" name="etapes" value="1">
     {{ form_fin.non_field_errors }}
@@ -146,20 +161,53 @@ sur une ligne.
       <p class="discret pleine-largeur">Préavis du locataire : {{ bail.mois_preavis }} mois pour ce logement ; la date de départ proposée en découle. Congé du bailleur : au terme du bail, le {{ bail.date_fin|date:"d/m/Y" }}.</p>
       {% include "proprietes/_champ.html" with champ=form_fin.conge_recu_le %}
       {% include "proprietes/_champ.html" with champ=form_fin.date_depart_prevue %}
-      {% include "proprietes/_champ.html" with champ=form_fin.date_fin_effective %}
-      {% if bail.date_fin_effective %}<label>Motif de la correction <input name="motif" required></label>{% endif %}
     </div>
   </form>
   {% if bail.conge_annulable %}<form method="post" action="{% url 'contrats:annuler_conge' bail.pk %}" id="form-annuler-conge" onsubmit="return confirm('Annuler le congé ? La location continue.');">{% csrf_token %}</form>{% endif %}
   <div class="boutons-etape">
     {% if bail.conge_annulable %}<button type="submit" form="form-annuler-conge" class="secondaire bouton-danger">Annuler le congé…</button>{% endif %}
-    {% if processus.rang != 7 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
+    {% if processus.rang != 7 or bail.sous_etape_sortie != 1 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
     <button type="submit" form="form-fin" class="pousse">Enregistrer</button>
   </div>
-  {% elif mode == "grisee" %}
-  <p class="ligne-etape">{% if bail.conge_recu_le %}Congé {% if bail.conge_origine == "bailleur" %}du bailleur{% else %}du locataire{% endif %} reçu le {{ bail.conge_recu_le|date:"d/m/Y" }} · {% endif %}{% if bail.date_fin_effective %}parti le {{ bail.date_fin_effective|date:"d/m/Y" }}{% else %}départ prévu le {{ bail.date_depart_prevue|date:"d/m/Y" }}{% endif %}</p>
+  {% elif sortie.ouverte == 2 %}
+  <form method="post" enctype="multipart/form-data" action="{% url 'contrats:edl_sortie' bail.pk %}" id="form-edl-sortie">
+    {% csrf_token %}
+    <div class="champs-etape">
+      {% include "proprietes/_champ.html" with champ=form_edl_sortie.date_fin_effective %}
+      {% include "proprietes/_champ.html" with champ=form_edl_sortie.edl_sortie %}
+      <div class="champ obligatoire{% if form_edl_sortie.edl_sortie_conforme.errors %} en-erreur{% endif %}">
+        <span class="libelle">{{ form_edl_sortie.edl_sortie_conforme.label|capfirst }}</span>
+        <div class="choix-radio">{% for radio in form_edl_sortie.edl_sortie_conforme %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
+      </div>
+    </div>
+  </form>
+  <p class="discret">{% if bail.edl_entree %}<a href="{% url 'contrats:fichier_edl' bail.pk 'edl_entree' %}" target="_blank" rel="noopener">Ouvrir l'état des lieux d'entrée</a> pour comparer. {% endif %}Le dépôt est à restituer un mois après la remise des clés si la sortie est conforme, deux mois s'il y a des dégradations.</p>
+  <div class="boutons-etape">
+    {% if bail.sous_etape_sortie != 2 %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
+    <button type="submit" form="form-edl-sortie" class="pousse">{% if bail.depot_garantie and not bail.date_fin_effective %}Enregistrer et passer à la restitution ›{% else %}Enregistrer{% endif %}</button>
+  </div>
   {% else %}
-  <p class="ligne-etape">Congé, départ prévu, départ effectif : à remplir quand le congé arrive. Terme du bail le {{ bail.date_fin|date:"d/m/Y" }}.</p>
+  <p class="ligne-etape">Clés rendues le {{ bail.date_fin_effective|date:"d/m/Y" }} · {% if bail.edl_sortie_conforme %}sortie conforme{% elif bail.edl_sortie_conforme is False %}dégradations{% else %}état des lieux non comparé{% endif %}{% if bail.edl_sortie %} · <a href="{% url 'contrats:fichier_edl' bail.pk 'edl_sortie' %}" target="_blank" rel="noopener">ouvrir l'état des lieux</a>{% endif %}. Dépôt de {{ bail.depot_garantie }} € à restituer avant le <strong>{{ bail.restitution_avant|date:"d/m/Y" }}</strong>.</p>
+  <form method="post" enctype="multipart/form-data" action="{% url 'contrats:restitution' bail.pk %}" id="form-restitution">
+    {% csrf_token %}
+    <div class="champs-etape">
+      {% include "proprietes/_champ.html" with champ=form_restitution.depot_retenues %}
+      {% include "proprietes/_champ.html" with champ=form_restitution.depot_motif %}
+      {% include "proprietes/_champ.html" with champ=form_restitution.depot_justificatif %}
+      {% include "proprietes/_champ.html" with champ=form_restitution.depot_restitue_le %}
+      {% if bail.termine %}<label>Motif de la correction <input name="motif" required></label>{% endif %}
+    </div>
+  </form>
+  <p class="discret">{% if bail.depot_retenues %}À rendre : {{ bail.depot_a_rendre }} € sur {{ bail.depot_garantie }} €. {% endif %}Après le {{ bail.restitution_avant|date:"d/m/Y" }}, majoration légale de 10 % du loyer hors charges par mois de retard commencé (article 22 de la loi du 6 juillet 1989).</p>
+  <div class="boutons-etape">
+    {% if bail.termine %}<a class="bouton secondaire" href="{{ annuler }}">Annuler</a>{% endif %}
+    <button type="submit" form="form-restitution" class="pousse">{% if bail.termine %}Enregistrer la correction{% else %}Enregistrer et terminer le bail{% endif %}</button>
+  </div>
+  {% endif %}
+  {% elif mode == "grisee" %}
+  <p class="ligne-etape">{% if bail.conge_recu_le %}Congé {% if bail.conge_origine == "bailleur" %}du bailleur{% else %}du locataire{% endif %} reçu le {{ bail.conge_recu_le|date:"d/m/Y" }} · {% endif %}{% if bail.date_fin_effective %}clés rendues le {{ bail.date_fin_effective|date:"d/m/Y" }}{% if bail.edl_sortie %} · <a href="{% url 'contrats:fichier_edl' bail.pk 'edl_sortie' %}" target="_blank" rel="noopener">état des lieux</a>{% endif %}{% if bail.depot_restitue_le %} · dépôt restitué le {{ bail.depot_restitue_le|date:"d/m/Y" }} ({{ bail.depot_a_rendre }} €{% if bail.depot_retenues %}, {{ bail.depot_retenues }} € retenus{% endif %}){% elif bail.restitution_attendue %} · dépôt à restituer avant le {{ bail.restitution_avant|date:"d/m/Y" }}{% endif %}{% else %}départ prévu le {{ bail.date_depart_prevue|date:"d/m/Y" }}{% endif %}</p>
+  {% else %}
+  <p class="ligne-etape">Congé, état des lieux de sortie, restitution du dépôt : à remplir quand le congé arrive. Terme du bail le {{ bail.date_fin|date:"d/m/Y" }}.</p>
   {% endif %}
   {% endif %}
 </section>

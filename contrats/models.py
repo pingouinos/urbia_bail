@@ -30,6 +30,16 @@ def ranger_bail_signe(bail, nom):
     return f"baux/{nom_aleatoire(nom)}"
 
 
+def ranger_edl(bail, nom):
+    return f"baux/edl/{nom_aleatoire(nom)}"
+
+
+# Les états des lieux et la restitution du dépôt sont suivis à partir de ce
+# jour : une entrée ou une sortie antérieure n'en attend pas, pour que les baux
+# déjà en cours ou terminés ne passent pas tous « à vérifier » d'un coup.
+SUIVI_EDL_DEPUIS = dt.date(2026, 10, 17)
+
+
 def _montant(**options):
     return models.DecimalField(max_digits=9, decimal_places=2, **options)
 
@@ -129,8 +139,25 @@ class Bail(Contrat):
         "départ prévu le", null=True, blank=True, help_text="Fin du préavis.",
     )
     date_fin_effective = models.DateField(
-        "fin effective", null=True, blank=True, help_text="Date de départ du locataire."
+        "clés rendues le", null=True, blank=True,
+        help_text="Remise des clés et état des lieux de sortie : le logement redevient libre.",
     )
+    # États des lieux et dépôt de garantie. L'entrée se clôt sur l'état des
+    # lieux d'entrée ; la sortie, sur la restitution du dépôt, due un mois
+    # après la remise des clés si l'état des lieux de sortie est conforme à
+    # celui d'entrée, deux mois sinon (article 22 de la loi du 6 juillet 1989).
+    edl_entree_le = models.DateField("état des lieux d'entrée et clés remises le", null=True, blank=True)
+    edl_entree = models.FileField("état des lieux d'entrée signé", upload_to=ranger_edl, blank=True)
+    cles_remises = models.PositiveSmallIntegerField("clés remises", null=True, blank=True)
+    edl_sortie = models.FileField("état des lieux de sortie signé", upload_to=ranger_edl, blank=True)
+    edl_sortie_conforme = models.BooleanField(
+        "comparé à l'entrée", null=True, blank=True,
+        choices=[(True, "Conforme"), (False, "Dégradations")],
+    )
+    depot_retenues = _montant(verbose_name="retenues (€)", default=0)
+    depot_motif = models.TextField("motif des retenues", blank=True)
+    depot_justificatif = models.FileField("justificatif (devis, facture)", upload_to=ranger_edl, blank=True)
+    depot_restitue_le = models.DateField("dépôt restitué le", null=True, blank=True)
     fichier_signe = models.FileField("bail signé (scan)", upload_to=ranger_bail_signe, blank=True)
     # Suivi des loyers : l'échéancier court à partir de ce mois. Sans date, le
     # bail n'est pas suivi (bail ancien dont les loyers sont tenus ailleurs).
@@ -224,11 +251,54 @@ class Bail(Contrat):
         return self.date_fin_effective is None
 
     @property
+    def edl_entree_attendu(self):
+        """Bail signé dont l'entrée attend son état des lieux."""
+        return self.signe and not self.edl_entree_le and self.date_effet >= SUIVI_EDL_DEPUIS
+
+    @property
+    def restitution_attendue(self):
+        """Clés rendues, dépôt pas encore restitué."""
+        return bool(
+            self.date_fin_effective and not self.depot_restitue_le and self.depot_garantie
+            and self.date_fin_effective >= SUIVI_EDL_DEPUIS
+        )
+
+    @property
+    def termine(self):
+        """Tout est fait : clés rendues et dépôt restitué. Le bail se verrouille."""
+        return bool(self.date_fin_effective) and not self.restitution_attendue
+
+    @property
+    def restitution_avant(self):
+        """Date limite de restitution du dépôt : un mois après la remise des
+        clés, deux mois si l'état des lieux de sortie relève des dégradations."""
+        if not self.date_fin_effective:
+            return None
+        return ajouter_mois(self.date_fin_effective, 2 if self.edl_sortie_conforme is False else 1)
+
+    @property
+    def depot_a_rendre(self):
+        return max(self.depot_garantie - (self.depot_retenues or 0), Decimal(0))
+
+    @property
+    def sous_etape_sortie(self):
+        """Où en est la sortie : 1 congé, 2 état des lieux de sortie,
+        3 restitution du dépôt, 4 terminée."""
+        if self.termine:
+            return 4
+        if self.date_fin_effective:
+            return 3
+        if self.conge_recu_le:
+            return 2
+        return 1
+
+    @property
     def signature_retirable(self):
         """Retour de l'entrée à la signature : la signature se retire tant
         que le locataire n'est pas entré dans les lieux, et le bail redevient
         modifiable."""
-        return self.signe and self.en_cours and not self.conge_recu_le and self.date_effet > timezone.localdate()
+        return (self.signe and self.en_cours and not self.conge_recu_le and not self.edl_entree_le
+                and self.date_effet > timezone.localdate())
 
     @property
     def conge_annulable(self):
@@ -253,6 +323,8 @@ class Bail(Contrat):
 
     @property
     def etat(self):
+        if self.restitution_attendue:
+            return "preavis", "Dépôt à rendre"
         if not self.en_cours:
             return "sans_bail", "Terminé"
         if self.conge_recu_le:
