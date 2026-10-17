@@ -171,3 +171,109 @@ class ContactsTests(Donnees, TestCase):
         self.assertRedirects(self.client.get(reverse("proprietes:bailleurs"), {"q": "durand"}),
                              f"{reverse('contacts:liste')}?q=durand&categorie=bailleur")
         self.assertEqual(self.client.get(reverse("candidatures:liste")).status_code, 200)
+
+
+def classeur_contacts(*lignes, entetes=("Catégorie", "Civilité", "Nom ou raison sociale", "Prénom", "E-mail", "Téléphone",
+                                         "Code postal", "Ville")):
+    import io
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.active.append(list(entetes))
+    for valeurs in lignes:
+        wb.active.append(list(valeurs))
+    flux = io.BytesIO()
+    wb.save(flux)
+    return flux.getvalue()
+
+
+@override_settings(MFA_OBLIGATOIRE=False)
+class ImportContactsTests(TestCase):
+    """Import d'un fichier de contacts : une personne connue est complétée,
+    jamais dédoublée, et une cellule vide n'efface rien."""
+
+    def setUp(self):
+        self.client.force_login(creer_gestionnaire("gestion"))
+
+    def importer(self, *lignes, **options):
+        from .tableur import importer
+
+        return importer("contacts.xlsx", classeur_contacts(*lignes, **options))
+
+    def test_cree_et_complete(self):
+        connu = Contact.objects.create(nom="Martin", prenom="Paul", email="paul@exemple.fr", ville="Toulouse")
+        rapport = self.importer(
+            ("Locataire", "Mme", "Bernard", "Claire", "claire@exemple.fr", 612345678, 1000, "Bourg"),
+            ("Garant", "M.", "MARTIN", "paul", None, "06 11 22 33 44", None, None),
+            ("Propriétaire", None, "SCI Les Tilleuls", None, "sci@exemple.fr", None, "31000", "Toulouse"),
+        )
+        self.assertEqual((rapport.crees, rapport.completes, rapport.erreurs), (2, 1, []))
+        claire = Contact.objects.get(nom="Bernard")
+        self.assertEqual((claire.categorie, claire.civilite, claire.telephone, claire.code_postal),
+                         ("locataire", "Mme", "06 12 34 56 78", "01000"))
+        connu.refresh_from_db()
+        # Complété sans rien perdre ; sa catégorie (aucune) prend celle du fichier.
+        self.assertEqual((connu.email, connu.ville, connu.telephone, connu.categorie),
+                         ("paul@exemple.fr", "Toulouse", "06 11 22 33 44", "garant"))
+        self.assertEqual(Contact.objects.filter(nom__iexact="martin").count(), 1)
+        # Sans prénom ni civilité : une entreprise, qui reçoit sa fiche de bailleur.
+        sci = Contact.objects.get(nom="SCI Les Tilleuls")
+        self.assertEqual(sci.nature, "entreprise")
+        self.assertEqual(Bailleur.objects.get(contact=sci).type, Bailleur.Type.PERSONNE_MORALE)
+
+    def test_bailleur_existant_suit_le_contact(self):
+        bailleur = Bailleur.objects.create(civilite="Mme", nom="Durand", prenom="Anne")
+        self.importer(("Propriétaire", None, "Durand", "Anne", None, "0611223344", None, None))
+        bailleur.refresh_from_db()
+        self.assertEqual(bailleur.telephone, "06 11 22 33 44")
+        self.assertEqual(Bailleur.objects.count(), 1)
+
+    def test_erreurs_par_ligne(self):
+        rapport = self.importer(
+            ("Locataire", "Mme", "Bernard", "Claire", "pas-un-mail", None, None, None),
+            (None, "M.", "Roux", "Jean", None, None, None, None),
+            ("Voisin", None, "Petit", "Léa", None, None, None, None),
+            ("Locataire", "M.", None, "Sans nom", None, None, None, None),
+        )
+        self.assertEqual(rapport.crees, 0)
+        self.assertEqual([numero for numero, _ in rapport.erreurs], [2, 3, 4, 5])
+        self.assertIn("E-mail", rapport.erreurs[0][1])
+        self.assertIn("Catégorie", rapport.erreurs[1][1])
+        self.assertIn("n'est pas une valeur permise", rapport.erreurs[2][1])
+        self.assertFalse(Contact.objects.exists())
+
+    def test_colonne_nom_obligatoire(self):
+        rapport = self.importer(("Locataire", "Claire"), entetes=("Catégorie", "Prénom"))
+        self.assertIn("Nom ou raison sociale", rapport.erreurs[0][1])
+
+    def test_entetes_courants_et_csv(self):
+        from .tableur import importer
+
+        contenu = "Type;Nom;Prénom;Email;Tel\nlocataire;Bernard;Claire;claire@exemple.fr;0612345678\n".encode("cp1252")
+        rapport = importer("export.csv", contenu)
+        self.assertEqual((rapport.crees, rapport.erreurs), (1, []))
+        self.assertEqual(Contact.objects.get().email, "claire@exemple.fr")
+
+    def test_parcours_verification_puis_confirmation(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.assertContains(self.client.get(reverse("contacts:liste")), reverse("contacts:importer"))
+        modele = self.client.get(reverse("contacts:modele"))
+        self.assertEqual(modele.status_code, 200)
+        fichier = SimpleUploadedFile("contacts.xlsx", classeur_contacts(
+            ("Locataire", "Mme", "Bernard", "Claire", None, None, None, None)))
+        reponse = self.client.post(reverse("contacts:importer"), {"fichier": fichier})
+        self.assertContains(reponse, "1 contact(s) à créer")
+        self.assertFalse(Contact.objects.exists())
+        reponse = self.client.post(reverse("contacts:importer_confirmer"), follow=True)
+        self.assertContains(reponse, "1 contact(s) créé(s)")
+        self.assertTrue(Contact.objects.filter(nom="Bernard").exists())
+        reponse = self.client.post(reverse("contacts:importer_confirmer"), follow=True)
+        self.assertContains(reponse, "Aucun fichier en attente")
+
+    def test_le_modele_se_reimporte(self):
+        from .tableur import importer, classeur
+
+        rapport = importer("modele.xlsx", classeur())
+        self.assertEqual((rapport.total, rapport.erreurs), (0, []))

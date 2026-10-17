@@ -175,6 +175,35 @@ class Contact(RattacheAgence, Horodatage):
         cls.history.filter(id__in=identifiants).delete()
         return resultat
 
+    def reporter_sur_bailleurs(self):
+        """Après une saisie ou un import : un propriétaire reçoit sa fiche de
+        bailleur s'il n'en a pas, sinon ses fiches de bailleur reprennent son
+        identité et ses coordonnées à jour."""
+        from proprietes.models import Bailleur
+
+        if self.categorie == self.Categorie.BAILLEUR and not self.bailleurs.exists():
+            # Un propriétaire a aussi sa fiche de bailleur, à laquelle se
+            # rattachent ses propriétés et ses mandats.
+            Bailleur.objects.create(
+                type=Bailleur.Type.PERSONNE_MORALE if self.entreprise else Bailleur.Type.PERSONNE_PHYSIQUE,
+                civilite=self.civilite, nom=self.nom, prenom=self.prenom, adresse=self.adresse,
+                code_postal=self.code_postal, ville=self.ville, email=self.email, telephone=self.telephone,
+            )
+            return
+        for bailleur in self.bailleurs.all():
+            for champ in ("civilite", "nom", "prenom", "email", "telephone", "adresse", "code_postal", "ville"):
+                setattr(bailleur, champ, getattr(self, champ))
+            # La nature choisie ici vaut aussi pour la fiche du bailleur ; sans cela, son
+            # type (société ou personne) reprendrait le dessus à l'enregistrement.
+            if self.entreprise and not bailleur.societe:
+                bailleur.type = Bailleur.Type.PERSONNE_MORALE
+            elif not self.entreprise and bailleur.societe:
+                bailleur.type = Bailleur.Type.PERSONNE_PHYSIQUE
+                bailleur.representant_civilite = bailleur.representant_nom = ""
+                bailleur.representant_prenom = bailleur.representant_qualite = bailleur.siren = ""
+                bailleur.associes.all().delete()
+            bailleur.save()
+
     # --- Catégories et liens ----------------------------------------------------
 
     @property

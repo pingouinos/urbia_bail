@@ -3,7 +3,7 @@
 {% block contenu %}
 <div class="titre-actions">
   <h1>Contacts</h1>
-  <div class="actions"><a class="bouton-petit bouton-action" href="{% url 'contacts:nouveau' %}">+ Nouveau contact</a></div>
+  <div class="actions"><a href="{% url 'contacts:importer' %}">Importer</a><a class="bouton-petit bouton-action" href="{% url 'contacts:nouveau' %}">+ Nouveau contact</a></div>
 </div>
 {% if propriete %}<p>Personnes liées à <a href="{{ propriete.get_absolute_url }}">{{ propriete }}</a> · <a href="{% url 'contacts:liste' %}">tous les contacts</a></p>{% endif %}
 <form class="filtres" method="get">
@@ -45,7 +45,7 @@
   {% endfor %}
 </ul>
 {% else %}
-<p class="carte discret">Aucun contact. Créez-en un avec « Nouveau contact » ; ceux des candidatures et des baux s'ajoutent d'eux-mêmes.</p>
+<p class="carte discret">Aucun contact. Créez-en un avec « Nouveau contact » ou <a href="{% url 'contacts:importer' %}">importez un fichier</a> ; ceux des candidatures et des baux s'ajoutent d'eux-mêmes.</p>
 {% endif %}
 {% include "proprietes/_pagination.html" %}
 {% endblock %}

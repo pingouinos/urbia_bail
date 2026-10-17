@@ -463,6 +463,25 @@ def _garder_import(contenu):
     return nom
 
 
+def garder_import(request, cle, fichier, contenu):
+    request.session[cle] = {"nom": fichier.name, "depot": _garder_import(contenu)}
+
+
+def reprendre_import(request, cle):
+    """(nom, contenu) du fichier vérifié juste avant, qui n'est importé qu'une
+    fois ; None s'il n'y en a pas."""
+    depot = request.session.pop(cle, None)
+    # Le nom du dépôt vient de la session : seul un nom que nous avons créé est accepté.
+    if not depot or not re.fullmatch(r"[0-9a-f]{32}", str(depot.get("depot", ""))):
+        return None
+    chemin = _dossier_imports() / depot["depot"]
+    if not chemin.exists():
+        return None
+    contenu = chemin.read_bytes()
+    chemin.unlink(missing_ok=True)
+    return depot["nom"], contenu
+
+
 def importer(request):
     """Étape 1 : dépôt du fichier et simulation, sans rien enregistrer."""
     form = ImportForm(request.POST or None, request.FILES or None)
@@ -475,23 +494,20 @@ def importer(request):
         except Exception:  # fichier illisible ou corrompu
             form.add_error("fichier", "Impossible de lire ce fichier. Vérifiez qu'il s'agit bien d'un .xlsx ou d'un .csv.")
         else:
-            request.session[CLE_SESSION_IMPORT] = {"nom": fichier.name, "depot": _garder_import(contenu)}
+            garder_import(request, CLE_SESSION_IMPORT, fichier, contenu)
     return render(request, "proprietes/import.html", {"form": form, "rapport": rapport})
 
 
 @require_POST
 def importer_confirmer(request):
     """Étape 2 : import réel du fichier simulé juste avant."""
-    depot = request.session.pop(CLE_SESSION_IMPORT, None)
-    chemin = _dossier_imports() / str(depot.get("depot", "")) if depot else None
-    # Le nom du dépôt vient de la session : seul un nom que nous avons créé est accepté.
-    if not depot or not re.fullmatch(r"[0-9a-f]{32}", str(depot.get("depot", ""))) or not chemin.exists():
+    depot = reprendre_import(request, CLE_SESSION_IMPORT)
+    if depot is None:
         messages.error(request, "Aucun fichier en attente : déposez-le à nouveau.")
         return redirect("proprietes:importer")
-    contenu = chemin.read_bytes()
-    chemin.unlink(missing_ok=True)
-    rapport = tableur.importer(depot["nom"], contenu)
-    noter(request, "import", depot["nom"], f"{rapport.crees} créées, {rapport.mis_a_jour} mises à jour")
+    nom, contenu = depot
+    rapport = tableur.importer(nom, contenu)
+    noter(request, "import", nom, f"{rapport.crees} créées, {rapport.mis_a_jour} mises à jour")
     messages.success(
         request,
         f"Import terminé : {rapport.crees} bien(s) créé(s), {rapport.mis_a_jour} mis à jour, "
