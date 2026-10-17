@@ -95,7 +95,7 @@ class ContactsTests(Donnees, TestCase):
 
     def test_creation_par_type(self):
         self.assertContains(self.client.get(reverse("contacts:liste")),
-                            f'<a class="bouton-petit bouton-corail" href="{reverse("contacts:nouveau")}">+ Nouveau contact</a>')
+                            f'<a class="bouton-petit bouton-action" href="{reverse("contacts:nouveau")}">+ Nouveau contact</a>')
         page = self.client.get(reverse("contacts:nouveau"))
         for libelle in ("Propriétaire (bailleur)", "Locataire", "Garant", "Personne", "Entreprise"):
             self.assertContains(page, libelle)

@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load static %}
+{% block marque %}<img src="{% static 'img/logo-clefaria.png' %}" alt="{{ nom_application }}" width="165" height="48">{% endblock %}
 {% block titre %}Double authentification · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <section class="carte connexion">

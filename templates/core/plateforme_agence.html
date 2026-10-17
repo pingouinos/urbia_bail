@@ -38,7 +38,7 @@
   <p class="discret">Ses comptes actifs retrouvent l'accès à leurs données.</p>
   <form method="post" action="{% url 'plateforme_agence_etat' agence.pk %}">
     {% csrf_token %}<input type="hidden" name="active" value="1">
-    <button type="submit" class="bouton-corail">Réactiver l'agence</button>
+    <button type="submit" class="bouton-action">Réactiver l'agence</button>
   </form>
   {% endif %}
 </section>

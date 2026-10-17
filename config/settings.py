@@ -1,4 +1,4 @@
-"""Configuration Django d'Urbia Gestion.
+"""Configuration Django de Clefaria Loc.
 
 Toute la configuration propre à un déploiement passe par des variables
 d'environnement (fichier .env en local, voir .env.example).
@@ -14,7 +14,7 @@ from django.core.exceptions import ImproperlyConfigured
 # Nom affiché dans les pages, l'administration et les applications
 # d'authentification. Les noms techniques (base urbiabail, image urbia_bail)
 # ne changent pas.
-NOM_APPLICATION = "Urbia Gestion"
+NOM_APPLICATION = "Clefaria Loc"
 # Dépôt GitHub du backlog : un ticket y devient une issue préremplie que
 # l'exploitant relit. Vide, le bouton disparaît.
 TICKETS_DEPOT_GITHUB = "pingouinos/urbia_bail"

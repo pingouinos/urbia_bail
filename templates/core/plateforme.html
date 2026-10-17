@@ -3,7 +3,7 @@
 {% block contenu %}
 <div class="titre-actions">
   <h1>Plateforme</h1>
-  <div class="actions"><a class="bouton-petit bouton-corail" href="{% url 'plateforme_agence_nouvelle' %}">+ Nouvelle agence</a></div>
+  <div class="actions"><a class="bouton-petit bouton-action" href="{% url 'plateforme_agence_nouvelle' %}">+ Nouvelle agence</a></div>
 </div>
 <p class="discret">{{ agences|length }} agence{{ agences|length|pluralize }}, dont {{ nb_actives }} active{{ nb_actives|pluralize }} · {{ nb_comptes }} compte{{ nb_comptes|pluralize }} actif{{ nb_comptes|pluralize }}</p>
 <table>

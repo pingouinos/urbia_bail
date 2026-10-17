@@ -41,6 +41,11 @@ class OrganisationForm(forms.ModelForm):
         model = Organisation
         fields = [champ for _, champs in SECTIONS for champ in champs]
         widgets = {"logo": forms.FileInput(attrs={"accept": "image/png,image/jpeg,image/webp"})}
+        # Ici plutôt que sur le modèle : changer l'aide du modèle demanderait une migration.
+        help_texts = {
+            "logo": "Image de 1 Mo au maximum. Elle figure en haut du menu, sur les pages des candidats "
+                    "et des propriétaires et, en PNG ou en JPEG, en tête des mandats et des baux.",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
