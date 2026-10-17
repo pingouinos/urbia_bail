@@ -721,3 +721,5 @@ table.liste-modeles td:last-child { text-align: right; }
 .lien-proprietaire { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 12px; padding: 12px 14px; background: var(--melon-clair); border-radius: 8px; }
 .lien-proprietaire > div { display: flex; flex-direction: column; gap: 2px; flex: 1 1 320px; }
 .lien-proprietaire form { margin: 0; }
+.outils-editeur button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 36px; min-height: 36px; }
+.outils-editeur .icone { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
