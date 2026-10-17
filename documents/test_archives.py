@@ -223,12 +223,26 @@ class ArchivesTests(Donnees, TestCase):
             objet.refresh_from_db()
             self.assertFalse(objet.signe)
 
-    def test_nouvelle_signature_refusee_sans_preparation(self):
+    def test_signature_sans_preparation_prepare_elle_meme(self):
+        """Sans version préparée, la signature archive le document du moment,
+        puis la signature qui s'y rattache (#160)."""
         for objet in (self.bail, self.mandat):
             self.client.post(self.url(objet, "deposer_signe"), {"date_signature": self.jour.isoformat()})
             objet.refresh_from_db()
+            self.assertTrue(objet.signe)
+            signature, preparation = objet.versions_document.all()[:2]
+            self.assertEqual((signature.nature, preparation.nature), ("signature", "preparation"))
+            self.assertEqual(signature.source, preparation)
+            self.assertEqual(bytes(signature.docx), bytes(preparation.docx))
+
+    def test_signature_refusee_si_donnees_changees_depuis_preparation(self):
+        for objet in (self.bail, self.mandat):
+            self.preparer(objet)
+            objet.charges += 10
+            objet.save()
+            self.client.post(self.url(objet, "deposer_signe"), {"date_signature": self.jour.isoformat()})
+            objet.refresh_from_db()
             self.assertFalse(objet.signe)
-            self.assertEqual(objet.versions_document.count(), 0)
 
     def test_correction_de_fin_exige_motif_et_archive_sans_changer_document(self):
         self.bail.date_effet = self.jour - dt.timedelta(days=20)

@@ -1,8 +1,8 @@
 """Référentiel des bailleurs et des biens (lots) gérés par l'agence.
 
 Les champs reprennent ce que le bail type (décret n° 2015-587) demande de
-décrire. La référence ICS du lot sert de clé pour les imports successifs et
-pour la future migration du logiciel de gestion.
+décrire. Le numéro du lot dans son immeuble, celui d'ICS, sert de clé pour
+les imports successifs et pour faire le lien avec le logiciel de gestion.
 """
 
 import datetime as dt
@@ -364,8 +364,9 @@ class Propriete(RattacheAgence, Horodatage):
         NON_SOUMIS = "NS", "Non soumis"
 
     # Identification
-    ref_ics = models.CharField(
-        "référence ICS du lot", max_length=50, null=True, blank=True
+    numero_lot = models.CharField(
+        "n° de lot", max_length=50, null=True, blank=True,
+        help_text="Numéro du lot dans son immeuble, celui d'ICS.",
     )
     bailleur = models.ForeignKey(Bailleur, on_delete=models.PROTECT, related_name="proprietes")
     immeuble = models.ForeignKey(
@@ -480,9 +481,10 @@ class Propriete(RattacheAgence, Horodatage):
     class Meta:
         ordering = ["ville", "adresse", "complement"]
         verbose_name = "propriété"
+        # Un numéro de lot ne se répète pas dans un immeuble ; d'un immeuble à l'autre, si.
         constraints = [models.UniqueConstraint(
-            fields=["agence", "ref_ics"], name="propriete_ref_ics_par_agence",
-            violation_error_message="Une propriété porte déjà cette référence ICS.",
+            fields=["immeuble", "numero_lot"], name="propriete_numero_lot_par_immeuble",
+            violation_error_message="Un lot de cet immeuble porte déjà ce numéro.",
         )]
 
     def save(self, *args, **kwargs):

@@ -4,6 +4,7 @@ import tempfile
 from decimal import Decimal
 from unittest import mock
 
+from core.processus import processus_mandat
 from core.testing import creer_gestionnaire, remplir_agence
 
 from django.contrib.auth.models import User
@@ -248,13 +249,8 @@ class VuesTests(Donnees, TestCase):
         demain = timezone.localdate() + timezone.timedelta(days=1)
         reponse = self.client.post(deposer, {"date_signature": demain.isoformat()}, follow=True)
         self.assertContains(reponse, "ne peut pas être dans le futur")
-        # Sans version préparée, le refus s'affiche en haut de page, pas sous
-        # l'ancre de l'étape où il passait inaperçu (ticket n° 1, #160).
-        reponse = self.client.post(deposer, {"date_signature": "2026-09-15"}, follow=True)
-        self.assertEqual(reponse.redirect_chain, [(mandat.get_absolute_url(), 302)])
-        self.assertContains(reponse, "Préparez la version à signer")
-        # La date seule suffit ; le scan suit quand il est disponible.
-        self.client.post(reverse("documents:preparer", args=["mandat", mandat.pk]))
+        # La date seule suffit ; le scan suit quand il est disponible. Sans
+        # version préparée, la signature la prépare elle-même (#160).
         reponse = self.client.post(deposer, {"date_signature": "2026-09-15"}, follow=True)
         self.assertContains(reponse, "Signé le 15/09/2026")
         mandat.refresh_from_db()
@@ -593,3 +589,48 @@ class ConformiteTests(Donnees, TestCase):
         message = verifier_modele("mandat_gestion", ancien)
         self.assertIn("le droit de rétractation du mandant particulier", message)
         self.assertEqual(generation.defauts_modele("mandat_gestion"), [])
+
+
+class MandatCourtTests(Donnees, TestCase):
+    """Mandat court (#160) : le nom, le prénom et l'e-mail du propriétaire,
+    l'adresse du bien, puis le lien ; le propriétaire complète le reste."""
+
+    def setUp(self):
+        remplir_agence()
+        self.client.force_login(creer_gestionnaire("gestion"))
+
+    def test_creer_envoyer_le_lien_puis_completer(self):
+        page = self.client.get(reverse("mandats:creer"))
+        self.assertContains(page, "Créer et envoyer le lien au propriétaire")
+        reponse = self.client.post(reverse("mandats:creer_court"), {
+            "nom": "Durand", "prenom": "Paul", "email": "paul.durand@exemple.fr", "telephone": "0612345678",
+            "adresse": "12 avenue de Muret", "code_postal": "31300", "ville": "Toulouse",
+        })
+        mandat = Mandat.objects.get()
+        self.assertRedirects(reponse, reverse("mandats:lien", args=[mandat.pk]))
+        bailleur = mandat.propriete.bailleur
+        self.assertEqual((bailleur.nom, bailleur.telephone), ("Durand", "06 12 34 56 78"))
+        self.assertTrue(mandat.lien_valide)
+        # La rédaction attend le propriétaire : rien ne se prépare ni ne se signe.
+        self.assertEqual(processus_mandat(mandat).rang, 1)
+        self.assertIn("Mandat à compléter", " ".join(mandat.interdictions))
+        self.assertIn("adresse du mandant", " ".join(mandat.interdictions))
+        self.assertEqual(self.client.get(mandat.get_absolute_url()).status_code, 200)
+        self.client.post(reverse("mandats:deposer_signe", args=[mandat.pk]), {"date_signature": "2026-09-15"})
+        mandat.refresh_from_db()
+        self.assertFalse(mandat.signe)
+        # Sa fiche remplie, le mandat reprend ses coordonnées ; restent la désignation et le loyer.
+        self.client.logout()
+        self.client.post(reverse("formulaire_proprietaire", args=[mandat.jeton]), {
+            "civilite": "M.", "nom": "Durand", "prenom": "Paul", "adresse": "9 rue des Lilas",
+            "code_postal": "31270", "ville": "Frouzins", "telephone": "06 12 34 56 78", "email": "paul.durand@exemple.fr",
+        })
+        mandat.refresh_from_db()
+        self.assertEqual(mandat.mandant_adresse, "9 rue des Lilas")
+        self.assertEqual(mandat.a_completer, ["désignation du bien", "loyer charges comprises (€)"])
+
+    def test_champs_obligatoires(self):
+        reponse = self.client.post(reverse("mandats:creer_court"), {"nom": "Durand"})
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, "Créer et envoyer le lien au propriétaire")
+        self.assertFalse(Mandat.objects.exists())

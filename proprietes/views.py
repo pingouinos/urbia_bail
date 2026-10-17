@@ -53,7 +53,7 @@ def _proprietes_filtres(request):
     q = request.GET.get("q", "").strip()
     if q:
         proprietes = proprietes.filter(
-            Q(ref_ics__icontains=q) | Q(adresse__icontains=q) | Q(complement__icontains=q)
+            Q(numero_lot__icontains=q) | Q(adresse__icontains=q) | Q(complement__icontains=q)
             | Q(immeuble__nom__icontains=q)
             | Q(ville__icontains=q) | Q(code_postal__startswith=q)
             | Q(bailleur__nom__icontains=q) | Q(bailleur__prenom__icontains=q)

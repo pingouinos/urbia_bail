@@ -10,7 +10,7 @@
   </div>
 </div>
 <form class="filtres" method="get">
-  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Référence, adresse, ville, bailleur…" aria-label="Rechercher">
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="N° de lot, adresse, ville, bailleur…" aria-label="Rechercher">
   <select name="usage" aria-label="Usage">
     <option value="">Tous les usages</option>
     {% for valeur, libelle in usages %}<option value="{{ valeur }}"{% if request.GET.usage == valeur %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
@@ -25,7 +25,7 @@
 </form>
 <p class="discret">{{ page.paginator.count }} propriété(s)</p>
 <table>
-  <thead><tr><th>Adresse</th><th>Ville</th><th>Location</th><th>Mandat</th><th>Usage</th><th>Bailleur</th><th>DPE</th><th>Réf. ICS</th></tr></thead>
+  <thead><tr><th>Adresse</th><th>Ville</th><th>Location</th><th>Mandat</th><th>Usage</th><th>Bailleur</th><th>DPE</th><th>N° de lot</th></tr></thead>
   <tbody>
   {% for propriete in page %}
     <tr{% if not propriete.actif %} class="inactif"{% endif %}>
@@ -36,7 +36,7 @@
       <td>{{ propriete.get_usage_display }}{% if propriete.meuble %} meublé{% endif %}</td>
       <td>{{ propriete.bailleur }}</td>
       <td>{% if propriete.location_interdite %}<span class="alerte">G</span>{% else %}{{ propriete.classe_dpe|default:"—" }}{% endif %}</td>
-      <td>{{ propriete.ref_ics|default:"—" }}</td>
+      <td>{{ propriete.numero_lot|default:"—" }}</td>
     </tr>
   {% empty %}
     <tr><td colspan="8" class="discret">Aucune propriété. Commencez par <a href="{% url 'proprietes:importer' %}">importer un fichier</a>.</td></tr>
