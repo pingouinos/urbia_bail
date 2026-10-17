@@ -14,6 +14,7 @@ class Modele(models.Model):
         ORIGINE = "origine", "Modèle d'origine"
         DEPOT = "depot", "Fichier Word déposé"
         GOOGLE = "google", "Repris de Google Docs"
+        EDITEUR = "editeur", "Modifié dans l'application"
         PRECEDENT = "precedent", "Version précédente remise en service"
 
     nom = models.CharField(max_length=60, unique=True)

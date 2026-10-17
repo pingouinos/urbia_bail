@@ -554,6 +554,28 @@ class Propriete(RattacheAgence, Horodatage):
         return Situation("loue", "Loué", bail, a_venir)
 
     @property
+    def candidatures_fermees(self):
+        """Pourquoi le logement ne prend pas de candidature, ou None : il est
+        loué sans congé enregistré, ou le bail du prochain locataire est déjà
+        rédigé. Renvoie (message, action qui le rouvre, son adresse)."""
+        situation = self.situation
+        if situation.a_venir:
+            qui = situation.a_venir.noms_locataires or "locataire à renseigner"
+            return (
+                f"Le prochain locataire est déjà trouvé ({qui}, bail du {situation.a_venir.date_effet:%d/%m/%Y}) : "
+                "pas de nouvelle candidature sur ce logement.",
+                "Ouvrir le bail", situation.a_venir.get_absolute_url(),
+            )
+        if situation.code == "loue":
+            qui = situation.bail.noms_locataires or "un locataire à renseigner"
+            return (
+                f"Ce logement est loué à {qui} et aucun congé n'est enregistré : "
+                "enregistrez d'abord son congé pour recevoir des candidatures.",
+                "Enregistrer le congé", reverse("contrats:fin", args=[situation.bail.pk]),
+            )
+        return None
+
+    @property
     def designation(self):
         """Description courte pour un mandat : « Appartement T2 meublé de 39 m² »."""
         if self.usage == self.Usage.STATIONNEMENT:

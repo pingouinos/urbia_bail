@@ -111,6 +111,14 @@ def locations_en_cours():
     return sorted(lignes.values(), key=lambda l: (l["propriete"].ville, l["propriete"].adresse))
 
 
+def modeles_a_corriger():
+    """Modèles en service qu'une règle légale rend à corriger."""
+    from documents.generation import defauts_modele
+    from documents.views import MODELES
+
+    return [{"nom": nom, "libelle": libelle} for nom, (libelle, _) in MODELES.items() if defauts_modele(nom)]
+
+
 def accueil(request):
     """Page d'accueil : les actions en attente en une liste, rangée par sujet,
     chacune avec un repère de l'étape où attend son dossier ; puis les
@@ -121,20 +129,35 @@ def accueil(request):
     mandats = Mandat.objects.filter(date_fin__isnull=True).select_related("propriete__bailleur").prefetch_related(
         "propriete__pieces", "propriete__bailleur__pieces",
     )
-    # Le parc : biens gérés (fiche active) et, parmi eux, ceux sans bail en
-    # place. Un bien sans aucun bail dans l'application est compté à part :
+    # Le parc : biens gérés (fiche active), répartis en loués, en préavis
+    # (congé reçu, comme le filtre de la liste des biens) et libres (sans bail
+    # en place). Un bien sans aucun bail dans l'application est compté à part :
     # importé d'Excel, il est souvent loué par un bail plus ancien.
     geres = Propriete.objects.filter(actif=True)
-    inoccupes = geres.filter(~Exists(baux_en_place()))
+    libres = geres.filter(~Exists(baux_en_place()))
+    en_preavis = geres.filter(Exists(baux_en_place().filter(conge_recu_le__isnull=False)))
+    nb_geres, nb_libres, nb_preavis = geres.count(), libres.count(), en_preavis.count()
+    nb_loues = nb_geres - nb_libres - nb_preavis
+    parc = {
+        "geres": nb_geres, "loues": nb_loues, "preavis": nb_preavis, "libres": nb_libres,
+        "sans_bail": libres.filter(baux__isnull=True).count(),
+        "sans_mandat": geres.filter(~Exists(Mandat.objects.filter(propriete=OuterRef("pk"), date_fin__isnull=True))).count(),
+        "prochain_depart": Bail.objects.filter(
+            propriete__in=en_preavis, conge_recu_le__isnull=False, date_depart_prevue__gte=timezone.localdate(),
+        ).order_by("date_depart_prevue").values_list("date_depart_prevue", flat=True).first(),
+        # Parts de la barre d'occupation, en pourcentage.
+        "part_loues": round(100 * nb_loues / nb_geres) if nb_geres else 0,
+        "part_preavis": round(100 * nb_preavis / nb_geres) if nb_geres else 0,
+    }
     return render(request, "core/accueil.html", {
         "est_admin": est_admin,
         "agence_manquants": Organisation.courante().manquants if est_admin else [],
+        "modeles_a_corriger": modeles_a_corriger() if est_admin else [],
         "derniers_baux": Bail.objects.select_related("propriete__bailleur").prefetch_related("locataires").order_by("-modifie_le")[:5],
         "locations": locations, "taches": par_rubrique(a_faire), "nb_taches": len(a_faire),
         "nb_urgentes": sum(tache.urgent for tache in a_faire),
         "nb_echeances": sum(tache.rubrique == ECHEANCES for tache in a_faire),
-        "nb_geres": geres.count(), "nb_inoccupes": inoccupes.count(),
-        "nb_sans_bail": inoccupes.filter(baux__isnull=True).count(),
+        "parc": parc,
         # Mandats en cours pas encore en gestion : signature ou dossier à finir.
         "nb_mandats_a_finaliser": sum(1 for mandat in mandats if not mandat.signe or mandat.pieces_manquantes),
     })

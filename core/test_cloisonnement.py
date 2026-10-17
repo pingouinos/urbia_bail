@@ -99,10 +99,13 @@ class CloisonnementTests(Donnees, TestCase):
 
     def test_lien_du_candidat_ouvre_son_agence(self):
         with activer(self.canal):
-            self.candidature_canal.statut = Candidature.Statut.RETENUE
-            self.candidature_canal.save()
-            self.candidature_canal.creer_lien()
-        reponse = self.client.get(reverse("formulaire_locataire", args=[self.candidature_canal.jeton]))
+            # Logement sans bail : celui du 3 quai de Brienne a déjà son prochain locataire.
+            candidature = self.creer_candidature(
+                self.creer_propriete(adresse="5 quai de Brienne"), candidats=(("Roux", 1800),),
+                statut=Candidature.Statut.RETENUE,
+            )
+            candidature.creer_lien()
+        reponse = self.client.get(reverse("formulaire_locataire", args=[candidature.jeton]))
         self.assertContains(reponse, "quai de Brienne")
 
     def test_sans_agence_rien_n_est_lisible(self):

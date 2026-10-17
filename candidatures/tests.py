@@ -141,6 +141,34 @@ class VuesTests(Donnees, TestCase):
         self.assertRedirects(reponse, candidature.get_absolute_url())
         self.assertEqual(candidature.noms, "Julie MARTIN")
 
+    def test_creation_refusee_sur_un_logement_loue_sans_conge(self):
+        propriete = self.creer_propriete()
+        bail = self.creer_bail(propriete=propriete, date_effet=dt.date(2024, 9, 1))
+        page = self.client.get(propriete.get_absolute_url(), {"onglet": "candidatures"})
+        self.assertNotContains(page, "Enregistrer une candidature")
+        self.assertContains(page, reverse("contrats:fin", args=[bail.pk]))
+        reponse = self.client.post(reverse("candidatures:creer"), self.donnees_formulaire(propriete, ["Martin"]))
+        self.assertContains(reponse, "aucun congé n&#x27;est enregistré")
+        self.assertFalse(Candidature.objects.exists())
+
+        # Congé reçu : le logement reprend des candidatures.
+        bail.conge_recu_le = dt.date(2026, 9, 15)
+        bail.date_depart_prevue = dt.date(2026, 12, 15)
+        bail.save()
+        self.assertContains(self.client.get(propriete.get_absolute_url(), {"onglet": "candidatures"}),
+                            "Enregistrer une candidature")
+        reponse = self.client.post(reverse("candidatures:creer"), self.donnees_formulaire(propriete, ["Martin"]))
+        self.assertRedirects(reponse, Candidature.objects.get().get_absolute_url())
+
+    def test_creation_refusee_quand_le_prochain_bail_est_redige(self):
+        propriete = self.creer_propriete()
+        self.creer_bail(propriete=propriete, date_effet=timezone.localdate() + dt.timedelta(days=20))
+        self.assertContains(self.client.get(reverse("candidatures:liste"), {"propriete": propriete.pk}),
+                            "Le prochain locataire est déjà trouvé")
+        reponse = self.client.post(reverse("candidatures:creer"), self.donnees_formulaire(propriete, ["Martin"]))
+        self.assertContains(reponse, "Le prochain locataire est déjà trouvé")
+        self.assertFalse(Candidature.objects.exists())
+
     def test_creation_avec_le_nom_seul(self):
         """Le candidat complète le reste par son lien : l'état civil,
         l'activité et les revenus sont repliés, et facultatifs."""
@@ -383,6 +411,16 @@ class LienLocataireTests(Donnees, TestCase):
         self.assertContains(page, 'href="https://aide.dossierfacile.logement.gouv.fr/fr/"')
         self.assertContains(page, "avec les documents justificatifs")
         self.assertContains(page, '<div class="champ obligatoire">\n  \n  <label for="id_candidats-0-nom">', html=False)
+
+    def test_pas_de_lien_sur_un_logement_loue_sans_conge(self):
+        formulaire = self.creer_lien()
+        self.creer_bail(propriete=self.candidature.propriete, date_effet=dt.date(2024, 9, 1))
+        self.assertFalse(Candidature.objects.get(pk=self.candidature.pk).lien_possible)
+        reponse = self.client.post(reverse("candidatures:lien", args=[self.candidature.pk]), {"action": "creer"},
+                                   follow=True)
+        self.assertContains(reponse, "aucun congé n&#x27;est enregistré")
+        self.client.logout()
+        self.assertEqual(self.client.get(formulaire).status_code, 404)
 
     def test_pas_de_lien_apres_un_refus(self):
         formulaire = self.creer_lien()

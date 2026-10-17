@@ -22,7 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from contrats.models import Bail
-from core.agence import ParAgence, RattacheAgence
+from core.agence import ParAgence, RattacheAgence, activer
 from core.champs import TelephoneField
 from core.models import Organisation
 from proprietes.models import Bailleur, Propriete, Horodatage
@@ -179,8 +179,10 @@ class Candidature(RattacheAgence, Horodatage):
     @property
     def lien_possible(self):
         """Le candidat peut recevoir un lien tant que sa candidature est à
-        l'étude ou retenue, et que le bail n'est pas rédigé."""
-        return self.statut in (self.Statut.A_ETUDIER, self.Statut.RETENUE) and not self.bail_id
+        l'étude ou retenue, que son bail n'est pas rédigé et que le logement
+        prend des candidatures (pas loué sans congé)."""
+        return (self.statut in (self.Statut.A_ETUDIER, self.Statut.RETENUE) and not self.bail_id
+                and not self.propriete.candidatures_fermees)
 
     @property
     def lien_valide(self):
@@ -203,7 +205,11 @@ class Candidature(RattacheAgence, Horodatage):
         """Candidature dont le lien est encore valable, ou None."""
         # Toutes agences : le lien est ouvert sans connexion, son jeton suffit.
         candidature = cls.tous.select_related("propriete", "agence").filter(jeton=jeton).first() if jeton else None
-        return candidature if candidature and candidature.lien_valide else None
+        if candidature is None:
+            return None
+        # La situation du logement se lit dans l'agence de la candidature.
+        with activer(candidature.agence):
+            return candidature if candidature.lien_valide else None
 
     def texte_lien(self, lien, signataire=""):
         propriete = self.propriete
