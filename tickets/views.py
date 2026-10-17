@@ -8,12 +8,11 @@ from django.core.exceptions import PermissionDenied
 from django.core.mail import EmailMessage
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils import timezone
 
 from core.agence import agence_active
 from core.fichiers import servir
 
-from .forms import SuiviForm, TicketForm
+from .forms import SuiviForm, TicketForm, page_sure
 from .models import Ticket
 
 logger = logging.getLogger(__name__)
@@ -36,8 +35,9 @@ def appareil(user_agent):
     return f"{navigateur} · {support}"
 
 
-def mes_tickets(request):
-    """Ouvrir un ticket, et suivre ceux qu'on a ouverts."""
+def ouvrir(request):
+    """Ouvrir un ticket, puis revenir à la page d'où l'on venait. Pas de
+    suivi côté utilisateur : l'exploitant répond par e-mail."""
     if request.method == "POST":
         form = TicketForm(request.POST, request.FILES)
         if form.is_valid():
@@ -46,23 +46,19 @@ def mes_tickets(request):
             ticket.appareil = appareil(request.META.get("HTTP_USER_AGENT", ""))
             ticket.save()
             prevenir_exploitant(request, ticket)
-            messages.success(request, "Ticket envoyé. La réponse s'affichera ici.")
-            return redirect("tickets:liste")
+            messages.success(request, "Ticket envoyé, merci.")
+            return redirect(ticket.page or "accueil")
     else:
-        page = request.GET.get("page", "")
-        form = TicketForm(initial={"page": "" if page.startswith(reverse("tickets:liste")) else page})
-    tickets = Ticket.objects.filter(auteur=request.user)
-    return render(request, "tickets/mes_tickets.html", {"form": form, "tickets": tickets})
-
-
-def capture(request, pk):
-    ticket = get_object_or_404(Ticket.objects.filter(auteur=request.user), pk=pk)
-    return servir(ticket.capture)
+        page = page_sure(request.GET.get("page", ""))
+        form = TicketForm(initial={"page": "" if page.startswith(reverse("tickets:ouvrir")) else page})
+    retour = page_sure(form["page"].value() or "") or reverse("accueil")
+    return render(request, "tickets/ouvrir.html", {"form": form, "retour": retour})
 
 
 def prevenir_exploitant(request, ticket):
-    """E-mail aux superutilisateurs. Un envoi raté ne perd pas le ticket :
-    il reste dans la Plateforme."""
+    """E-mail aux superutilisateurs, auquel il suffit de répondre pour écrire
+    à l'auteur. Un envoi raté ne perd pas le ticket : il reste dans la
+    Plateforme."""
     destinataires = list(
         get_user_model().objects.filter(is_superuser=True, is_active=True).exclude(email="").values_list("email", flat=True)
     )
@@ -79,6 +75,7 @@ def prevenir_exploitant(request, ticket):
     try:
         EmailMessage(
             subject=f"[Ticket] {ticket.get_type_display()} : {ticket.titre}", body=corps, to=destinataires,
+            reply_to=[request.user.email] if request.user.email else None,
         ).send()
     except Exception:
         logger.exception("E-mail du ticket %s non envoyé", ticket.pk)
@@ -121,13 +118,9 @@ def plateforme_tickets(request):
 def plateforme_ticket(request, pk):
     _exploitant(request)
     ticket = get_object_or_404(Ticket.tous.select_related("agence", "auteur"), pk=pk)
-    reponse_avant = ticket.reponse
     form = SuiviForm(request.POST or None, instance=ticket)
     if form.is_valid():
-        ticket = form.save(commit=False)
-        if ticket.reponse != reponse_avant:
-            ticket.repondu_le = timezone.now() if ticket.reponse else None
-        ticket.save()
+        form.save()
         messages.success(request, "Ticket mis à jour.")
         return redirect("plateforme_tickets")
     return render(request, "tickets/plateforme_ticket.html", {

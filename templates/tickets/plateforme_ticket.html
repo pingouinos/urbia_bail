@@ -6,7 +6,7 @@
   <h1>{{ ticket.titre }}</h1>
   <span class="pastille pastille-ticket-{{ ticket.etat }}">{{ ticket.get_etat_display }}</span>
 </div>
-<p class="discret">{{ ticket.get_type_display }} · {{ ticket.auteur.get_full_name|default:ticket.auteur.username|default:"compte supprimé" }} ({{ ticket.agence.designation }}) · {{ ticket.cree_le|date:"d/m/Y à H:i" }}</p>
+<p class="discret">{{ ticket.get_type_display }} · {{ ticket.auteur.get_full_name|default:ticket.auteur.username|default:"compte supprimé" }} ({{ ticket.agence.designation }}) · {{ ticket.cree_le|date:"d/m/Y à H:i" }}{% if ticket.auteur.email %} · répondre à <a href="mailto:{{ ticket.auteur.email }}">{{ ticket.auteur.email }}</a>{% endif %}</p>
 <section class="carte">
   <p class="ticket-texte">{{ ticket.texte }}</p>
   <p class="discret">Page : {{ ticket.page|default:"non indiquée" }} · {{ ticket.appareil|default:"appareil inconnu" }}</p>
@@ -28,7 +28,6 @@
       <span class="libelle">État</span>
       <div class="choix-radio">{% for radio in form.etat %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
     </div>
-    {% include "proprietes/_champ.html" with champ=form.reponse %}
     {% include "proprietes/_champ.html" with champ=form.issue %}
   </fieldset>
   <button type="submit" class="bouton-corail">Enregistrer</button>

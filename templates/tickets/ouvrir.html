@@ -24,25 +24,6 @@
     </div>
     {% if form.page.value %}<p class="discret pleine-largeur">Page jointe : {{ form.page.value }}</p>{% endif %}
   </fieldset>
-  <button type="submit" class="bouton-corail">Envoyer</button>
+  <div class="actions"><button type="submit" class="bouton-corail">Envoyer</button> <a href="{{ retour }}">Annuler</a></div>
 </form>
-
-<section class="carte">
-  <h2>Mes tickets</h2>
-  {% if tickets %}
-  <ul class="lignes-taches">
-    {% for ticket in tickets %}
-    <li class="ligne-ticket">
-      <div class="titre-actions">
-        <span><strong>{{ ticket.titre }}</strong><br><span class="discret">{{ ticket.get_type_display }} · envoyé le {{ ticket.cree_le|date:"d/m/Y à H:i" }}{% if ticket.capture %} · <a href="{% url 'tickets:capture' ticket.pk %}">capture</a>{% endif %}</span></span>
-        <span class="pastille pastille-ticket-{{ ticket.etat }}">{{ ticket.get_etat_display }}</span>
-      </div>
-      {% if ticket.reponse %}<p class="ticket-reponse">{{ ticket.reponse }}</p>{% endif %}
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="discret">Aucun ticket pour l'instant.</p>
-  {% endif %}
-</section>
 {% endblock %}

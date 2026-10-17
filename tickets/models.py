@@ -37,8 +37,6 @@ class Ticket(RattacheAgence):
     cree_le = models.DateTimeField("ouvert le", auto_now_add=True)
 
     etat = models.CharField("état", max_length=10, choices=Etat.choices, default=Etat.RECU)
-    reponse = models.TextField("réponse", blank=True, help_text="Lue par l'auteur du ticket dans « Mes tickets ».")
-    repondu_le = models.DateTimeField(null=True, blank=True)
     issue = models.URLField("issue GitHub", blank=True, help_text="Adresse de l'issue, une fois créée.")
 
     class Meta:

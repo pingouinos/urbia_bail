@@ -27,7 +27,7 @@ class TicketsTests(TestCase):
         self.urbia = Organisation.objects.create(nom="URBIA Immobilier")
         self.canal = Organisation.objects.create(nom="Agence du Canal")
         with activer(self.urbia):
-            self.elodie = creer_gestionnaire("elodie", first_name="Elodie", last_name="Martin")
+            self.elodie = creer_gestionnaire("elodie", email="elodie@urbia.example", first_name="Elodie", last_name="Martin")
             self.collegue = creer_gestionnaire("paul")
         with activer(self.canal):
             self.lea = creer_gestionnaire("lea")
@@ -36,52 +36,61 @@ class TicketsTests(TestCase):
     def ouvrir(self, client_user, texte="La page reste blanche sur « Rédiger le bail ».", **autres):
         self.client.force_login(client_user)
         donnees = {"type": Ticket.Type.BUG, "texte": texte, "page": "/candidatures/12/", **autres}
-        return self.client.post(reverse("tickets:liste"), donnees, HTTP_USER_AGENT=CHROME_ANDROID)
+        return self.client.post(reverse("tickets:ouvrir"), donnees, HTTP_USER_AGENT=CHROME_ANDROID)
 
     def test_lien_dans_le_menu_avec_la_page_courante(self):
         self.client.force_login(self.elodie)
         page = self.client.get(reverse("contacts:liste"))
-        self.assertContains(page, f'{reverse("tickets:liste")}?page=/contacts/')
-        formulaire = self.client.get(reverse("tickets:liste"), {"page": "/contacts/"})
+        self.assertContains(page, f'{reverse("tickets:ouvrir")}?page=/contacts/')
+        formulaire = self.client.get(reverse("tickets:ouvrir"), {"page": "/contacts/"})
         self.assertContains(formulaire, "Page jointe : /contacts/")
 
     def test_ouvrir_un_ticket(self):
         reponse = self.ouvrir(self.elodie)
-        self.assertRedirects(reponse, reverse("tickets:liste"))
+        # Retour à la page d'où le ticket est parti.
+        self.assertRedirects(reponse, "/candidatures/12/", fetch_redirect_response=False)
         ticket = Ticket.tous.get()
         self.assertEqual((ticket.agence, ticket.auteur, ticket.etat), (self.urbia, self.elodie, Ticket.Etat.RECU))
         self.assertEqual(ticket.page, "/candidatures/12/")
         self.assertEqual(ticket.appareil, "Chrome · téléphone")
-        # L'exploitant est prévenu par e-mail, avec le lien vers la Plateforme.
+        # L'exploitant est prévenu par e-mail, avec le lien vers la Plateforme ;
+        # répondre à l'e-mail écrit à l'auteur.
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["editeur@example.com"])
+        self.assertEqual(mail.outbox[0].reply_to, ["elodie@urbia.example"])
         self.assertIn("Elodie Martin (URBIA Immobilier)", mail.outbox[0].body)
         self.assertIn(reverse("plateforme_ticket", args=[ticket.pk]), mail.outbox[0].body)
 
+    def test_sans_page_retour_au_tableau_de_bord(self):
+        self.assertRedirects(self.ouvrir(self.elodie, page=""), reverse("accueil"), fetch_redirect_response=False)
+
     def test_page_exterieure_ignoree(self):
-        self.ouvrir(self.elodie, page="https://exemple.com/")
-        self.assertEqual(Ticket.tous.get().page, "")
+        for page in ("https://exemple.com/", "//exemple.com/", "/\\exemple.com/", "javascript:alert(1)"):
+            with self.subTest(page=page):
+                self.assertRedirects(self.ouvrir(self.elodie, page=page), reverse("accueil"), fetch_redirect_response=False)
+                self.assertNotContains(self.client.get(reverse("tickets:ouvrir"), {"page": page}), "exemple.com")
+        self.assertEqual(set(Ticket.tous.values_list("page", flat=True)), {""})
 
     def test_capture(self):
         self.ouvrir(self.elodie, capture=SimpleUploadedFile("ecran.png", PNG, content_type="image/png"))
         ticket = Ticket.tous.get()
         self.assertTrue(ticket.capture.name.startswith("tickets/"))
-        self.assertEqual(self.client.get(reverse("tickets:capture", args=[ticket.pk]))["Content-Type"], "image/png")
-        # Un collègue ne l'ouvre pas.
-        self.client.force_login(self.collegue)
-        self.assertEqual(self.client.get(reverse("tickets:capture", args=[ticket.pk])).status_code, 404)
+        # Seul l'exploitant l'ouvre.
+        self.assertEqual(self.client.get(reverse("plateforme_ticket_capture", args=[ticket.pk])).status_code, 403)
+        self.client.force_login(self.exploitant)
+        self.assertEqual(
+            self.client.get(reverse("plateforme_ticket_capture", args=[ticket.pk]))["Content-Type"], "image/png",
+        )
 
     def test_capture_qui_n_est_pas_une_image(self):
         reponse = self.ouvrir(self.elodie, capture=SimpleUploadedFile("ecran.png", b"pas une image"))
+        self.assertContains(reponse, "ni un PDF ni une image")
         self.assertEqual(reponse.status_code, 200)
         self.assertFalse(Ticket.tous.exists())
 
-    def test_chacun_voit_ses_tickets(self):
+    def test_pas_de_suivi_cote_utilisateur(self):
         self.ouvrir(self.elodie, texte="Ticket d'Elodie")
-        self.ouvrir(self.collegue, texte="Ticket de Paul")
-        page = self.client.get(reverse("tickets:liste"))
-        self.assertContains(page, "Ticket de Paul")
-        self.assertNotContains(page, "Ticket d'Elodie")
+        self.assertNotContains(self.client.get(reverse("tickets:ouvrir")), "Ticket d&#x27;Elodie")
 
     def test_reserve_a_l_exploitant(self):
         self.ouvrir(self.elodie)
@@ -103,19 +112,14 @@ class TicketsTests(TestCase):
         self.assertContains(liste, '<span class="compteur">2</span>', html=True)
         fiche = self.client.get(reverse("plateforme_ticket", args=[ticket.pk]))
         self.assertContains(fiche, "Préparer l'issue sur GitHub")
+        self.assertContains(fiche, "mailto:elodie@urbia.example")
         reponse = self.client.post(reverse("plateforme_ticket", args=[ticket.pk]), {
-            "etat": Ticket.Etat.EN_COURS, "reponse": "Corrigé dans la prochaine version.",
-            "issue": "https://github.com/pingouinos/urbia_bail/issues/200",
+            "etat": Ticket.Etat.EN_COURS, "issue": "https://github.com/pingouinos/urbia_bail/issues/200",
         })
         self.assertRedirects(reponse, reverse("plateforme_tickets"))
         ticket.refresh_from_db()
         self.assertEqual(ticket.etat, Ticket.Etat.EN_COURS)
-        self.assertIsNotNone(ticket.repondu_le)
-        # Elodie lit la réponse dans « Mes tickets ».
-        self.client.force_login(self.elodie)
-        page = self.client.get(reverse("tickets:liste"))
-        self.assertContains(page, "Corrigé dans la prochaine version.")
-        self.assertContains(page, "En cours")
+        self.assertEqual(ticket.issue, "https://github.com/pingouinos/urbia_bail/issues/200")
 
     def test_resolus_masques_par_defaut(self):
         self.ouvrir(self.elodie, texte="Déjà réglé")

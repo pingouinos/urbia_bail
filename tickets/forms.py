@@ -1,8 +1,15 @@
 from django import forms
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from core.fichiers import controler_fichier
 
 from .models import Ticket
+
+
+def page_sure(page):
+    """Un chemin de l'application, jamais une adresse extérieure ; sinon vide."""
+    sure = page.startswith("/") and url_has_allowed_host_and_scheme(page, allowed_hosts=None)
+    return page if sure and len(page) <= 300 else ""
 
 
 class TicketForm(forms.ModelForm):
@@ -31,9 +38,7 @@ class TicketForm(forms.ModelForm):
         return capture
 
     def clean_page(self):
-        # Un chemin de l'application, jamais une adresse extérieure.
-        page = self.cleaned_data.get("page", "")
-        return page[:300] if page.startswith("/") and not page.startswith("//") else ""
+        return page_sure(self.cleaned_data.get("page", ""))
 
 
 class SuiviForm(forms.ModelForm):
@@ -41,8 +46,5 @@ class SuiviForm(forms.ModelForm):
 
     class Meta:
         model = Ticket
-        fields = ["etat", "reponse", "issue"]
-        widgets = {
-            "etat": forms.RadioSelect,
-            "reponse": forms.Textarea(attrs={"rows": 4}),
-        }
+        fields = ["etat", "issue"]
+        widgets = {"etat": forms.RadioSelect}

@@ -716,10 +716,8 @@ table.liste-modeles td:last-child { text-align: right; }
 
 /* Tickets : retours des utilisateurs sur l'application. */
 .compteur { display: inline-block; min-width: 22px; margin-left: auto; padding: 0 7px; border-radius: 999px; background: var(--acier); color: #fff; font-size: 0.8rem; font-weight: 700; text-align: center; }
-.ticket-reponse { margin: 6px 0 0; padding: 8px 12px; border-left: 3px solid var(--vert); background: var(--vert-clair); border-radius: 0 8px 8px 0; white-space: pre-line; }
 .ticket-texte { white-space: pre-line; }
 .ticket-capture img { display: block; max-width: 100%; max-height: 480px; border: 1px solid var(--bord); border-radius: 8px; }
 .pastille-ticket-recu { background: var(--melon-clair); border-color: var(--melon); }
 .pastille-ticket-en_cours { background: var(--carte); border-color: var(--corail); }
 .pastille-ticket-resolu { background: var(--vert-clair); border-color: var(--vert); }
-.ligne-ticket { padding: 10px 6px; }
