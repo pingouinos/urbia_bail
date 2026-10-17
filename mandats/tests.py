@@ -634,3 +634,29 @@ class MandatCourtTests(Donnees, TestCase):
         self.assertEqual(reponse.status_code, 200)
         self.assertContains(reponse, "Créer et envoyer le lien au propriétaire")
         self.assertFalse(Mandat.objects.exists())
+
+    def test_surface_saisie_apres_coup_complete_le_mandat(self):
+        """La surface et le loyer arrivés sur la fiche après le mandat
+        remplissent les honoraires restés à zéro, la désignation et le loyer."""
+        self.client.post(reverse("mandats:creer_court"), {
+            "nom": "Durand", "prenom": "Paul", "email": "paul.durand@exemple.fr",
+            "adresse": "12 avenue de Muret", "code_postal": "31300", "ville": "Toulouse",
+        })
+        mandat = Mandat.objects.get()
+        self.assertEqual(mandat.honoraires_bail_locataire, 0)
+        propriete = mandat.propriete
+        propriete.surface, propriete.nb_pieces, propriete.zone_tendue = Decimal("39"), 2, True
+        propriete.dernier_loyer, propriete.charges = Decimal("854"), Decimal("45")
+        propriete.save()
+        mandat.refresh_from_db()
+        self.assertEqual((mandat.honoraires_bail_bailleur, mandat.honoraires_bail_locataire), (390, 390))
+        self.assertEqual((mandat.honoraires_edl_bailleur, mandat.honoraires_edl_locataire), (117, 117))
+        self.assertEqual((mandat.loyer_cc, mandat.charges), (Decimal("899"), Decimal("45")))
+        self.assertIn("39 m²", mandat.designation)
+        # Un montant saisi par l'agence n'est jamais écrasé.
+        mandat.honoraires_bail_bailleur = Decimal("500")
+        mandat.save()
+        propriete.surface = Decimal("45")
+        propriete.save()
+        mandat.refresh_from_db()
+        self.assertEqual((mandat.honoraires_bail_bailleur, mandat.honoraires_bail_locataire), (500, 390))
