@@ -218,7 +218,8 @@ def corriger(request, nom):
     for extrait, remplacement, avant, apres in changements:
         debut = avant.find(extrait)
         lignes.append({
-            "message": CLAUSES_PERIMEES[nom][extrait], "avant": avant[:debut], "retire": extrait,
+            # Sans le renvoi vers « Modèles des documents » : on y est déjà.
+            "message": CLAUSES_PERIMEES[nom][extrait].split(" Corriger le modèle")[0], "avant": avant[:debut], "retire": extrait,
             "ajoute": remplacement, "apres": avant[debut + len(extrait):],
         })
     return render(request, "documents/corriger.html", {
