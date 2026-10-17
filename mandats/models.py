@@ -123,8 +123,7 @@ class Mandat(Contrat):
         PROFESSIONNEL = "professionnel", "Mandant professionnel (société, SCI non familiale)"
 
     numero = models.PositiveIntegerField(
-        "numéro au registre", unique=True,
-        error_messages={"unique": "Ce numéro est déjà porté par un autre mandat."},
+        "numéro au registre",
     )
     propriete = models.ForeignKey(
         Propriete, on_delete=models.PROTECT, related_name="mandats", verbose_name="propriété",
@@ -194,6 +193,11 @@ class Mandat(Contrat):
         ordering = ["-numero"]
         verbose_name = "mandat de gestion"
         verbose_name_plural = "mandats de gestion"
+        # Chaque agence tient son propre registre (loi Hoguet).
+        constraints = [models.UniqueConstraint(
+            fields=["agence", "numero"], name="mandat_numero_par_agence",
+            violation_error_message="Ce numéro est déjà porté par un autre mandat.",
+        )]
 
     def __str__(self):
         return f"Mandat n° {self.numero} · {self.mandant}"

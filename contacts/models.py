@@ -19,6 +19,7 @@ from django.db import models
 from django.urls import reverse
 from simple_history.models import HistoricalRecords
 
+from core.agence import RattacheAgence
 from core.champs import TelephoneField
 
 from proprietes.models import Horodatage
@@ -46,7 +47,7 @@ class Lien:
     precision: str = ""
 
 
-class Contact(Horodatage):
+class Contact(RattacheAgence, Horodatage):
     class Nature(models.TextChoices):
         PERSONNE = "personne", "Personne"
         ENTREPRISE = "entreprise", "Entreprise"

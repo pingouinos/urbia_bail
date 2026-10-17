@@ -1,5 +1,6 @@
 from urllib.parse import quote, urlencode
 
+from core.agence import activer
 from core.journal import noter
 from django.conf import settings
 from django.contrib import messages
@@ -188,6 +189,12 @@ def formulaire_locataire(request, jeton):
     objet = Candidature.par_jeton(jeton)
     if objet is None:
         return render(request, "candidatures/locataire_invalide.html", status=404)
+    # Le visiteur n'a pas d'agence : le lien lui ouvre celle de la candidature, et elle seule.
+    with activer(objet.agence):
+        return _formulaire_locataire(request, objet)
+
+
+def _formulaire_locataire(request, objet):
     form = DossierLocataireForm(request.POST or None, instance=objet)
     candidats = candidat_locataire_formset(objet, request.POST or None)
     if request.method == "POST" and formulaire_locataire_valide(form, candidats):

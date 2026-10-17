@@ -88,7 +88,9 @@ class BailForm(forms.ModelForm):
 
     def clean(self):
         donnees = super().clean()
-        propriete, mandat = donnees.get("propriete") or self.instance.propriete, donnees.get("mandat")
+        # Bien refusé par le champ (hors de la liste) : la nouvelle fiche n'en a pas encore.
+        propriete = donnees.get("propriete") or (self.instance.propriete if self.instance.propriete_id else None)
+        mandat = donnees.get("mandat")
         if mandat and propriete and mandat.propriete_id != propriete.pk:
             self.add_error("mandat", "Ce mandat concerne un autre bien.")
         # Un logement déjà loué ne se reloue qu'une fois le congé reçu, et
