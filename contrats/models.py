@@ -338,6 +338,11 @@ class Bail(Contrat):
                 f"Ce bien est un {propriete.get_usage_display().lower()} : le bail d'habitation ne lui "
                 "convient pas, et l'application n'a pas encore de modèle pour ce type de bail."
             )
+        if self.mandat is None or not (self.signe or self.mandat.en_cours):
+            interdictions.append(
+                "Aucun mandat de gestion en cours n'est rattaché à ce bail : l'agence ne peut pas le faire "
+                "signer sans mandat écrit du bailleur (article 6 de la loi du 2 janvier 1970)."
+            )
         if self.loyer and self.depot_garantie > self.loyer * self.mois_depot_max:
             interdictions.append(
                 f"Dépôt de garantie supérieur à {self.mois_depot_max} mois de loyer hors charges "
@@ -354,8 +359,6 @@ class Bail(Contrat):
         manquants = propriete.champs_manquants_pour_bail()
         if manquants:
             alertes.append("Fiche du bien incomplète : " + ", ".join(manquants) + ".")
-        if self.mandat is None:
-            alertes.append("Aucun mandat de gestion n'est rattaché à ce bail.")
         if self.colocation and self.pk and self.locataires.count() < 2:
             alertes.append("Colocation cochée avec un seul locataire : la clause de colocation ne s'appliquera pas.")
         if self.precedent_loyer and self.loyer and self.loyer > self.precedent_loyer:

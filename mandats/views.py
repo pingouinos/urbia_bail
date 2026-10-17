@@ -95,6 +95,13 @@ def mandat_editer(request):
         form = MandatForm(request.POST)
         if form.is_valid():
             objet = form.save()
+            # Le bail rédigé en attendant le mandat s'y rattache : il peut alors être préparé.
+            for bail in objet.propriete.baux.filter(mandat__isnull=True, date_signature__isnull=True,
+                                                    date_fin_effective__isnull=True):
+                bail.mandat = objet
+                bail.save(update_fields=["mandat", "modifie_le"])
+                messages.info(request, f"Mandat rattaché au bail de {bail.noms_locataires or 'ce logement'} : "
+                                       "il peut maintenant être préparé et signé.")
             immeuble = objet.propriete.immeuble
             if immeuble:
                 # Un mandat par lot : on revient à l'immeuble tant qu'il en reste à rédiger.
