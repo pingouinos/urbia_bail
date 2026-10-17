@@ -6,6 +6,9 @@ from comptes.roles import ADMINISTRATEURS, GESTIONNAIRES, attribuer_role, est_ad
 from .models import Organisation
 
 TAILLE_MAX_LOGO = 1024 * 1024
+# Adresses de sites saisies telles qu'on les lit (« www.agence.fr ») : le champ
+# « url » du navigateur refuserait sans dire pourquoi une adresse sans https://.
+SITES = ["site", "mediateur_site"]
 # Premiers octets des formats acceptés ; le SVG est écarté car il peut porter du script.
 SIGNATURES = {
     b"\x89PNG\r\n\x1a\n": "image/png",
@@ -41,11 +44,19 @@ class OrganisationForm(forms.ModelForm):
         model = Organisation
         fields = [champ for _, champs in SECTIONS for champ in champs]
         widgets = {"logo": forms.FileInput(attrs={"accept": "image/png,image/jpeg,image/webp"})}
+        # Ici plutôt que sur le modèle : changer l'aide du modèle demanderait une migration.
+        help_texts = {
+            "logo": "Image de 1 Mo au maximum. Elle figure en haut du menu, sur les pages des candidats "
+                    "et des propriétaires et, en PNG ou en JPEG, en tête des mandats et des baux.",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for champ in Organisation.MENTIONS:
             self.fields[champ].required = True
+        for champ in SITES:
+            self.fields[champ].assume_scheme = "https"
+            self.fields[champ].widget = forms.TextInput(attrs={"inputmode": "url", "autocomplete": "url"})
         if not self.instance.logo:
             del self.fields["retirer_logo"]
 

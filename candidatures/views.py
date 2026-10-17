@@ -37,7 +37,7 @@ def liste(request):
     q = request.GET.get("q", "").strip()
     if q:
         candidatures = candidatures.filter(
-            Q(propriete__adresse__icontains=q) | Q(propriete__ville__icontains=q) | Q(propriete__ref_ics__icontains=q)
+            Q(propriete__adresse__icontains=q) | Q(propriete__ville__icontains=q) | Q(propriete__numero_lot__icontains=q)
             | Q(candidats__nom__icontains=q) | Q(candidats__prenom__icontains=q)
         ).distinct()
     propriete = None

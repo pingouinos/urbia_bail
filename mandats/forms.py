@@ -4,12 +4,45 @@ from django import forms
 from django.utils import timezone
 
 from proprietes.models import Bailleur, Piece, Propriete
+from core.champs import normaliser_telephone
 from core.fichiers import controler_fichier
 from documents.forms import FichierSigneMixin, SignatureMixin
 
 from .models import (
     PLAFOND_BAIL_HORS_ZONE_TENDUE, PLAFOND_BAIL_ZONE_TENDUE, PLAFOND_ETAT_DES_LIEUX, Mandat, plafonds_locataire,
 )
+
+
+class MandatCourtForm(forms.Form):
+    """Mandat court : l'agence ne saisit que de quoi joindre le propriétaire
+    et retrouver le bien ; il complète sa fiche par le lien qu'il reçoit."""
+
+    nom = forms.CharField(label="Nom du propriétaire", max_length=200)
+    prenom = forms.CharField(label="Prénom", max_length=100)
+    email = forms.EmailField(label="E-mail")
+    telephone = Bailleur._meta.get_field("telephone").formfield(label="Téléphone portable", required=False)
+    adresse = forms.CharField(label="Adresse du bien confié", max_length=255)
+    code_postal = Propriete._meta.get_field("code_postal").formfield()
+    ville = forms.CharField(label="Ville", max_length=100)
+
+    def clean_telephone(self):
+        return normaliser_telephone(self.cleaned_data.get("telephone"))
+
+    def creer(self):
+        """Bailleur, propriété et mandat en attente du propriétaire."""
+        donnees = self.cleaned_data
+        bailleur = Bailleur.objects.create(
+            nom=donnees["nom"], prenom=donnees["prenom"], email=donnees["email"], telephone=donnees["telephone"],
+        )
+        propriete = Propriete.objects.create(
+            bailleur=bailleur, adresse=donnees["adresse"], code_postal=donnees["code_postal"], ville=donnees["ville"],
+        )
+        mandat = Mandat.depuis_propriete(propriete)
+        # La désignation se rédige une fois le bien décrit : un T0 de 0 m² n'a rien à faire au mandat.
+        mandat.designation = ""
+        mandat.save()
+        mandat.creer_lien()
+        return mandat
 
 
 class MandatForm(forms.ModelForm):

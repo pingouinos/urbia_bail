@@ -361,6 +361,8 @@ class MentionsManquantesTests(MediaTemporaire, TestCase):
             self.client.get(reverse("documents:essai_correction", args=["mandat_gestion"]))
         self.client.post(reverse("documents:appliquer_correction", args=["mandat_gestion"]))
         self.assertEqual(generation.defauts_modele("mandat_gestion"), [])
+        self.assertEqual(Modele.objects.get(nom="mandat_gestion").relu_reference,
+                         "la correction proposée (mentions obligatoires reprises du modèle d'origine)")
 
 
 @override_settings(MFA_OBLIGATOIRE=False)

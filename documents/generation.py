@@ -259,8 +259,8 @@ def logo_agence():
             image = b""
     if dimensions_image(image) is None:
         image = b""
-        if "urbia" in (organisation.nom or "").lower():
-            chemin = finders.find("img/logo-urbia-gestion.png")
+        if organisation.logo_par_defaut:
+            chemin = finders.find(organisation.logo_par_defaut)
             image = Path(chemin).read_bytes() if chemin else b""
     dimensions = dimensions_image(image)
     if dimensions is None:

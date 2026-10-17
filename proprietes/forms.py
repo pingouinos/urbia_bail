@@ -108,7 +108,10 @@ class MiseEnLocationForm(forms.ModelForm):
         self.fields["dernier_loyer"].required = True
 
 
-class ProprieteForm(AdresseDejaConnueMixin, RefIcsVideEnNullMixin, forms.ModelForm):
+class ProprieteForm(AdresseDejaConnueMixin, forms.ModelForm):
+    def clean_numero_lot(self):
+        return self.cleaned_data.get("numero_lot") or None
+
     class Meta:
         model = Propriete
         exclude = ["cree_le", "modifie_le", "disponible_le"]
@@ -122,7 +125,7 @@ class ProprieteForm(AdresseDejaConnueMixin, RefIcsVideEnNullMixin, forms.ModelFo
 
     # Regroupement des champs à l'affichage.
     SECTIONS = [
-        ("Identification", ["ref_ics", "bailleur", "immeuble", "usage", "meuble", "actif"]),
+        ("Identification", ["bailleur", "immeuble", "numero_lot", "usage", "meuble", "actif"]),
         ("Localisation", [
             "adresse", "complement", "code_postal", "ville", "etage", "numero_appartement",
             "numero_parking", "numero_cellier", "identifiant_fiscal", "syndic",

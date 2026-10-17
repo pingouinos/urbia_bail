@@ -3,7 +3,7 @@
 {% block contenu %}
 <div class="barre-fiche">
   <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span><span class="fil-ici">{{ immeuble }}</span></nav>
-  {% url 'proprietes:immeuble_modifier' immeuble.pk as modifier %}{% url 'proprietes:immeuble_supprimer' immeuble.pk as supprimer %}{% include "_actions_fiche.html" with modifier=modifier supprimer=supprimer question="Supprimer cet immeuble ? Ses lots sont conservés, sans immeuble." %}
+  {% url 'proprietes:immeuble_modifier' immeuble.pk as modifier %}{% url 'proprietes:immeuble_supprimer' immeuble.pk as supprimer %}{% include "_actions_fiche.html" with modifier=modifier libelle_modifier="Modifier l’immeuble" supprimer=supprimer question="Supprimer cet immeuble ? Ses lots sont conservés, sans immeuble." %}
 </div>
 
 <section class="carte fiche-entete fiche-immeuble">
@@ -32,7 +32,7 @@
     <tbody>
     {% for lot in lots %}
       <tr{% if not lot.actif %} class="inactif"{% endif %}>
-        <td><a href="{{ lot.get_absolute_url }}">{{ lot.complement|default:lot.numero_appartement|default:"Lot sans désignation" }}</a>{% if lot.etage %}<br><span class="discret">Étage {{ lot.etage }}</span>{% endif %}</td>
+        <td><a href="{{ lot.get_absolute_url }}">{% if lot.numero_lot %}Lot {{ lot.numero_lot }}{% else %}{{ lot.complement|default:lot.numero_appartement|default:"Lot sans désignation" }}{% endif %}</a>{% if lot.numero_lot and lot.complement %}<br><span class="discret">{{ lot.complement }}</span>{% endif %}{% if lot.etage %}<br><span class="discret">Étage {{ lot.etage }}</span>{% endif %}</td>
         <td>{% with situation=lot.situation %}<span class="pastille pastille-{{ situation.code }}">{{ situation.libelle }}</span>{% if lot.a_louer %} <span class="pastille pastille-a_louer">À louer</span>{% endif %}{% if situation.bail %}<br><span class="discret">{{ situation.bail.noms_locataires }}</span>{% endif %}{% endwith %}</td>
         <td>{{ lot.get_usage_display }}{% if lot.meuble %} meublé{% endif %}{% if lot.nb_pieces %} · T{{ lot.nb_pieces }}{% endif %}{% if lot.surface %} · {{ lot.surface }} m²{% endif %}</td>
         <td>{% if lot.dernier_loyer %}{{ lot.dernier_loyer }} €{% else %}—{% endif %}</td>

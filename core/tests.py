@@ -238,7 +238,7 @@ class OrganisationTests(TestCase):
     def test_fiche_vide_puis_remplie(self):
         self.assertEqual(Organisation.objects.count(), 0)
         organisation = Organisation.courante()
-        self.assertEqual(organisation.designation, "Urbia Gestion")
+        self.assertEqual(organisation.designation, "Agence sans nom")
         self.assertIn("carte professionnelle", organisation.manquants)
         self.connecter(ADMINISTRATEURS)
         self.assertContains(self.client.get(reverse("accueil")), "La fiche de l'agence est incomplète")
@@ -259,6 +259,15 @@ class OrganisationTests(TestCase):
         reponse = self.client.post(reverse("agence"), {**self.DONNEES, "carte_pro": ""})
         self.assertEqual(reponse.status_code, 200)
         self.assertFalse(Organisation.courante().nom)
+
+    def test_sites_sans_https(self):
+        """Une adresse de site tapée sans « https:// » est acceptée et complétée (#160)."""
+        self.connecter(ADMINISTRATEURS)
+        page = self.client.get(reverse("agence"))
+        self.assertNotContains(page, 'type="url"')
+        self.client.post(reverse("agence"), {**self.DONNEES, "site": "www.urbia.fr", "mediateur_site": "mediateur.example"})
+        organisation = Organisation.courante()
+        self.assertEqual((organisation.site, organisation.mediateur_site), ("https://www.urbia.fr", "https://mediateur.example"))
 
     def test_reservee_aux_administrateurs(self):
         self.connecter(GESTIONNAIRES)

@@ -3,7 +3,7 @@
 {% block contenu %}
 <div class="barre-fiche">
   <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'proprietes:liste' %}">Propriétés</a><span aria-hidden="true">›</span>{% if propriete.immeuble %}<a href="{{ propriete.immeuble.get_absolute_url }}">{{ propriete.immeuble }}</a><span aria-hidden="true">›</span>{% endif %}<span class="fil-ici">{{ propriete.adresse }}{% if propriete.complement %}, {{ propriete.complement }}{% endif %}</span></nav>
-  {% url 'proprietes:propriete_modifier' propriete.pk as modifier %}{% url 'proprietes:propriete_supprimer' propriete.pk as supprimer %}{% include "_actions_fiche.html" with modifier=modifier supprimer=supprimer question="Supprimer définitivement cette propriété ?" %}
+  {% url 'proprietes:propriete_modifier' propriete.pk as modifier %}{% url 'proprietes:propriete_supprimer' propriete.pk as supprimer %}{% include "_actions_fiche.html" with modifier=modifier libelle_modifier="Modifier le logement" supprimer=supprimer question="Supprimer définitivement cette propriété ?" %}
 </div>
 
 <section class="carte fiche-entete">
@@ -23,7 +23,7 @@
     {% if not propriete.actif %}<span class="pastille pastille-libre">Plus géré par l'agence</span>{% endif %}
   </p>
   <p>Appartient à <a href="{{ propriete.bailleur.get_absolute_url }}"><strong>{{ propriete.bailleur }}</strong></a>{% if mandat %} · <a href="{{ mandat.get_absolute_url }}">mandat n° {{ mandat.numero }}</a>{% endif %}{% if propriete.immeuble %} · <a href="{{ propriete.immeuble.get_absolute_url }}">immeuble{% if propriete.immeuble.nom %} {{ propriete.immeuble.nom }}{% endif %}</a>{% endif %}{% if propriete.surface %} · {{ propriete.surface }} m²{% endif %}{% if propriete.nb_pieces %} · {{ propriete.nb_pieces }} pièce{{ propriete.nb_pieces|pluralize }}{% endif %}</p>
-  <p class="discret adresse"><svg class="icone" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg>{{ propriete.adresse }}, {{ propriete.code_postal }} {{ propriete.ville }}{% if propriete.ref_ics %} · réf. ICS {{ propriete.ref_ics }}{% endif %} · <a href="{% url 'contacts:liste' %}?propriete={{ propriete.pk }}">contacts liés</a></p>
+  <p class="discret adresse"><svg class="icone" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg>{{ propriete.adresse }}, {{ propriete.code_postal }} {{ propriete.ville }}{% if propriete.numero_lot %} · lot {{ propriete.numero_lot }}{% endif %} · <a href="{% url 'contacts:liste' %}?propriete={{ propriete.pk }}">contacts liés</a></p>
   <nav class="onglets" aria-label="Rubriques de la fiche">
     <a href="?onglet=location"{% if onglet == "location" %} aria-current="page"{% endif %}>Location</a>
     <a href="?onglet=informations"{% if onglet == "informations" %} aria-current="page"{% endif %}>Informations générales</a>
@@ -121,7 +121,7 @@
       {% if propriete.numero_appartement or propriete.numero_parking or propriete.numero_cellier %}<dt>Numéros</dt><dd>{% if propriete.numero_appartement %}appartement {{ propriete.numero_appartement }} {% endif %}{% if propriete.numero_parking %}parking {{ propriete.numero_parking }} {% endif %}{% if propriete.numero_cellier %}cellier {{ propriete.numero_cellier }}{% endif %}</dd>{% endif %}
       {% if propriete.identifiant_fiscal %}<dt>Identifiant fiscal</dt><dd>{{ propriete.identifiant_fiscal }}</dd>{% endif %}
       {% if propriete.syndic %}<dt>Syndic</dt><dd>{{ propriete.syndic }}</dd>{% endif %}
-      <dt>Réf. ICS</dt><dd>{{ propriete.ref_ics|default:"—" }}</dd>
+      <dt>N° de lot</dt><dd>{{ propriete.numero_lot|default:"—" }}</dd>
     </dl>
   </section>
   <section class="carte">
@@ -238,7 +238,7 @@
     {% for champ in form_piece %}{% include "proprietes/_champ.html" %}{% endfor %}
     <p class="discret pleine-largeur">PDF ou image, 20 Mo au maximum. Pour un DPE, la date indiquée met à jour celle de la fiche.</p>
   </fieldset>
-  <div class="actions-formulaire"><button type="submit" class="bouton-corail">Déposer</button></div>
+  <div class="actions-formulaire"><button type="submit" class="bouton-action">Déposer</button></div>
 </form>
 
 {% else %}

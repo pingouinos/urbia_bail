@@ -9,6 +9,7 @@ urlpatterns = [
     path("", views.registre, name="registre"),
     path("registre.xlsx", views.registre_export, name="registre_export"),
     path("nouveau/", views.mandat_editer, name="creer"),
+    path("nouveau/court/", views.mandat_court, name="creer_court"),
     path("<int:pk>/", views.etapes, name="mandat"),
     # Ancienne adresse de la page des étapes, gardée pour les liens déjà notés.
     path("<int:pk>/modifier/", RedirectView.as_view(pattern_name="mandats:mandat", query_string=True), name="modifier"),

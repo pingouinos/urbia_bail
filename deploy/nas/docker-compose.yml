@@ -1,6 +1,6 @@
 # Urbia Gestion · test sur le NAS Synology, accessible seulement depuis le réseau
-# local en HTTP (http://<IP du NAS>:8080). La production reste le VPS
-# (docker-compose.yml à la racine, avec Caddy et HTTPS).
+# local en HTTP (http://<IP du NAS>:8080). La production tourne chez OVH
+# (deploy/ovh/, avec Caddy et HTTPS).
 #
 # À coller dans Container Manager (Projet > Créer > Créer docker-compose.yml) :
 # le NAS ne construit rien, il télécharge l'image publiée par GitHub à chaque
@@ -19,7 +19,7 @@
 #   - 192.168.1.10 (deux fois) par l'adresse IP du NAS.
 services:
   web:
-    image: ghcr.io/pingouinos/urbia_bail:main
+    image: ghcr.io/pingouinos/clefaria-loc:main
     # Télécharge la dernière image publiée à chaque (re)création du projet.
     pull_policy: always
     restart: unless-stopped

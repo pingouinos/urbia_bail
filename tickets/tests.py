@@ -114,12 +114,12 @@ class TicketsTests(TestCase):
         self.assertContains(fiche, "Préparer l'issue sur GitHub")
         self.assertContains(fiche, "mailto:elodie@urbia.example")
         reponse = self.client.post(reverse("plateforme_ticket", args=[ticket.pk]), {
-            "etat": Ticket.Etat.EN_COURS, "issue": "https://github.com/pingouinos/urbia_bail/issues/200",
+            "etat": Ticket.Etat.EN_COURS, "issue": "https://github.com/pingouinos/clefaria-loc/issues/200",
         })
         self.assertRedirects(reponse, reverse("plateforme_tickets"))
         ticket.refresh_from_db()
         self.assertEqual(ticket.etat, Ticket.Etat.EN_COURS)
-        self.assertEqual(ticket.issue, "https://github.com/pingouinos/urbia_bail/issues/200")
+        self.assertEqual(ticket.issue, "https://github.com/pingouinos/clefaria-loc/issues/200")
 
     def test_resolus_masques_par_defaut(self):
         self.ouvrir(self.elodie, texte="Déjà réglé")
@@ -131,7 +131,7 @@ class TicketsTests(TestCase):
     def test_issue_preremplie_sans_nom_d_auteur(self):
         self.ouvrir(self.elodie)
         lien = urlparse(lien_issue(Ticket.tous.get()))
-        self.assertEqual(lien.path, "/pingouinos/urbia_bail/issues/new")
+        self.assertEqual(lien.path, "/pingouinos/clefaria-loc/issues/new")
         parametres = parse_qs(lien.query)
         self.assertIn("Rédiger le bail", parametres["body"][0])
         self.assertIn("/candidatures/12/", parametres["body"][0])

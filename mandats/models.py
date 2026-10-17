@@ -143,7 +143,8 @@ class Mandat(Contrat):
     mandant_code_postal_ville = models.CharField("code postal et ville du mandant", max_length=120)
     designation = models.TextField("désignation du bien", help_text="Nature, surface, composition.")
     adresse_bien = models.CharField("adresse du bien", max_length=255)
-    loyer_cc = _montant(verbose_name="loyer charges comprises (€)")
+    # Vide le temps que le propriétaire remplisse sa fiche (mandat court).
+    loyer_cc = _montant(verbose_name="loyer charges comprises (€)", null=True)
     charges = _montant(verbose_name="dont charges (€)", default=0)
 
     # Durée
@@ -287,6 +288,15 @@ class Mandat(Contrat):
         mandat = cls.tous.select_related("propriete__bailleur", "agence").filter(jeton=jeton).first() if jeton else None
         return mandat if mandat and mandat.lien_valide else None
 
+    # Ce qu'un mandat créé en version courte attend encore pour être préparé.
+    A_COMPLETER = ["mandant", "mandant_adresse", "mandant_code_postal_ville", "designation", "adresse_bien", "loyer_cc"]
+
+    @property
+    def a_completer(self):
+        """Libellés des champs encore vides, dans l'ordre du formulaire."""
+        return [str(self._meta.get_field(champ).verbose_name) for champ in self.A_COMPLETER
+                if getattr(self, champ) in (None, "")]
+
     def reprendre_mandant(self):
         """Avant la signature, le mandat suit la fiche du bailleur."""
         if self.signe:
@@ -339,6 +349,8 @@ class Mandat(Contrat):
     def etat(self):
         if not self.en_cours:
             return "sans_bail", "Terminé"
+        if not self.signe and self.a_completer:
+            return "libre", "À compléter"
         if not self.signe:
             return "libre", "À signer"
         if self.alertes:
@@ -420,6 +432,8 @@ class Mandat(Contrat):
 
         agence = Organisation.courante()
         interdictions = []
+        if self.a_completer:
+            interdictions.append("Mandat à compléter : " + ", ".join(self.a_completer) + ".")
         if agence.manquants:
             interdictions.append(
                 "Mentions légales de l'agence à compléter dans Administration › Agence : "

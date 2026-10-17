@@ -4,7 +4,7 @@
 <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><span class="fil-ici">Utilisateurs</span></nav>
 <div class="titre-actions">
   <h1>Utilisateurs</h1>
-  <div class="actions"><a class="bouton-petit bouton-corail" href="{% url 'utilisateur_creer' %}">+ Nouvel utilisateur</a></div>
+  <div class="actions"><a class="bouton-petit bouton-action" href="{% url 'utilisateur_creer' %}">+ Nouvel utilisateur</a></div>
 </div>
 {% if google_active %}<p class="discret">Un collaborateur qui se connecte avec son compte Google de l'agence obtient son compte tout seul, comme gestionnaire. Il suffit ensuite d'ajuster son rôle ici.</p>{% endif %}
 <table>

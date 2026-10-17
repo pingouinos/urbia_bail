@@ -48,12 +48,12 @@ def liste(request):
     if q:
         baux = baux.filter(
             Q(propriete__adresse__icontains=q) | Q(propriete__ville__icontains=q)
-            | Q(propriete__ref_ics__icontains=q)
+            | Q(propriete__numero_lot__icontains=q)
             | Q(locataires__nom__icontains=q) | Q(locataires__prenom__icontains=q)
         ).distinct()
         filtre = (
             Q(mandant__icontains=q) | Q(propriete__adresse__icontains=q) | Q(propriete__ville__icontains=q)
-            | Q(propriete__ref_ics__icontains=q)
+            | Q(propriete__numero_lot__icontains=q)
         )
         if q.isdigit():
             filtre |= Q(numero=int(q))
@@ -427,7 +427,7 @@ def choisir_logement(request):
     for mot in q.split():
         proprietes = proprietes.filter(
             Q(adresse__icontains=mot) | Q(complement__icontains=mot) | Q(code_postal__icontains=mot)
-            | Q(ville__icontains=mot) | Q(ref_ics__icontains=mot) | Q(bailleur__nom__icontains=mot)
+            | Q(ville__icontains=mot) | Q(numero_lot__icontains=mot) | Q(bailleur__nom__icontains=mot)
             | Q(bailleur__prenom__icontains=mot)
         )
     candidatures = Candidature.objects.filter(
@@ -546,12 +546,15 @@ def deposer_signe(request, pk):
             signer(request, objet, form)
         except ValidationError as erreur:
             messages.error(request, " ".join(erreur.messages))
-            return redirect(vers_etapes(objet))
+            # Haut de page : le message s'y affiche, au-dessus de la préparation
+            # qu'il réclame souvent ; l'ancre de l'étape le laissait hors de vue.
+            return redirect(objet)
         messages.success(request, f"Signature du bail enregistrée au {objet.date_signature:%d/%m/%Y}.")
     else:
         for erreurs in form.errors.values():
             for erreur in erreurs:
                 messages.error(request, erreur)
+        return redirect(objet)
     return redirect(vers_etapes(objet))
 
 

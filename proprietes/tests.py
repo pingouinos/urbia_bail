@@ -16,7 +16,7 @@ import tempfile
 from .models import Bailleur, Immeuble, Piece, Propriete
 
 ENTETES = [
-    "Réf. ICS lot", "Réf. ICS bailleur", "Type de bailleur", "Bailleur (nom ou raison sociale)",
+    "N° de lot", "Réf. ICS bailleur", "Type de bailleur", "Bailleur (nom ou raison sociale)",
     "Bailleur prénom", "Usage", "Adresse", "Complément", "Code postal", "Ville",
     "Surface (m²)", "Pièces principales", "Classe DPE", "Zone tendue", "Date DPE",
 ]
@@ -24,7 +24,7 @@ ENTETES = [
 
 def ligne(ref="L001", **autres):
     valeurs = {
-        "Réf. ICS lot": ref, "Réf. ICS bailleur": "B01", "Type de bailleur": "Personne physique",
+        "N° de lot": ref, "Réf. ICS bailleur": "B01", "Type de bailleur": "Personne physique",
         "Bailleur (nom ou raison sociale)": "Durand", "Bailleur prénom": "Anne",
         "Usage": "Habitation", "Adresse": "12 rue des Lois", "Complément": "Bât. A, 2e étage",
         "Code postal": "31000", "Ville": "Toulouse", "Surface (m²)": 45.5,
@@ -48,7 +48,7 @@ class ImportTests(TestCase):
     def test_import_cree_propriete_et_bailleur(self):
         rapport = tableur.importer("proprietes.xlsx", xlsx(ligne()))
         self.assertEqual((rapport.crees, rapport.bailleurs_crees, rapport.erreurs), (1, 1, []))
-        propriete = Propriete.objects.get(ref_ics="L001")
+        propriete = Propriete.objects.get(numero_lot="L001")
         self.assertEqual(propriete.surface, Decimal("45.50"))
         self.assertEqual(propriete.classe_dpe, "D")
         self.assertTrue(propriete.zone_tendue)
@@ -61,20 +61,26 @@ class ImportTests(TestCase):
         rapport = tableur.importer("proprietes.xlsx", xlsx(
             ligne(None), ligne(None, **{"Complément": "Bât. B", "Réf. ICS bailleur": None})))
         self.assertEqual((rapport.erreurs, rapport.crees), ([], 2))
-        self.assertEqual(Propriete.objects.filter(ref_ics__isnull=True).count(), 2)
+        self.assertEqual(Propriete.objects.filter(numero_lot__isnull=True).count(), 2)
         rapport = tableur.importer("proprietes.xlsx", xlsx(ligne(None, **{"Classe DPE": "C"})))
         self.assertEqual((rapport.crees, rapport.mis_a_jour), (0, 1))
         self.assertEqual(Propriete.objects.get(complement="Bât. A, 2e étage").classe_dpe, "C")
         # La référence peut être ajoutée plus tard sur le même lot.
         rapport = tableur.importer("proprietes.xlsx", xlsx(ligne("L001")))
         self.assertEqual((rapport.crees, rapport.mis_a_jour), (0, 1))
-        self.assertEqual(Propriete.objects.get(ref_ics="L001").complement, "Bât. A, 2e étage")
+        self.assertEqual(Propriete.objects.get(numero_lot="L001").complement, "Bât. A, 2e étage")
+
+    def test_ancienne_colonne_ref_ics_lot(self):
+        """Un fichier préparé avant le renommage garde sa colonne « Réf. ICS lot »."""
+        anciennes = ["Réf. ICS lot" if entete == "N° de lot" else entete for entete in ENTETES]
+        tableur.importer("proprietes.xlsx", xlsx(ligne("L001"), entetes=anciennes))
+        self.assertTrue(Propriete.objects.filter(numero_lot="L001").exists())
 
     def test_reimport_met_a_jour_sans_effacer_les_cellules_vides(self):
         tableur.importer("proprietes.xlsx", xlsx(ligne()))
         rapport = tableur.importer("proprietes.xlsx", xlsx(ligne(**{"Surface (m²)": None, "Classe DPE": "C"})))
         self.assertEqual((rapport.crees, rapport.mis_a_jour, rapport.bailleurs_crees), (0, 1, 0))
-        propriete = Propriete.objects.get(ref_ics="L001")
+        propriete = Propriete.objects.get(numero_lot="L001")
         self.assertEqual(propriete.surface, Decimal("45.50"))
         self.assertEqual(propriete.classe_dpe, "C")
         self.assertEqual(Bailleur.objects.count(), 1)
@@ -91,7 +97,7 @@ class ImportTests(TestCase):
         self.assertIn("Classe DPE", rapport.erreurs[0][1])
         self.assertIn("nombre", rapport.erreurs[1][1])
         self.assertIn("obligatoire", rapport.erreurs[2][1])
-        self.assertEqual(list(Propriete.objects.values_list("ref_ics", flat=True)), ["L001"])
+        self.assertEqual(list(Propriete.objects.values_list("numero_lot", flat=True)), ["L001"])
 
     def test_simulation_n_enregistre_rien(self):
         rapport = tableur.importer("proprietes.xlsx", xlsx(ligne()), simulation=True)
@@ -102,7 +108,7 @@ class ImportTests(TestCase):
     def test_colonne_obligatoire_absente(self):
         rapport = tableur.importer("proprietes.xlsx", xlsx(["X"], entetes=["Adresse"]))
         self.assertIn("Code postal", rapport.erreurs[0][1])
-        self.assertNotIn("Réf. ICS lot", rapport.erreurs[0][1])
+        self.assertNotIn("N° de lot", rapport.erreurs[0][1])
 
     def test_csv_excel_francais(self):
         contenu = (
@@ -111,7 +117,7 @@ class ImportTests(TestCase):
         ).encode("cp1252")
         rapport = tableur.importer("export.csv", contenu)
         self.assertEqual(rapport.erreurs, [])
-        propriete = Propriete.objects.get(ref_ics="L010")
+        propriete = Propriete.objects.get(numero_lot="L010")
         self.assertEqual(propriete.surface, Decimal("32.50"))
         self.assertEqual(propriete.usage, Propriete.Usage.PROFESSIONNEL)
         self.assertEqual(propriete.bailleur.nom, "Société Générale Immo")
@@ -131,7 +137,7 @@ class ImportTests(TestCase):
         Propriete.objects.update(surface=None)
         rapport = tableur.importer("export.xlsx", contenu)
         self.assertEqual((rapport.mis_a_jour, rapport.erreurs), (2, []))
-        self.assertEqual(Propriete.objects.get(ref_ics="L001").surface, Decimal("45.50"))
+        self.assertEqual(Propriete.objects.get(numero_lot="L001").surface, Decimal("45.50"))
 
     def test_modele_vide_a_listes_deroulantes(self):
         feuille = load_workbook(io.BytesIO(tableur.classeur())).active
@@ -146,6 +152,20 @@ class ProprieteTests(TestCase):
         self.assertTrue(propriete.location_interdite)
         propriete.usage = Propriete.Usage.COMMERCIAL
         self.assertFalse(propriete.location_interdite)
+
+    def test_numero_de_lot_unique_dans_son_immeuble(self):
+        """Le n° de lot est celui de l'immeuble : le même numéro se retrouve
+        d'un immeuble à l'autre, jamais deux fois dans le même (#160)."""
+        from django.core.exceptions import ValidationError
+
+        bailleur = Bailleur.objects.create(nom="Durand")
+        pins, canal = (Immeuble.objects.create(nom=nom, adresse="1 rue", code_postal="31000", ville="Toulouse")
+                       for nom in ("Les Pins", "Le Canal"))
+        valeurs = {"bailleur": bailleur, "adresse": "1 rue", "code_postal": "31000", "ville": "Toulouse", "numero_lot": "12"}
+        Propriete.objects.create(immeuble=pins, **valeurs)
+        Propriete(immeuble=canal, **valeurs).full_clean()
+        with self.assertRaisesMessage(ValidationError, "Un lot de cet immeuble porte déjà ce numéro."):
+            Propriete(immeuble=pins, **valeurs).full_clean()
 
     def test_duree_bail_selon_bailleur(self):
         self.assertEqual(Bailleur(type=Bailleur.Type.SCI_FAMILIALE).duree_bail_nu_ans, 3)
@@ -166,7 +186,7 @@ class VuesTests(TestCase):
 
         reponse = self.client.post(reverse("proprietes:importer_confirmer"), follow=True)
         self.assertContains(reponse, "1 bien(s) créé(s)")
-        self.assertTrue(Propriete.objects.filter(ref_ics="L001").exists())
+        self.assertTrue(Propriete.objects.filter(numero_lot="L001").exists())
 
         # Le fichier n'est importé qu'une fois.
         reponse = self.client.post(reverse("proprietes:importer_confirmer"), follow=True)
@@ -262,8 +282,15 @@ class VuesTests(TestCase):
         page = self.client.get(immeuble.get_absolute_url())
         self.assertContains(page, "2 lots")
         self.assertContains(page, "Apt 1")
+        # Chaque fiche dit ce que son bouton modifie (#160).
+        self.assertContains(page, "Modifier l’immeuble")
         self.assertContains(self.client.get(reverse("proprietes:liste")), "Immeuble Résidence du Canal")
         self.assertContains(self.client.get(premier.get_absolute_url()), immeuble.get_absolute_url())
+        self.assertContains(self.client.get(premier.get_absolute_url()), "Modifier le logement")
+        # Le n° de lot désigne le lot dans la liste de l'immeuble.
+        premier.numero_lot = "12"
+        premier.save()
+        self.assertContains(self.client.get(immeuble.get_absolute_url()), "Lot 12")
         # Un lot de plus reprend l'adresse et ce que les lots ont en commun.
         page = self.client.get(reverse("proprietes:propriete_creer"), {"immeuble": immeuble.pk})
         initial = page.context["form"].initial

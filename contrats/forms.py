@@ -124,7 +124,7 @@ class LogementForm(RefIcsVideEnNullMixin, forms.ModelForm):
     class Meta:
         model = Propriete
         fields = [
-            "adresse", "complement", "code_postal", "ville", "ref_ics", "meuble", "type_habitat",
+            "adresse", "complement", "code_postal", "ville", "numero_lot", "meuble", "type_habitat",
             "regime_juridique", "periode_construction", "surface", "nb_pieces", "chauffage", "eau_chaude",
             "classe_dpe", "equipements", "zone_tendue", "dernier_loyer", "charges",
         ]
@@ -132,7 +132,7 @@ class LogementForm(RefIcsVideEnNullMixin, forms.ModelForm):
         widgets = {"equipements": forms.Textarea(attrs={"rows": 3})}
 
     SECTIONS = [
-        ("Adresse", ["adresse", "complement", "code_postal", "ville", "ref_ics"]),
+        ("Adresse", ["adresse", "complement", "code_postal", "ville", "numero_lot"]),
         ("Description", [
             "meuble", "type_habitat", "regime_juridique", "periode_construction", "surface", "nb_pieces",
             "chauffage", "eau_chaude", "classe_dpe", "equipements",
