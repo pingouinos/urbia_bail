@@ -292,20 +292,15 @@ def _cle_essai(nom):
 
 
 def corriger(request, nom):
-    """Correction proposée d'un modèle aux clauses périmées : avant, après,
+    """Correction proposée d'un modèle aux clauses périmées ou aux mentions
+    obligatoires manquantes : avant, après,
     document d'essai, puis mise en service par l'administrateur."""
     _verifier(request, nom)
     _, changements, empreinte = _correction(nom)
     if not changements:
         messages.info(request, f"Aucune correction à proposer pour « {MODELES[nom][0]} ».")
         return redirect("documents:modele", nom=nom)
-    lignes = []
-    for extrait, remplacement, avant, apres in changements:
-        debut = avant.find(extrait)
-        lignes.append({
-            "message": _sans_renvoi(CLAUSES_PERIMEES[nom][extrait]), "avant": avant[:debut], "retire": extrait,
-            "ajoute": remplacement, "apres": avant[debut + len(extrait):],
-        })
+    lignes = [{**changement, "message": _sans_renvoi(changement["message"])} for changement in changements]
     return render(request, "documents/corriger.html", {
         "nom": nom, "libelle": MODELES[nom][0], "lignes": lignes,
         "essai_vu": request.session.get(_cle_essai(nom)) == empreinte,
@@ -355,7 +350,10 @@ def appliquer_correction(request, nom):
         messages.error(request, f"« {libelle} » n'a pas été corrigé. {raison}")
         return redirect("documents:corriger", nom=nom)
     mettre_en_service(nom, contenu, Modele.Origine.EDITEUR, request.user)
-    reference = "; ".join(f"« {remplacement} » au lieu de « {extrait} »" for extrait, remplacement, _, _ in changements)
+    reference = "; ".join(
+        f"« {c['ajoute']} » au lieu de « {c['retire']} »" if c["retire"]
+        else f"passage repris du modèle d'origine ({c['ajoute'].splitlines()[0]})"
+        for c in changements)
     Modele.objects.filter(nom=nom).update(
         relu_le=timezone.localdate(), relu_par=request.user, relu_reference=f"la correction proposée ({reference})"[:200])
     del request.session[_cle_essai(nom)]
@@ -418,7 +416,7 @@ def texte(request, nom):
         "sommaire": gabarits.titres(arbre),
         "donnees": [(code, gabarits.libelle(code)) for code in gabarits.expressions(defaut, "data-donnee")],
         "conditions": [(code, gabarits.libelle_condition({"data-si": code})) for code in gabarits.expressions(defaut, "data-si")],
-        "corrigeable": bool(alertes) and bool(corriger_modele(nom, source)[1]),
+        "corrigeable": bool(corriger_modele(nom, source)[1]),
     })
 
 

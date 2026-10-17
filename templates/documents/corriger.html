@@ -5,10 +5,12 @@
 <h1>Corriger : {{ libelle|lower }}</h1>
 {% for ligne in lignes %}
 <p>{{ ligne.message }}</p>
-<div class="comparaison">
+{% if ligne.retire %}<div class="comparaison">
   <div class="version-avant"><span class="discret">Dans le modèle aujourd'hui</span><p>{{ ligne.avant }}<del>{{ ligne.retire }}</del>{{ ligne.apres }}</p></div>
   <div class="version-apres"><span class="discret">Après correction</span><p>{{ ligne.avant }}<ins>{{ ligne.ajoute }}</ins>{{ ligne.apres }}</p></div>
-</div>
+</div>{% else %}<div class="comparaison">
+  <div class="version-apres"><span class="discret">Passage ajouté{% if ligne.ancre %}, après « {{ ligne.ancre|truncatechars:80 }} »{% else %} en fin de modèle{% endif %}</span><p><ins>{{ ligne.ajoute|linebreaksbr }}</ins></p></div>
+</div>{% endif %}
 {% endfor %}
 <section class="carte etapes-correction">
   <div class="etape-correction"><span class="numero-etape{% if essai_vu %} fait{% endif %}">1</span>
