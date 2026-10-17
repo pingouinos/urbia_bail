@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titre %}Tickets · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<div class="titre-actions">
+  <h1>Tickets</h1>
+  <div class="actions">{% if tous %}<a class="bouton-petit secondaire" href="{% url 'plateforme_tickets' %}">À traiter seulement</a>{% else %}<a class="bouton-petit secondaire" href="?etat=tous">Voir aussi les résolus</a>{% endif %}</div>
+</div>
+<p class="discret">{{ nb_a_traiter }} à traiter sur {{ nb_tickets }} ticket{{ nb_tickets|pluralize }}, toutes agences confondues.</p>
+<table>
+  <thead><tr><th>Ticket</th><th>Agence</th><th>Ouvert le</th><th>État</th></tr></thead>
+  <tbody>
+  {% for ticket in tickets %}
+    <tr>
+      <td><a href="{% url 'plateforme_ticket' ticket.pk %}">{{ ticket.titre }}</a><br><span class="discret">{{ ticket.get_type_display }} · {{ ticket.auteur.get_full_name|default:ticket.auteur.username|default:"compte supprimé" }}{% if ticket.issue %} · issue liée{% endif %}</span></td>
+      <td>{{ ticket.agence.designation }}</td>
+      <td>{{ ticket.cree_le|date:"d/m/Y H:i" }}</td>
+      <td><span class="pastille pastille-ticket-{{ ticket.etat }}">{{ ticket.get_etat_display }}</span></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4" class="discret">{% if tous %}Aucun ticket pour l'instant.{% else %}Aucun ticket à traiter.{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

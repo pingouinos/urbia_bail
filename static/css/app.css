@@ -310,6 +310,7 @@ ins { background: var(--vert-clair); text-decoration: none; font-weight: 600; }
   /* Le compte connecté sous le logo, en haut du panneau. */
   .avec-panneau .marque { order: 0; }
   .avec-panneau .lien-admin { margin-top: auto; }
+  .avec-panneau .lien-ticket + .lien-admin { margin-top: 0; }
   .avec-panneau .compte { order: 0; flex-wrap: nowrap; gap: 8px; padding: 10px; border: 1px solid var(--bord); border-radius: var(--rayon); background: var(--fond); }
   .avec-panneau main { width: 100%; }
 }
@@ -723,3 +724,11 @@ table.liste-modeles td:last-child { text-align: right; }
 .lien-proprietaire form { margin: 0; }
 .outils-editeur button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 36px; min-height: 36px; }
 .outils-editeur .icone { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Tickets : retours des utilisateurs sur l'application. */
+.compteur { display: inline-block; min-width: 22px; margin-left: auto; padding: 0 7px; border-radius: 999px; background: var(--acier); color: #fff; font-size: 0.8rem; font-weight: 700; text-align: center; }
+.ticket-texte { white-space: pre-line; }
+.ticket-capture img { display: block; max-width: 100%; max-height: 480px; border: 1px solid var(--bord); border-radius: 8px; }
+.pastille-ticket-recu { background: var(--melon-clair); border-color: var(--melon); }
+.pastille-ticket-en_cours { background: var(--carte); border-color: var(--corail); }
+.pastille-ticket-resolu { background: var(--vert-clair); border-color: var(--vert); }
