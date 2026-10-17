@@ -50,7 +50,7 @@ nano .env
 
 Dans `.env`, coller les deux chaînes aléatoires dans `SECRET_KEY` et `POSTGRES_PASSWORD`, vérifier `DOMAINE`, puis enregistrer (Ctrl+O, Entrée, Ctrl+X). Si le dépôt est privé, `curl` est refusé : copier les deux fichiers depuis son ordinateur avec `scp docker-compose.yml .env.example ubuntu@<IP>:/srv/clefaria/`.
 
-Si l'image est privée, se connecter une fois au registre avec un jeton GitHub (*Settings* > *Developer settings* > *Personal access tokens (classic)*, droit `read:packages` seul) :
+L'image est privée : se connecter une fois au registre avec un jeton GitHub (*Settings* > *Developer settings* > *Personal access tokens (classic)*, droit `read:packages` seul) :
 
 ```bash
 docker login ghcr.io -u pingouinos
