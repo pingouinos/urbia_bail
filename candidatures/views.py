@@ -51,6 +51,7 @@ def liste(request):
     parametres.pop("page", None)
     return render(request, "candidatures/liste.html", {
         "page": page, "parametres": parametres.urlencode(), "statuts": Candidature.Statut.choices, "propriete": propriete,
+        "fermeture": propriete.candidatures_fermees if propriete else None,
     })
 
 
@@ -153,7 +154,9 @@ def lien(request, pk):
     objet = get_object_or_404(Candidature.objects.select_related("propriete"), pk=pk)
     if request.method == "POST" and request.POST.get("action") == "creer":
         if not objet.lien_possible:
-            messages.error(request, "Le lien s'envoie à une candidature à l'étude ou retenue, avant la rédaction du bail.")
+            fermeture = objet.propriete.candidatures_fermees
+            messages.error(request, fermeture[0] if fermeture else (
+                "Le lien s'envoie à une candidature à l'étude ou retenue, avant la rédaction du bail."))
             return redirect(objet)
         objet.creer_lien()
         return redirect("candidatures:lien", pk=objet.pk)
