@@ -1,5 +1,5 @@
-# Déploiement Urbia Gestion sur un VPS : Caddy (HTTPS automatique), application,
-# base PostgreSQL et conversion PDF. Seul Caddy est exposé sur Internet.
+# Construction locale de Clefaria Loc pour la CI et les essais : Caddy, application,
+# base PostgreSQL et conversion PDF. La production est décrite dans deploy/ovh/.
 services:
   caddy:
     image: caddy:2-alpine
