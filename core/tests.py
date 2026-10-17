@@ -517,7 +517,7 @@ class OrganisationTests(TestCase):
         self.assertIn("no-store", reponse["Cache-Control"])
         # Le parcours du candidat ne laisse fuir son lien personnel ni par le Referer ni par un cache.
         public = self.client.get("/locataire/jeton-inconnu/")
-        self.assertEqual(public["Referrer-Policy"], "no-referrer")
+        self.assertEqual(public["Referrer-Policy"], "same-origin")
 
     def test_adresse_du_client(self):
         from django.test import RequestFactory

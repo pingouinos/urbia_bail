@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views
+from . import proprietaire, views
 
 app_name = "mandats"
 
@@ -17,5 +17,6 @@ urlpatterns = [
     path("<int:pk>/reconduction/", views.information_reconduction, name="information_reconduction"),
     path("<int:pk>/mandat.pdf", views.telecharger, {"format_": "pdf"}, name="pdf"),
     path("<int:pk>/signe/", views.deposer_signe, name="deposer_signe"),
+    path("<int:pk>/lien/", proprietaire.lien, name="lien"),
     path("<int:pk>/signe/fichier", views.fichier_signe, name="fichier_signe"),
 ]

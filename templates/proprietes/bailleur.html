@@ -20,6 +20,7 @@
     <dt>Réf. ICS</dt><dd>{{ bailleur.ref_ics|default:"—" }}</dd>
     <dt>Adresse</dt><dd>{% if bailleur.adresse %}{{ bailleur.adresse }}, {{ bailleur.code_postal }} {{ bailleur.ville }}{% else %}—{% endif %}</dd>
     <dt>Contact</dt><dd>{{ bailleur.email|default:"" }} {{ bailleur.telephone|default:"" }}</dd>
+    {% if bailleur.versement or bailleur.iban %}<dt>Versement</dt><dd>{{ bailleur.get_versement_display|default:"" }}{% if bailleur.iban %}{% if bailleur.versement %} · {% endif %}IBAN {{ bailleur.iban }}{% endif %}</dd>{% endif %}
     {% if bailleur.siren %}<dt>SIREN</dt><dd>{{ bailleur.siren }}{% if bailleur.lien_annuaire %} · <a href="{{ bailleur.lien_annuaire }}" target="_blank" rel="noopener noreferrer">télécharger l'extrait RNE sur l'Annuaire des Entreprises</a>{% endif %}</dd>{% elif bailleur.societe %}<dt>SIREN</dt><dd><span class="discret">à renseigner : il permet de télécharger gratuitement l'extrait d'immatriculation de la société</span></dd>{% endif %}
   </dl>
 </section>

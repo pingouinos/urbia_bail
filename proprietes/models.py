@@ -20,7 +20,7 @@ from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from core.agence import ParAgence, RattacheAgence
-from core.champs import TelephoneField, code_postal_francais, siren_valide
+from core.champs import TelephoneField, code_postal_francais, iban_valide, siren_valide
 from core.fichiers import nom_aleatoire
 
 
@@ -80,6 +80,10 @@ class Bailleur(RattacheAgence, Horodatage):
         MONSIEUR = "M.", "Monsieur"
         MADAME = "Mme", "Madame"
 
+    class Versement(models.TextChoices):
+        MENSUEL = "mensuel", "Mensuel"
+        TRIMESTRIEL = "trimestriel", "Trimestriel"
+
     type = models.CharField(max_length=20, choices=Type.choices, default=Type.PERSONNE_PHYSIQUE)
     civilite = models.CharField("civilité", max_length=5, choices=Civilite.choices, blank=True)
     nom = models.CharField("nom ou raison sociale", max_length=200)
@@ -98,6 +102,11 @@ class Bailleur(RattacheAgence, Horodatage):
     ville = models.CharField(max_length=100, blank=True)
     email = models.EmailField("e-mail", blank=True)
     telephone = TelephoneField("téléphone", blank=True)
+    # Versement des loyers au propriétaire, à reporter dans la comptabilité.
+    versement = models.CharField(
+        "versement des loyers", max_length=12, choices=Versement.choices, blank=True,
+    )
+    iban = models.CharField("IBAN", max_length=42, blank=True, validators=[iban_valide])
     siren = models.CharField("SIREN", max_length=20, blank=True, validators=[siren_valide])
     # Personne qui signe pour une société (SCI, personne morale).
     representant_civilite = models.CharField(

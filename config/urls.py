@@ -7,6 +7,7 @@ from django.views.generic import RedirectView
 from candidatures import views as candidatures_views
 from comptes import views as comptes_views
 from core import plateforme, views
+from mandats import proprietaire
 
 admin.site.site_header = f"{settings.NOM_APPLICATION} · administration"
 admin.site.site_title = settings.NOM_APPLICATION
@@ -39,7 +40,9 @@ urlpatterns = [
     # Anciennes adresses, pour les favoris et les liens déjà envoyés.
     re_path(r"^biens/(?P<suite>.*)$", RedirectView.as_view(url="/proprietes/%(suite)s", query_string=True)),
     re_path(r"^baux/(?P<suite>.*)$", RedirectView.as_view(url="/contrats/%(suite)s", query_string=True)),
-    # Formulaire du candidat, seule partie ouverte sans connexion.
+    # Formulaires du candidat et du propriétaire, seules parties ouvertes sans connexion.
+    path("proprietaire/merci/", proprietaire.merci, name="formulaire_proprietaire_merci"),
+    path("proprietaire/<str:jeton>/", proprietaire.formulaire, name="formulaire_proprietaire"),
     path("locataire/merci/", candidatures_views.formulaire_locataire_merci, name="formulaire_locataire_merci"),
     path("locataire/confidentialite/", candidatures_views.confidentialite, name="confidentialite"),
     path("locataire/<str:jeton>/", candidatures_views.formulaire_locataire, name="formulaire_locataire"),

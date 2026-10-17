@@ -36,6 +36,7 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
   {% include "_etape_entete.html" with section=section signee="mandat signé" %}
 
   {% if numero == 1 %}
+  {% if not mandat.signe %}{% include "mandats/_lien_proprietaire.html" %}{% endif %}
   {% if mode == "ouverte" %}
   <form method="post" action="{{ mandat.get_absolute_url }}" class="formulaire">
     {% csrf_token %}
@@ -97,6 +98,7 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
   {% endif %}
 
   {% elif numero == 3 %}
+  {% if mandat.signe and nb_manquantes %}{% include "mandats/_lien_proprietaire.html" %}{% endif %}
   {% if mode == "ouverte" %}
   <p class="ligne-etape">{% if nb_manquantes %}{{ nb_manquantes }} pièce{{ nb_manquantes|pluralize }} à fournir. L'étape se clôt d'elle-même quand toutes les pièces obligatoires sont déposées.{% else %}Dossier complet. Une pièce périmée ou à remplacer se dépose ici.{% endif %}</p>
   {% with retour=mandat.get_absolute_url|add:"?etape=3#etape-3" %}{% include "mandats/_dossier_mandat.html" %}{% endwith %}
