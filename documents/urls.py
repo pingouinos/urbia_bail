@@ -16,4 +16,7 @@ urlpatterns = [
     path("<str:nom>/precedent/", views.precedent, name="precedent"),
     path("<str:nom>/retablir/", views.retablir, name="retablir"),
     path("<str:nom>/relu/", views.relu, name="relu"),
+    path("<str:nom>/corriger/", views.corriger, name="corriger"),
+    path("<str:nom>/corriger/essai/", views.essai_correction, name="essai_correction"),
+    path("<str:nom>/corriger/appliquer/", views.appliquer_correction, name="appliquer_correction"),
 ]
