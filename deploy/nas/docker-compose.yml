@@ -19,7 +19,7 @@
 #   - 192.168.1.10 (deux fois) par l'adresse IP du NAS.
 services:
   web:
-    image: ghcr.io/pingouinos/urbia_bail:main
+    image: ghcr.io/pingouinos/clefaria-loc:main
     # Télécharge la dernière image publiée à chaque (re)création du projet.
     pull_policy: always
     restart: unless-stopped

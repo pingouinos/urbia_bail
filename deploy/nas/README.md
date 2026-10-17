@@ -4,7 +4,7 @@ Version allégée de l'application pour un essai sur le réseau local de l'agenc
 
 Ce qui change par rapport au VPS : pas de HTTPS ni de Caddy (adresse `http://<IP du NAS>:8080`, accessible seulement depuis le bureau) et mémoire bornée (384 Mo pour l'application, 768 Mo pour Gotenberg, qui convertit les mandats et les baux en PDF). L'ensemble utilise environ 160 Mo au repos et 310 Mo une fois le premier PDF produit, LibreOffice restant ensuite chargé. La connexion Google ne fonctionne pas ici, car Google refuse une adresse de retour en HTTP : on teste avec un compte local et sa double authentification.
 
-Le NAS ne construit rien et n'a pas besoin du code : il télécharge l'image de l'application, publiée par GitHub à chaque fusion sur `main` (`ghcr.io/pingouinos/urbia_bail:main`), ainsi que PostgreSQL et Gotenberg. Tout tient dans le fichier [`docker-compose.yml`](docker-compose.yml) de ce dossier, à coller dans Container Manager.
+Le NAS ne construit rien et n'a pas besoin du code : il télécharge l'image de l'application, publiée par GitHub à chaque fusion sur `main` (`ghcr.io/pingouinos/clefaria-loc:main`), ainsi que PostgreSQL et Gotenberg. Tout tient dans le fichier [`docker-compose.yml`](docker-compose.yml) de ce dossier, à coller dans Container Manager.
 
 Les conteneurs utilisent directement le réseau du NAS (`network_mode: host`) plutôt que le réseau interne de Docker : sur le DS220+, ce dernier laisse ouvrir une connexion entre conteneurs mais n'y fait passer aucune donnée (l'application attend la base sans jamais l'atteindre). Seule l'application est visible depuis le bureau, sur le port 8080 ; la base (port 25432) et Gotenberg (port 23300) n'écoutent que sur le NAS lui-même.
 
@@ -38,7 +38,7 @@ Si le pare-feu de DSM est activé : *Panneau de configuration* > *Sécurité* > 
 - **Le journal parle de `Address already in use` ou `Address in use`** : un autre service du NAS occupe déjà le port (c'est le cas du 5433 sur le DS220+). Pour l'application, remplacer `8080` par un port libre (par exemple `8090`) dans la ligne `command` et dans `CSRF_TRUSTED_ORIGINS` ; pour la base, `25432` aux trois endroits (`DATABASE_URL`, `command` et test de santé de `db`) ; pour Gotenberg, `23300` dans `GOTENBERG_URL` et dans sa `command`.
 - **La page reste vide (« réponse vide », `NS_ERROR_NET_EMPTY_RESPONSE`)** : l'application n'écoute pas encore. Au premier démarrage, la préparation de la base prend jusqu'à une minute ; sinon, lire *Conteneur* > `urbia-web-1` > *Détails* > *Journal*. Un mot de passe différent entre `DATABASE_URL` et `POSTGRES_PASSWORD` fait redémarrer l'application en boucle. La base garde le mot de passe de sa création : pour en changer, supprimer le projet puis le recréer sous un autre nom, ce qui repart d'une base neuve.
 - **`Bind mount failed: '/volume1/docker/urbia/sauvegardes' does not exist`** : créer le dossier `sauvegardes` dans `docker/urbia` avec File Station, puis *Action* > *Créer*. Les trois autres conteneurs tournent déjà, seul `urbia-sauvegarde-1` attend ce dossier.
-- **Le téléchargement de `ghcr.io/pingouinos/urbia_bail` est refusé (`denied` ou `unauthorized`)** : sur GitHub, ouvrir le paquet `urbia_bail` du compte, puis *Package settings* > *Change visibility* > *Public*.
+- **Le téléchargement de `ghcr.io/pingouinos/clefaria-loc` est refusé (`denied` ou `unauthorized`)** : sur GitHub, ouvrir le paquet `clefaria-loc` du compte, puis *Package settings* > *Change visibility* > *Public*.
 
 ## Sauvegardes
 
