@@ -8,6 +8,7 @@ Word restent converties par LibreOffice.
 """
 
 import base64
+import copy
 import html
 import io
 import logging
@@ -93,13 +94,91 @@ REMPLACEMENTS = {
 
 
 def corriger_modele(nom, contenu=None):
-    """(contenu corrigé, [(extrait, remplacement, avant, après)]) : le modèle
-    en service avec les clauses périmées remplacées par leur correction
-    validée ; liste vide si rien n'est à corriger."""
+    """(contenu corrigé, changements) : le modèle en service avec ses clauses
+    périmées remplacées par leur correction validée, et les passages du
+    modèle d'origine qui portent une mention obligatoire absente remis à leur
+    place. Chaque changement est un dict : message, avant, retire, ajoute,
+    apres (textes à montrer). Liste vide si rien n'est à corriger."""
     if contenu is None:
         contenu = lire_modele(nom)
-    corrige, changements = gabarits.remplacer(contenu, REMPLACEMENTS.get(nom, {}))
+    corrige, remplacements = gabarits.remplacer(contenu, REMPLACEMENTS.get(nom, {}))
+    changements = []
+    for extrait, remplacement, avant, _ in remplacements:
+        debut = avant.find(extrait)
+        changements.append({
+            "message": CLAUSES_PERIMEES[nom][extrait], "avant": avant[:debut], "retire": extrait,
+            "ajoute": remplacement, "apres": avant[debut + len(extrait):],
+        })
+    corrige, ajouts = completer_modele(nom, corrige)
+    changements += ajouts
     return (corrige, changements) if changements else (contenu, [])
+
+
+def _mention_presente(texte, balise):
+    return re.search(r"[{%]\s*(if|for \w+ in)?\s*" + re.escape(balise) + r"\b", texte)
+
+
+def _cle_bloc(noeud):
+    """Texte d'un bloc de premier niveau, pour le retrouver d'un modèle à l'autre."""
+    return " ".join(gabarits.texte(gabarits.Noeud("div", enfants=[noeud])).split()).lower()
+
+
+def _lisible(texte):
+    """Texte d'un passage pour l'administrateur : données en « [libellé] »,
+    sans les lignes de condition ni de répétition."""
+    lignes = [ligne for ligne in texte.splitlines() if not re.fullmatch(r"\s*\{%.*%\}\s*", ligne)]
+    lignes = ["(texte légal rempli selon le mandat)" if ligne.strip() == "{{ ligne }}" else ligne for ligne in lignes]
+    return re.sub(r"\{\{ (.*?) \}\}", lambda m: f"[{gabarits.libelle(m.group(1))}]", "\n".join(lignes))
+
+
+def completer_modele(nom, contenu):
+    """(contenu, ajouts) : chaque mention obligatoire absente reprise du
+    modèle d'origine avec son passage (son titre de section s'il manque
+    aussi), inséré après le dernier passage d'origine que le modèle de
+    l'agence a gardé."""
+    balises = BALISES_REQUISES.get(nom, {})
+    if not balises:
+        return contenu, []
+    arbre = gabarits.nettoyer(contenu)
+    absentes = [(b, l) for b, l in balises.items() if not _mention_presente(gabarits.texte(arbre), b)]
+    if not absentes:
+        return contenu, []
+    origine = gabarits.nettoyer((MODELES_PAR_DEFAUT / fichier(nom)).read_text(encoding="utf-8")).enfants
+    rangs = []
+    for balise, libelle in absentes:
+        rang = next((i for i, bloc in enumerate(origine)
+                     if isinstance(bloc, gabarits.Noeud) and _mention_presente(gabarits.texte(bloc), balise)), None)
+        if rang is not None:
+            rangs.append((rang, balise, libelle))
+    ajouts = []
+    # Dans l'ordre du modèle d'origine : chaque passage repris sert de repère au suivant.
+    for rang, balise, libelle in sorted(rangs):
+        if _mention_presente(gabarits.texte(arbre), balise):
+            continue  # reprise avec le passage d'une autre mention
+        cles = [_cle_bloc(bloc) for bloc in arbre.enfants]
+        debut = rang
+        if (rang > 0 and isinstance(origine[rang - 1], gabarits.Noeud) and origine[rang - 1].balise == "h2"
+                and _cle_bloc(origine[rang - 1]) not in cles):
+            debut = rang - 1
+        position = len(arbre.enfants)
+        for precedent in reversed(origine[:debut]):
+            cle = _cle_bloc(precedent) if isinstance(precedent, gabarits.Noeud) else ""
+            if cle and cle in cles:
+                position = len(cles) - cles[::-1].index(cle)
+                break
+        passage = copy.deepcopy(origine[debut:rang + 1])
+        arbre.enfants[position:position] = passage
+        avant = next((_cle_bloc(bloc) for bloc in reversed(arbre.enfants[:position])
+                      if isinstance(bloc, gabarits.Noeud) and _cle_bloc(bloc)), "")
+        ajouts.append({
+            "message": f"Le modèle ne contient pas {libelle} : le passage du modèle d'origine est repris.",
+            "avant": "", "retire": "",
+            "ajoute": _lisible(gabarits.texte(gabarits.Noeud("div", enfants=passage))),
+            "apres": "", "ancre": _lisible(avant)[:120],
+        })
+    if not ajouts:
+        return contenu, []
+    return gabarits.serialiser(arbre), ajouts
 
 
 def texte_docx(contenu):

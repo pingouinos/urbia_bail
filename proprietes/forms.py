@@ -62,7 +62,7 @@ class BailleurForm(SocieteOuPersonneMixin, RefIcsVideEnNullMixin, forms.ModelFor
         fields = [
             "type", "nom", "civilite", "prenom", "conjoint_civilite", "conjoint_nom", "conjoint_prenom",
             "representant_civilite", "representant_nom", "representant_prenom", "representant_qualite", "siren",
-            "ref_ics", "adresse", "code_postal", "ville", "email", "telephone",
+            "ref_ics", "adresse", "code_postal", "ville", "email", "telephone", "versement", "iban",
         ]
 
 

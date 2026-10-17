@@ -23,7 +23,7 @@ from .models import Evenement, Organisation
 # publiés par l'INSEE, la liste officielle des communes en zone tendue, et
 # les modèles des documents (rattachés en PR 4).
 COMMUNS = {"Organisation", "Membre", "IndiceIRL", "Commune", "ListeCommunes", "Modele"}
-APPLICATIONS = {"proprietes", "contacts", "contrats", "mandats", "candidatures", "documents", "core"}
+APPLICATIONS = {"proprietes", "contacts", "contrats", "mandats", "candidatures", "documents", "core", "tickets"}
 
 
 class CloisonnementTests(Donnees, TestCase):
