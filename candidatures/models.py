@@ -185,6 +185,12 @@ class Candidature(Horodatage):
     def lien_valide(self):
         return bool(self.jeton and self.lien_possible and timezone.now() < self.lien_expire_le)
 
+    @property
+    def lien_a_envoyer(self):
+        """Candidat retenu qui n'a ni lien valable ni dossier complété : c'est
+        la prochaine chose à faire avant de rédiger son bail."""
+        return self.lien_possible and not self.lien_valide and not self.rempli_le
+
     def creer_lien(self):
         """Nouveau lien pour le candidat ; l'ancien cesse de fonctionner."""
         self.jeton = secrets.token_urlsafe(32)
