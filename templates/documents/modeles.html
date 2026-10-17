@@ -16,6 +16,14 @@
 <section class="carte">
   <h2>{{ modele.libelle }}</h2>
   <p class="discret">{% if modele.etat.mis_en_service_le %}{{ modele.etat.get_origine_display }}, le {{ modele.etat.mis_en_service_le|date:"d/m/Y à H:i" }}{% if modele.etat.mis_en_service_par %} par {{ modele.etat.mis_en_service_par.get_full_name|default:modele.etat.mis_en_service_par.username }}{% endif %}.{% elif modele.personnalise %}Modèle déposé par l'agence.{% else %}Modèle d'origine.{% endif %}</p>
+  <form method="post" action="{% url 'documents:relu' modele.nom %}" class="relecture">
+    {% csrf_token %}
+    <span>{% if modele.etat.relu_le %}Relu le <strong>{{ modele.etat.relu_le|date:"d/m/Y" }}</strong>{% if modele.etat.relu_par %} par {{ modele.etat.relu_par.get_full_name|default:modele.etat.relu_par.username }}{% endif %}, d'après {{ modele.etat.relu_reference }}{% else %}Pas encore relu{% endif %}{% if modele.a_relire %} <span class="pastille pastille-a_reverifier">À relire</span>{% endif %}</span>
+    <details><summary>Marquer relu</summary>
+      <input type="text" name="reference" maxlength="200" required value="{{ modele.etat.relu_reference }}" placeholder="la loi de 1989 et le décret 2015-587" aria-label="Relu d'après quels textes">
+      <button type="submit" class="secondaire">Enregistrer la relecture</button>
+    </details>
+  </form>
   <form method="post" action="{% url 'documents:reprendre' modele.nom %}" class="copie">
     {% csrf_token %}
     <input type="url" name="lien_google" value="{{ modele.etat.lien_google }}" placeholder="https://docs.google.com/document/d/…" aria-label="Lien du Google Doc" required>

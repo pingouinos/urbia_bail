@@ -22,6 +22,12 @@ class Modele(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
         verbose_name="mis en service par",
     )
+    relu_le = models.DateField("relu le", null=True, blank=True)
+    relu_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        verbose_name="relu par",
+    )
+    relu_reference = models.CharField("relu d'après", max_length=200, blank=True)
 
     class Meta:
         verbose_name = "modèle"

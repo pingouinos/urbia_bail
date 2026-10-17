@@ -148,7 +148,9 @@ def administration(request):
     """Accueil de l'administration : l'agence, les utilisateurs, les modèles."""
     _administrateur(request)
     Utilisateur = get_user_model()
+    from documents.regles import registre, resume
     return render(request, "core/administration.html", {
+        "regles": resume(registre()),
         "organisation": Organisation.courante(),
         "nb_utilisateurs": Utilisateur.objects.filter(is_active=True).count(),
     })
