@@ -4,11 +4,12 @@ from django.db import migrations, models
 
 
 def rattacher(apps, schema_editor):
-    """Tous les comptes existants appartiennent à l'agence déjà en service."""
+    """Tous les comptes existants appartiennent à l'agence déjà en service,
+    sauf les superutilisateurs, qui exploitent la plateforme."""
     Organisation = apps.get_model("core", "Organisation")
     Membre = apps.get_model("core", "Membre")
     Utilisateur = apps.get_model(*settings.AUTH_USER_MODEL.split("."))
-    comptes = Utilisateur.objects.filter(membre__isnull=True)
+    comptes = Utilisateur.objects.filter(membre__isnull=True, is_superuser=False)
     if not comptes.exists():
         return
     agence = Organisation.objects.order_by("pk").first() or Organisation.objects.create()

@@ -27,9 +27,11 @@ def connexion_refusee(sender, credentials, request=None, **kwargs):
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def rattacher_compte(sender, instance, created, raw=False, **kwargs):
-    """Un nouveau compte appartient à l'agence de qui le crée."""
+def rattacher_compte(sender, instance, raw=False, **kwargs):
+    """Un compte appartient à l'agence de qui le crée. Le superutilisateur,
+    qui exploite la plateforme, n'appartient à aucune."""
     from .models import Membre, Organisation
 
-    if created and not raw:
-        Membre.objects.get_or_create(utilisateur=instance, defaults={"organisation": Organisation.courante()})
+    if raw or instance.is_superuser or Membre.objects.filter(utilisateur=instance).exists():
+        return
+    Membre.objects.create(utilisateur=instance, organisation=Organisation.courante())

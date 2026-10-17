@@ -265,10 +265,13 @@ class ArchivesTests(Donnees, TestCase):
                 objet.refresh_from_db()
                 self.assertEqual(objet.date_signature, self.jour - dt.timedelta(days=20))
 
-    def test_superutilisateur_sans_groupe_accede_et_archive_inaccessible_sans_role(self):
-        root = User.objects.create_superuser("root", "root@example.com", "test-password")
-        self.client.force_login(root)
+    def test_superutilisateur_hors_agence_et_archive_inaccessible_sans_role(self):
+        self.client.force_login(self.admin)
         version = self.preparer(self.bail)
         self.assertEqual(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])).status_code, 200)
+        # Le superutilisateur exploite la plateforme : les documents des agences ne lui sont pas servis.
+        self.client.force_login(User.objects.create_superuser("root", "root@example.com", "test-password"))
+        self.assertRedirects(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])),
+                             reverse("admin:index"), fetch_redirect_response=False)
         self.client.force_login(User.objects.create_user("inconnu"))
         self.assertEqual(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])).status_code, 403)

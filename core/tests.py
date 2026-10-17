@@ -119,9 +119,23 @@ class AgencesTests(TestCase):
         reponse = self.client.get(reverse("admin:index"))
         self.assertEqual(reponse.status_code, 302)
         self.assertTrue(reponse["Location"].startswith(reverse("admin:login")))
-        self.client.force_login(User.objects.create_superuser("exploitant", password="x"))
+        exploitant = User.objects.create_superuser("exploitant", password="x")
+        self.client.force_login(exploitant)
         self.assertEqual(self.client.get(reverse("admin:index")).status_code, 200)
-        self.assertEqual(Membre.objects.get(utilisateur__username="exploitant").organisation, self.urbia)
+
+    def test_superutilisateur_sans_agence(self):
+        """Le superutilisateur exploite la plateforme : il n'a pas d'agence et
+        ne voit les données d'aucune dans l'application."""
+        exploitant = User.objects.create_superuser("exploitant", password="x")
+        self.assertFalse(Membre.objects.filter(utilisateur=exploitant).exists())
+        self.client.force_login(exploitant)
+        for page in (reverse("accueil"), reverse("utilisateurs"), reverse("proprietes:liste")):
+            with self.subTest(page=page):
+                self.assertRedirects(self.client.get(page), reverse("admin:index"))
+        # Redevenu un compte ordinaire, il rejoint une agence.
+        exploitant.is_superuser = False
+        exploitant.save()
+        self.assertEqual(exploitant.membre.organisation, self.urbia)
 
 
 @override_settings(MFA_OBLIGATOIRE=False)
