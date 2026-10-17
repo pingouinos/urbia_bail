@@ -1,6 +1,7 @@
 """Versions contractuelles et transitions, appelées sous verrou du contrat.
 
-La préparation est obligatoire avant une nouvelle signature. Une reprise
+Toute signature repose sur une version préparée : à défaut, la signature la
+prépare elle-même, sur les données du moment. Une reprise
 historique ne prouve jamais quel document a été envoyé aux parties.
 """
 import hashlib
@@ -110,8 +111,11 @@ def signer(request, objet, form):
         source = derniere_version(objet)
         source = source if source and source.nature == "preparation" else None
         if source is None:
-            raise ValidationError("Préparez la version à signer avant d’enregistrer la signature.")
-        if source:
+            # Rien de préparé : le document signé est celui que la page
+            # téléchargeait, généré sur les données du moment ; on l'archive.
+            source = creer(objet, request.user, "preparation",
+                           "Version préparée à l’enregistrement de la signature.")
+        else:
             # La date n'était pas connue au moment de préparer le document.
             contexte = objet.contexte_courant()
             contexte["date_signature"] = source.contexte.get("date_signature", "")
