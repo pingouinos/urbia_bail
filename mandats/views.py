@@ -1,3 +1,5 @@
+import datetime as dt
+
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
@@ -10,6 +12,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from comptes.roles import est_administrateur
+from contrats import echeances
 from core.journal import noter
 from core.processus import navigation, processus_mandat, sections_etapes
 from proprietes.models import Propriete
@@ -186,7 +189,39 @@ def etapes(request, pk):
         "form": form, "form_signe": SignatureForm(instance=objet), "form_fin": FinMandatForm(instance=objet),
         "dossier": dossier, "nb_manquantes": len(manquantes),
         "administrateur": administrateur, "historique": objet.history.select_related("history_user")[:10],
+        **echeance_du_mandat(objet),
     })
+
+
+def echeance_du_mandat(mandat):
+    """Fin de la période en cours d'un mandat signé, et la lettre de la loi
+    Chatel quand le mandant est protégé."""
+    periode = echeances.periode_mandat(mandat)
+    if not periode:
+        return {}
+    fin, reconduction = periode
+    return {
+        "periode_fin": fin, "periode_suivante": fin + dt.timedelta(days=1), "reconduction": reconduction,
+        "chatel": reconduction and echeances.protege_par_chatel(mandat),
+        "chatel_du": echeances.ajouter_mois(fin, -3), "chatel_limite": echeances.ajouter_mois(fin, -1),
+        "chatel_envoyee": echeances.lettre_chatel_envoyee(mandat, fin),
+        "chatel_ouverte": echeances.echeance_mandat(mandat) is not None,
+        "aujourd_hui": timezone.localdate(),
+    }
+
+
+@require_POST
+@verrouiller(Mandat)
+def information_reconduction(request, pk):
+    """Lettre de fin de période envoyée au mandant (loi Chatel)."""
+    from contrats.views import _date_postee
+
+    objet = get_object_or_404(Mandat, pk=pk)
+    objet.information_reconduction_le = _date_postee(request, "information_reconduction_le")
+    objet.save(update_fields=["information_reconduction_le", "modifie_le"])
+    noter(request, "lettre de reconduction", objet, f"Envoyée le {objet.information_reconduction_le:%d/%m/%Y}")
+    messages.success(request, f"Lettre notée comme envoyée le {objet.information_reconduction_le:%d/%m/%Y}.")
+    return redirect(f"{objet.get_absolute_url()}#echeance")
 
 
 @require_POST

@@ -23,7 +23,7 @@ from .forms import OrganisationForm, UtilisateurForm
 from .journal import noter
 from .models import Evenement, Organisation
 from .processus import processus_location
-from .taches import de, par_rubrique, taches
+from .taches import ECHEANCES, de, par_rubrique, taches
 
 
 def locations_en_cours():
@@ -132,6 +132,7 @@ def accueil(request):
         "derniers_baux": Bail.objects.select_related("propriete__bailleur").prefetch_related("locataires").order_by("-modifie_le")[:5],
         "locations": locations, "taches": par_rubrique(a_faire), "nb_taches": len(a_faire),
         "nb_urgentes": sum(tache.urgent for tache in a_faire),
+        "nb_echeances": sum(tache.rubrique == ECHEANCES for tache in a_faire),
         "nb_geres": geres.count(), "nb_inoccupes": inoccupes.count(),
         "nb_sans_bail": inoccupes.filter(baux__isnull=True).count(),
         # Mandats en cours pas encore en gestion : signature ou dossier à finir.

@@ -148,6 +148,56 @@ tant qu'elles se modifient et un cadenas une fois le mandat signé.
 {% endwith %}{% endfor %}
 </div>
 
+{% if periode_fin %}
+<section class="carte" id="echeance">
+  <div class="titre-actions">
+    <h2>Échéance du mandat</h2>
+    {% if chatel %}{% if chatel_envoyee %}<span class="pastille pastille-loue">Lettre envoyée le {{ mandat.information_reconduction_le|date:"d/m/Y" }}</span>{% elif chatel_ouverte %}<span class="pastille pastille-libre">Lettre à envoyer avant le {{ chatel_limite|date:"d/m/Y" }}</span>{% endif %}{% endif %}
+  </div>
+  <p>{% if reconduction %}Période en cours jusqu'au {{ periode_fin|date:"d/m/Y" }} : sauf opposition, le mandat se renouvelle seul le {{ periode_suivante|date:"d/m/Y" }}.{% else %}Le mandat se termine le {{ periode_fin|date:"d/m/Y" }}, sans reconduction possible : préparer un nouveau mandat avec le propriétaire.{% endif %}</p>
+  {% if chatel %}
+  <p class="discret">Le propriétaire est un particulier : l'agence doit le prévenir par écrit, entre le {{ chatel_du|date:"d/m/Y" }} et le {{ chatel_limite|date:"d/m/Y" }}, qu'il peut refuser la reconduction (article L. 215-1 du code de la consommation). Sinon, le propriétaire pourra résilier le mandat à tout moment.</p>
+  {% if chatel_ouverte or chatel_envoyee %}
+  <details class="courrier"{% if chatel_ouverte %} open{% endif %}>
+    <summary>Lettre au propriétaire</summary>
+    <textarea id="texte-chatel" class="texte-courrier" rows="16" readonly>Objet : échéance de votre mandat de gestion n° {{ mandat.numero }}
+
+{{ mandat.mandant }}
+{{ mandat.mandant_adresse }}, {{ mandat.mandant_code_postal_ville }}
+
+Madame, Monsieur,
+
+Le mandat de gestion n° {{ mandat.numero }} que vous nous avez confié pour le bien situé {{ mandat.adresse_bien }} arrive au terme de sa période le {{ periode_fin|date:"d/m/Y" }}. Sauf opposition de votre part, il sera reconduit tacitement le {{ periode_suivante|date:"d/m/Y" }}.
+
+Conformément à l'article L. 215-1 du code de la consommation, vous pouvez refuser cette reconduction en nous l'indiquant par écrit avant le {{ periode_fin|date:"d/m/Y" }}.
+
+Nous restons à votre disposition et vous prions d'agréer, Madame, Monsieur, nos salutations distinguées.
+
+{{ agence.designation }}</textarea>
+    <button type="button" class="bouton-petit secondaire" data-copier="texte-chatel">Copier la lettre</button>
+  </details>
+  <form method="post" action="{% url 'mandats:information_reconduction' mandat.pk %}" class="en-ligne-formulaire">
+    {% csrf_token %}
+    <label>Envoyée le <input type="date" name="information_reconduction_le" value="{{ aujourd_hui|date:'Y-m-d' }}" max="{{ aujourd_hui|date:'Y-m-d' }}"></label>
+    <button type="submit" class="bouton-petit">Noter l'envoi</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</section>
+<script>
+  document.querySelectorAll("#echeance [data-copier]").forEach(function (bouton) {
+    bouton.addEventListener("click", function () {
+      var champ = document.getElementById(bouton.dataset.copier);
+      var libelle = bouton.textContent;
+      navigator.clipboard.writeText(champ.value).then(function () {
+        bouton.textContent = "Copié";
+        setTimeout(function () { bouton.textContent = libelle; }, 2000);
+      }, function () { champ.select(); });
+    });
+  });
+</script>
+{% endif %}
+
 <section class="carte" id="historique">
   <h2>Historique</h2>
   <ul class="historique">

@@ -612,3 +612,19 @@ a.puce-parc:hover { border-color: var(--corail); color: var(--texte); }
 .derniers-contrats > li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 0; }
 .derniers-contrats > li > a:first-child { display: grid; min-width: 0; color: var(--texte); }
 .derniers-contrats > li > a:first-child:hover strong { color: var(--lien-survol); }
+
+/* Fiche du bail : révision annuelle du loyer et assurance du locataire. */
+.suivi-loyer { border: 2px solid var(--melon); }
+.revision { display: grid; gap: 12px; }
+.revision-calcul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.revision-case { display: grid; align-content: start; gap: 2px; padding: 10px 12px; border: 1px solid var(--bord); border-radius: 8px; min-width: 0; }
+.revision-case > span { font-size: 0.85rem; color: var(--discret); }
+.revision-case b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.revision-resultat { background: var(--vert-clair); border-color: var(--vert); }
+.revision-indice { display: grid; gap: 4px; font-size: 0.9rem; }
+.revision-indice input { max-width: 10em; }
+.courrier { margin-top: 12px; }
+.courrier summary { cursor: pointer; font-weight: 600; }
+.texte-courrier { display: block; width: 100%; margin: 8px 0; font: inherit; font-size: 0.92rem; }
+.en-ligne-formulaire { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+@media (max-width: 760px) { .revision-calcul { grid-template-columns: 1fr; } }

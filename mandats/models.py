@@ -148,6 +148,12 @@ class Mandat(Contrat):
     date_fin = models.DateField(
         "fin du mandat", null=True, blank=True, help_text="À renseigner à la résiliation ou à l'échéance."
     )
+    # Loi Chatel (article L. 215-1 du code de la consommation) : le mandant
+    # particulier est prévenu, de trois mois à un mois avant chaque échéance,
+    # qu'il peut s'opposer à la reconduction. Date de la dernière lettre.
+    information_reconduction_le = models.DateField(
+        "lettre de fin de période envoyée le", null=True, blank=True, editable=False,
+    )
 
     # Rémunération
     taux_gestion = models.DecimalField(

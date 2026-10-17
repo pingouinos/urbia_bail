@@ -6,6 +6,7 @@ import calendar
 import datetime as dt
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -135,6 +136,11 @@ class Bail(Contrat):
     # Suivi des loyers : l'échéancier court à partir de ce mois. Sans date, le
     # bail n'est pas suivi (bail ancien dont les loyers sont tenus ailleurs).
     suivi_loyers_depuis = models.DateField("suivi des loyers depuis", null=True, blank=True, editable=False)
+    # Assurance habitation : le locataire la justifie à l'entrée puis chaque
+    # année, sur demande. La date sert au rappel du tableau de bord.
+    attestation_assurance_le = models.DateField(
+        "dernière attestation d'assurance reçue le", null=True, blank=True, editable=False,
+    )
 
     history = HistoricalRecords()
 
@@ -301,6 +307,17 @@ class Bail(Contrat):
     @property
     def total_mensuel(self):
         return (self.loyer or 0) + (self.charges or 0)
+
+    @property
+    def loyer_actuel(self):
+        """Le loyer après la dernière révision appliquée. Le bail signé garde
+        son loyer d'origine : la révision s'enregistre à côté."""
+        revision = self.revisions.filter(statut=RevisionLoyer.Statut.APPLIQUEE).first()
+        return revision.nouveau_loyer if revision else self.loyer
+
+    @property
+    def total_actuel(self):
+        return (self.loyer_actuel or 0) + (self.charges or 0)
 
     @property
     def interdictions(self):
@@ -696,3 +713,63 @@ class Echeance(models.Model):
             "date": date(timezone.localdate()),
             "lieu": bail.lieu_signature,
         }
+
+
+class IndiceIRL(models.Model):
+    """Indice de référence des loyers publié par l'INSEE chaque trimestre
+    (France métropolitaine hors Corse). Les valeurs connues sont chargées par
+    migration ; une valeur publiée depuis se saisit depuis la révision d'un bail."""
+
+    annee = models.PositiveSmallIntegerField("année")
+    trimestre = models.PositiveSmallIntegerField("trimestre", choices=[(n, f"T{n}") for n in range(1, 5)])
+    valeur = models.DecimalField(max_digits=7, decimal_places=2)
+
+    class Meta:
+        ordering = ["-annee", "-trimestre"]
+        verbose_name = "indice de référence des loyers"
+        verbose_name_plural = "indices de référence des loyers"
+        constraints = [models.UniqueConstraint(fields=["annee", "trimestre"], name="irl_unique_par_trimestre")]
+
+    def __str__(self):
+        return f"IRL {libelle_trimestre(self.trimestre, self.annee)} : {self.valeur}"
+
+    @classmethod
+    def valeur_de(cls, trimestre, annee):
+        indice = cls.objects.filter(trimestre=trimestre, annee=annee).first()
+        return indice.valeur if indice else None
+
+
+def libelle_trimestre(trimestre, annee):
+    return f"{trimestre}{'er' if trimestre == 1 else 'e'} trimestre {annee}"
+
+
+class RevisionLoyer(models.Model):
+    """Révision annuelle du loyer d'un bail, appliquée ou à laquelle le
+    propriétaire a renoncé pour l'année. Le bail signé n'est pas modifié."""
+
+    class Statut(models.TextChoices):
+        APPLIQUEE = "appliquee", "Appliquée"
+        RENONCEE = "renoncee", "Non révisé"
+
+    bail = models.ForeignKey(Bail, on_delete=models.CASCADE, related_name="revisions")
+    date_revision = models.DateField("date de révision prévue au bail")
+    applicable_le = models.DateField("nouveau loyer dû à partir du")
+    statut = models.CharField(max_length=10, choices=Statut.choices)
+    ancien_loyer = _montant(verbose_name="loyer avant révision (€)")
+    nouveau_loyer = _montant(verbose_name="loyer après révision (€)")
+    irl_libelle = models.CharField("trimestre de l'IRL", max_length=30)
+    irl_ancien = models.DecimalField("IRL de l'année précédente", max_digits=7, decimal_places=2, null=True)
+    irl_nouveau = models.DecimalField("nouvel IRL", max_digits=7, decimal_places=2, null=True)
+    cree_le = models.DateTimeField("enregistrée le", auto_now_add=True)
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+", verbose_name="par",
+    )
+
+    class Meta:
+        ordering = ["-date_revision", "-cree_le"]
+        verbose_name = "révision de loyer"
+        verbose_name_plural = "révisions de loyer"
+        constraints = [models.UniqueConstraint(fields=["bail", "date_revision"], name="revision_unique_par_annee")]
+
+    def __str__(self):
+        return f"Révision du {self.date_revision:%d/%m/%Y} · {self.bail}"

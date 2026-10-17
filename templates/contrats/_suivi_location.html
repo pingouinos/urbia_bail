@@ -1,0 +1,89 @@
+{% comment %}Bail signé en cours : révision annuelle du loyer (calculée avec l'IRL) et attestation d'assurance du locataire. Le bail signé ne change pas : chaque révision s'enregistre à côté.{% endcomment %}
+<section class="carte suivi-loyer" id="revision">
+  {% if revision and not revision.gelee %}
+  <div class="titre-actions">
+    <h2>Révision du loyer au {{ revision.date|date:"d/m/Y" }}</h2>
+    {% if revision.en_retard %}<span class="pastille pastille-libre">À faire depuis le {{ revision.date|date:"d/m/Y" }}</span>{% else %}<span class="pastille pastille-preavis">À faire</span>{% endif %}
+  </div>
+  <form method="post" action="{% url 'contrats:reviser' bail.pk %}" class="revision">
+    {% csrf_token %}
+    <div class="revision-calcul">
+      <div class="revision-case"><span>Loyer actuel</span><b>{{ revision.ancien_loyer }} €</b><span>hors charges</span></div>
+      <div class="revision-case"><span>IRL du {{ revision.libelle_irl }}</span>
+        {% if revision.irl_nouveau %}<b>{{ revision.irl_ancien|default:"?" }} → {{ revision.irl_nouveau }}</b><span>un an d'écart, publiés par l'INSEE</span>
+        {% else %}<label class="revision-indice">Indice publié par l'INSEE <input name="irl_nouveau" inputmode="decimal" autocomplete="off" placeholder="ex. 148,06" required></label><span>Pas encore connu de l'application. <a href="https://www.insee.fr/fr/statistiques/serie/001515333" target="_blank" rel="noopener">Voir sur le site de l'INSEE</a></span>{% endif %}
+        {% if not revision.irl_ancien and revision.trimestre %}<label class="revision-indice">Indice de l'année précédente <input name="irl_ancien" inputmode="decimal" autocomplete="off" required></label>{% endif %}
+      </div>
+      <div class="revision-case revision-resultat"><span>Nouveau loyer</span>{% if revision.nouveau_loyer is not None %}<b>{{ revision.nouveau_loyer }} €</b><span>{% if revision.hausse >= 0 %}+{% endif %}{{ revision.hausse }} € par mois, à partir du {{ revision.applicable_le|date:"d/m/Y" }}</span>{% else %}<b>…</b><span>calculé dès que l'indice est saisi</span>{% endif %}</div>
+    </div>
+    {% if not revision.trimestre %}<p class="alerte">Le trimestre de l'IRL écrit au bail (« {{ bail.irl_trimestre }} ») n'a pas pu être lu : le corriger sur le bail, sous la forme « 2e trimestre 2026 ».</p>{% endif %}
+    <div class="boutons-etape">
+      <button type="submit" name="decision" value="appliquer"{% if not revision.trimestre %} disabled{% endif %}>Appliquer le nouveau loyer</button>
+      <button type="submit" name="decision" value="renoncer" class="secondaire" formnovalidate>Le propriétaire renonce cette année</button>
+    </div>
+    <p class="discret">Nouveau loyer = loyer actuel × nouvel indice ÷ indice de l'année précédente. Une révision faite en retard ne vaut que pour l'avenir ; au-delà d'un an, celle de l'année est perdue.</p>
+  </form>
+  {% else %}
+  <h2>Loyer</h2>
+  <p>{{ bail.loyer_actuel }} € hors charges + {{ bail.charges }} € de charges, soit {{ bail.total_actuel }} € par mois.</p>
+  {% if revision.gelee %}<p class="alerte">Logement classé {{ bail.propriete.classe_dpe }} : la loi Climat et résilience interdit d'augmenter le loyer. Aucune révision n'est proposée tant que le DPE n'est pas refait.</p>
+  {% else %}<p class="discret">Prochaine révision le {{ prochaine_revision|date:"d/m/Y" }}, avec l'IRL du même trimestre publié dans l'année : elle apparaîtra dans « À faire » un mois avant.</p>{% endif %}
+  {% endif %}
+
+  {% if courrier %}
+  <details class="courrier" open>
+    <summary>Courrier au locataire</summary>
+    <textarea id="texte-courrier" class="texte-courrier" rows="18" readonly>Objet : révision annuelle de votre loyer
+
+{{ bail.noms_locataires }}
+{{ bail.propriete.adresse }}{% if bail.propriete.complement %}, {{ bail.propriete.complement }}{% endif %}, {{ bail.propriete.code_postal }} {{ bail.propriete.ville }}
+
+Madame, Monsieur,
+
+Comme le prévoit votre bail du {{ bail.date_effet|date:"d/m/Y" }}, votre loyer est révisé chaque année selon l'indice de référence des loyers publié par l'INSEE (article 17-1 de la loi du 6 juillet 1989).
+
+Indice de l'année précédente : {{ courrier.irl_ancien }}
+Indice du {{ courrier.irl_libelle }} : {{ courrier.irl_nouveau }}
+
+Votre loyer hors charges passe de {{ courrier.ancien_loyer }} € à {{ courrier.nouveau_loyer }} € à partir du {{ courrier.applicable_le|date:"d/m/Y" }}. Les charges ne changent pas ({{ bail.charges }} €).
+
+Nous vous prions d'agréer, Madame, Monsieur, nos salutations distinguées.
+
+{{ agence.designation }}</textarea>
+    <button type="button" class="bouton-petit secondaire" data-copier="texte-courrier">Copier le courrier</button>
+  </details>
+  {% endif %}
+
+  {% if revisions %}
+  <h3 class="rubrique-taches">Révisions enregistrées</h3>
+  <ul class="historique">
+    {% for r in revisions %}<li>{{ r.date_revision|date:"d/m/Y" }} · {% if r.statut == "appliquee" %}{{ r.ancien_loyer }} € → {{ r.nouveau_loyer }} € à partir du {{ r.applicable_le|date:"d/m/Y" }} ({{ r.irl_libelle }}){% else %}loyer inchangé à {{ r.ancien_loyer }} €, le propriétaire a renoncé{% endif %} <span class="discret">· noté par {{ r.cree_par|default:"—" }}</span></li>{% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<section class="carte" id="assurance">
+  <div class="titre-actions">
+    <h2>Assurance habitation du locataire</h2>
+    {% if assurance_due %}<span class="pastille {% if bail.attestation_assurance_le and assurance_due < aujourd_hui %}pastille-libre{% else %}pastille-preavis{% endif %}">À redemander</span>{% elif bail.attestation_assurance_le %}<span class="pastille pastille-loue">À jour</span>{% endif %}
+  </div>
+  <p>{% if bail.attestation_assurance_le %}Dernière attestation reçue le {{ bail.attestation_assurance_le|date:"d/m/Y" }} : à redemander le {{ bail.attestation_assurance_le|date:"d/m" }}/{{ bail.attestation_assurance_le|date:"Y"|add:1 }}.{% else %}Aucune attestation notée. Le locataire la remet à l'entrée, puis chaque année sur demande.{% endif %}</p>
+  <form method="post" action="{% url 'contrats:assurance' bail.pk %}" class="en-ligne-formulaire">
+    {% csrf_token %}
+    <label>Reçue le <input type="date" name="attestation_assurance_le" value="{{ aujourd_hui|date:'Y-m-d' }}" max="{{ aujourd_hui|date:'Y-m-d' }}"></label>
+    <button type="submit" class="bouton-petit">Noter l'attestation</button>
+  </form>
+</section>
+<script>
+  // Copie du courrier dans le presse-papiers, pour Word ou Gmail.
+  document.querySelectorAll("#revision [data-copier]").forEach(function (bouton) {
+    bouton.addEventListener("click", function () {
+      var champ = document.getElementById(bouton.dataset.copier);
+      var libelle = bouton.textContent;
+      navigator.clipboard.writeText(champ.value).then(function () {
+        bouton.textContent = "Copié";
+        setTimeout(function () { bouton.textContent = libelle; }, 2000);
+      }, function () { champ.select(); });
+    });
+  });
+</script>
