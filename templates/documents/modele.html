@@ -2,7 +2,7 @@
 {% block titre %}{{ libelle }} · {{ nom_application }}{% endblock %}
 {% block contenu %}
 <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><a href="{% url 'documents:modeles' %}">Modèles des documents</a><span aria-hidden="true">›</span><span class="fil-ici">{{ libelle }}</span></nav>
-<div class="titre-pastille"><h1>{{ libelle }}</h1>{% if legal.a_corriger %}<span class="pastille pastille-a_corriger">À corriger</span>{% else %}<span class="pastille pastille-a_jour">Conforme</span>{% endif %}{% if a_relire %}<span class="pastille pastille-a_reverifier">À relire</span>{% endif %}</div>
+<div class="titre-pastille"><h1>{{ libelle }}</h1>{% if legal.a_corriger %}<span class="pastille pastille-a_corriger">À corriger</span>{% else %}<span class="pastille pastille-a_jour">Contrôles OK</span>{% endif %}{% if a_relire %}<span class="pastille pastille-a_reverifier">À relire</span>{% endif %}</div>
 <p class="discret">{% if etat.mis_en_service_le %}{{ etat.get_origine_display }}, le {{ etat.mis_en_service_le|date:"d/m/Y à H:i" }}{% if etat.mis_en_service_par %} par {{ etat.mis_en_service_par.get_full_name|default:etat.mis_en_service_par.username }}{% endif %}.{% elif personnalise %}Modèle déposé par l'agence.{% else %}Modèle d'origine.{% endif %}
   {% if etat.relu_le %}Relu le {{ etat.relu_le|date:"d/m/Y" }}{% if etat.relu_par %} par {{ etat.relu_par.get_full_name|default:etat.relu_par.username }}{% endif %}, d'après {{ etat.relu_reference }}.{% else %}Pas encore relu.{% endif %}</p>
 {% if legal.a_corriger %}
