@@ -1,5 +1,5 @@
 # Publie l'image de l'application sur le registre de GitHub à chaque fusion
-# sur main. Le NAS de test la télécharge au lieu de la construire.
+# sur main. Le serveur de production la télécharge au lieu de la construire.
 name: Image publiée
 
 on:

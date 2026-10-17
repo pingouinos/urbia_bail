@@ -108,6 +108,6 @@ Connexion Google, une fois le Workspace de l'agence prêt : dans la console Goog
 
 Le `docker-compose.yml` à la racine construit l'image depuis le code : il sert à la CI et aux essais en local.
 
-## Test sur le NAS de l'agence
+## Essai sur un ordinateur
 
-Une version allégée tourne sur le NAS Synology pour un essai sur le réseau local : voir [deploy/nas/README.md](deploy/nas/README.md). Pour un essai sur un seul ordinateur avec Docker Desktop : [deploy/poste/README.md](deploy/poste/README.md).
+Pour un essai sur un seul ordinateur avec Docker Desktop : [deploy/poste/README.md](deploy/poste/README.md).
