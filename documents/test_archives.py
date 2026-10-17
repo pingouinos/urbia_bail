@@ -200,7 +200,10 @@ class ArchivesTests(Donnees, TestCase):
         self.client.force_login(self.admin)
         self.client.post(self.url(self.bail, "supprimer"))
         self.assertTrue(type(self.bail).objects.filter(pk=self.bail.pk).exists())
-        self.assertEqual(self.client.post(reverse("admin:contrats_bail_change", args=[self.bail.pk]), {}).status_code, 403)
+        # La console Django est réservée au superutilisateur : un administrateur d'agence est renvoyé à sa connexion.
+        console = self.client.post(reverse("admin:contrats_bail_change", args=[self.bail.pk]), {})
+        self.assertEqual(console.status_code, 302)
+        self.assertTrue(console["Location"].startswith(reverse("admin:login")))
 
     def test_signature_et_archive_atomiques(self):
         self.preparer(self.bail)

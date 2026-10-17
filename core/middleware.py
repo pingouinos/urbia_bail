@@ -1,9 +1,11 @@
-"""En-têtes de sécurité, et limite de débit du formulaire ouvert au public."""
+"""En-têtes de sécurité, limite de débit du formulaire ouvert au public, et
+agence du compte connecté."""
 
 from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponse
 
+from .agence import activer
 from .journal import adresse_ip
 
 # Les pages n'appellent que l'application elle-même et, pour l'aide à la
@@ -65,3 +67,21 @@ class SecuriteMiddleware:
         except ValueError:  # la clé a expiré entre les deux appels
             cache.add(cle, 1, FENETRE)
             return False
+
+
+class AgenceMiddleware:
+    """Pendant la requête, `Organisation.courante()` est l'agence du compte
+    connecté."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from .models import Membre
+
+        agence = None
+        if request.user.is_authenticated:
+            membre = Membre.objects.select_related("organisation").filter(utilisateur=request.user).first()
+            agence = membre.organisation if membre else None
+        with activer(agence):
+            return self.get_response(request)

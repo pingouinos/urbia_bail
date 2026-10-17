@@ -6,4 +6,4 @@ class CoreConfig(AppConfig):
     name = "core"
 
     def ready(self):
-        from . import signaux  # noqa: F401  (branche le journal de sécurité)
+        from . import signaux  # noqa: F401  (journal de sécurité, agence des comptes)
