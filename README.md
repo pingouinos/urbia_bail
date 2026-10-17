@@ -9,7 +9,7 @@ Le cadrage fonctionnel et les décisions sont dans le document de cadrage partag
 - Django 5.2 (Python 3.12), PostgreSQL 16
 - Connexion « Se connecter avec Google », limitée au domaine Google Workspace de l'agence ; comptes locaux de secours avec double authentification TOTP et verrouillage après 5 échecs
 - Gotenberg pour l'impression des documents en PDF (Chromium)
-- Docker Compose sur un VPS OVH, Caddy pour le HTTPS automatique
+- Docker Compose sur une instance OVH Public Cloud, Caddy pour le HTTPS automatique
 
 ## Rôles
 
@@ -98,29 +98,15 @@ python manage.py runserver
 
 Sans `DATABASE_URL`, l'application utilise SQLite. Les tests : `python manage.py test`.
 
-## Déploiement sur un VPS OVH
+## Production sur OVH
 
-1. Commander un VPS (Debian 12, 2 Go de RAM minimum, 4 Go conseillés avec Gotenberg) dans un centre de données français.
-2. Faire pointer un nom de domaine (enregistrement DNS A) vers l'adresse IP du VPS.
-3. Sur le VPS : installer Docker (`curl -fsSL https://get.docker.com | sh`), ouvrir uniquement les ports 22, 80 et 443 dans le pare-feu.
-4. Dans la console Google Cloud (projet rattaché au Workspace de l'agence) : écran de consentement OAuth de type « Interne », puis identifiants OAuth « Application Web » avec l'URI de redirection `https://<DOMAINE>/oidc/callback/`.
-5. Cloner le dépôt dans `/opt/urbiabail`, copier `.env.example` en `.env` et le remplir (`SECRET_KEY`, `POSTGRES_PASSWORD`, `DOMAINE`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_*`, et `EMAIL_URL` pour que l'application envoie elle-même les réponses aux candidats).
-6. Lancer la pile : `docker compose up -d --build`. Caddy obtient seul le certificat HTTPS.
-7. Créer l'administrateur de secours : `docker compose exec web python manage.py createsuperuser`, puis, depuis `/admin/`, créer les comptes des collaborateurs avec leur adresse Google.
+L'application tourne sur une instance OVH Public Cloud avec Docker Compose, Caddy pour le HTTPS automatique et une sauvegarde quotidienne : installation, reprise des données du NAS, mise à jour et sauvegardes dans [deploy/ovh/README.md](deploy/ovh/README.md).
 
 La sonde `/sante/` répond `{"statut": "ok"}` quand l'application et la base fonctionnent.
 
-Mise à jour : `git pull && docker compose up -d --build` (les migrations s'appliquent au démarrage).
+Connexion Google, une fois le Workspace de l'agence prêt : dans la console Google Cloud (projet rattaché au Workspace de l'agence), écran de consentement OAuth de type « Interne », puis identifiants OAuth « Application Web » avec l'URI de redirection `https://<DOMAINE>/oidc/callback/`, à reporter dans les `GOOGLE_*` du `.env`.
 
-### Sauvegarde
-
-`scripts/sauvegarde.sh` efface les candidatures arrivées à échéance puis exporte chaque nuit la base et les documents dans `/var/backups/urbiabail` et garde 14 jours. À planifier par cron (`0 2 * * * /opt/urbiabail/scripts/sauvegarde.sh`) puis à recopier hors du VPS, par exemple vers le NAS de l'agence avec Hyper Backup ou vers un stockage objet OVH.
-
-Restauration de la base :
-
-```bash
-docker compose exec -T db pg_restore -U urbiabail -d urbiabail --clean < base-AAAA-MM-JJ.dump
-```
+Le `docker-compose.yml` à la racine construit l'image depuis le code : il sert à la CI et aux essais en local.
 
 ## Test sur le NAS de l'agence
 
