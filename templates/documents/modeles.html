@@ -4,51 +4,15 @@
 <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><span class="fil-ici">Modèles des documents</span></nav>
 <h1>Modèles des documents</h1>
 <section class="carte">
-  <h2>Modifier un modèle dans Google Docs</h2>
-  <ol>
-    <li>La première fois : télécharger le modèle en service (Word), l'importer dans Google Drive, puis <em>Ouvrir avec</em> &gt; <em>Google Docs</em>. Dans <em>Partager</em> &gt; <em>Accès général</em>, choisir « Tous les utilisateurs qui ont le lien », rôle <em>Lecteur</em>, puis copier le lien et le coller ci-dessous.</li>
-    <li>Modifier le texte dans Google Docs, en laissant intactes les balises entre <code>{% templatetag openvariable %} {% templatetag closevariable %}</code> et <code>{% templatetag openblock %} {% templatetag closeblock %}</code>.</li>
-    <li>Cliquer sur <em>Reprendre depuis Google Docs</em> : l'application vérifie les balises, fait un remplissage d'essai, puis met le modèle en service. Ouvrir le document d'essai pour contrôler la mise en page.</li>
-  </ol>
-  <p class="discret">Le modèle ne contient que le texte type, sans donnée personnelle. Si le partage par lien n'est pas proposé, un administrateur Google Workspace doit autoriser le partage en dehors de l'agence (console d'administration, <em>Drive et Docs</em> &gt; <em>Paramètres de partage</em>).</p>
+  <div class="tableau-defilant"><table class="liste-modeles">
+    <thead><tr><th>Modèle</th><th>État légal</th><th>Relecture</th><th><span class="masque">Action</span></th></tr></thead>
+    <tbody>{% for modele in modeles %}<tr>
+      <td><a href="{% url 'documents:modele' modele.nom %}"><strong>{{ modele.libelle }}</strong></a><br><span class="discret">{% if modele.etat.mis_en_service_le %}{{ modele.etat.get_origine_display }}, le {{ modele.etat.mis_en_service_le|date:"d/m/Y" }}{% elif modele.personnalise %}Modèle déposé par l'agence{% else %}Modèle d'origine{% endif %}</span></td>
+      <td>{% if modele.legal.a_corriger %}<span class="pastille pastille-a_corriger">À corriger</span><br><span class="discret">{{ modele.legal.raison }}</span>{% else %}<span class="pastille pastille-a_jour">Conforme</span>{% endif %}</td>
+      <td class="nombre">{% if modele.a_relire %}<span class="pastille pastille-a_reverifier">À relire</span>{% if modele.etat.relu_le %}<br><span class="discret">dernière le {{ modele.etat.relu_le|date:"d/m/Y" }}</span>{% endif %}{% else %}{{ modele.etat.relu_le|date:"d/m/Y" }}{% if modele.etat.relu_par %}, {{ modele.etat.relu_par.get_full_name|default:modele.etat.relu_par.username }}{% endif %}{% endif %}</td>
+      <td><a class="bouton{% if not modele.legal.a_corriger %} secondaire{% endif %}" href="{% url 'documents:modele' modele.nom %}">{% if modele.legal.a_corriger %}Corriger{% else %}Ouvrir{% endif %}</a></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
 </section>
-{% for modele in modeles %}
-<section class="carte">
-  <h2>{{ modele.libelle }}</h2>
-  <p class="discret">{% if modele.etat.mis_en_service_le %}{{ modele.etat.get_origine_display }}, le {{ modele.etat.mis_en_service_le|date:"d/m/Y à H:i" }}{% if modele.etat.mis_en_service_par %} par {{ modele.etat.mis_en_service_par.get_full_name|default:modele.etat.mis_en_service_par.username }}{% endif %}.{% elif modele.personnalise %}Modèle déposé par l'agence.{% else %}Modèle d'origine.{% endif %}</p>
-  <form method="post" action="{% url 'documents:relu' modele.nom %}" class="relecture">
-    {% csrf_token %}
-    <span>{% if modele.etat.relu_le %}Relu le <strong>{{ modele.etat.relu_le|date:"d/m/Y" }}</strong>{% if modele.etat.relu_par %} par {{ modele.etat.relu_par.get_full_name|default:modele.etat.relu_par.username }}{% endif %}, d'après {{ modele.etat.relu_reference }}{% else %}Pas encore relu{% endif %}{% if modele.a_relire %} <span class="pastille pastille-a_reverifier">À relire</span>{% endif %}</span>
-    <details><summary>Marquer relu</summary>
-      <input type="text" name="reference" maxlength="200" required value="{{ modele.etat.relu_reference }}" placeholder="la loi de 1989 et le décret 2015-587" aria-label="Relu d'après quels textes">
-      <button type="submit" class="secondaire">Enregistrer la relecture</button>
-    </details>
-  </form>
-  <form method="post" action="{% url 'documents:reprendre' modele.nom %}" class="copie">
-    {% csrf_token %}
-    <input type="url" name="lien_google" value="{{ modele.etat.lien_google }}" placeholder="https://docs.google.com/document/d/…" aria-label="Lien du Google Doc" required>
-    <button type="submit">Reprendre depuis Google Docs</button>
-  </form>
-  <p class="actions-formulaire">
-    {% if modele.essai %}<a class="bouton secondaire" href="{% url 'documents:essai' modele.nom %}">Document d'essai (PDF)</a>{% endif %}
-    <a href="{% url 'documents:telecharger' modele.nom %}">Télécharger le modèle en service (Word)</a>
-    {% if modele.etat.lien_google %}<a href="{{ modele.etat.lien_google }}" target="_blank" rel="noopener noreferrer">Ouvrir le Google Doc</a>{% endif %}
-  </p>
-  <details>
-    <summary>Autres actions</summary>
-    <form method="post" enctype="multipart/form-data" action="{% url 'documents:deposer' modele.nom %}" class="en-ligne">
-      {% csrf_token %}
-      <input type="file" name="fichier" accept=".docx" required aria-label="Fichier Word">
-      <button type="submit" class="secondaire">Déposer un fichier Word</button>
-    </form>
-    {% if modele.precedent %}
-    <form method="post" action="{% url 'documents:precedent' modele.nom %}" class="en-ligne">{% csrf_token %}<button type="submit" class="lien">Revenir à la version précédente</button></form>
-    {% endif %}
-    {% if modele.personnalise %}
-    <form method="post" action="{% url 'documents:retablir' modele.nom %}" class="en-ligne">{% csrf_token %}<button type="submit" class="lien">Rétablir le modèle d'origine</button></form>
-    {% endif %}
-  </details>
-  <details><summary>Balises disponibles</summary><p><code>{% for variable in modele.variables %}{% templatetag openvariable %} {{ variable }} {% templatetag closevariable %}{% if not forloop.last %}, {% endif %}{% endfor %}</code></p></details>
-</section>
-{% endfor %}
+<p class="discret">L'état légal compare le modèle en service aux <a href="{% url 'documents:regles' %}">règles légales</a> suivies par l'application. Il ne remplace pas un avis juridique.</p>
 {% endblock %}

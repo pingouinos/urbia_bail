@@ -659,3 +659,17 @@ button.secondaire.bouton-danger[type=submit]:hover { background: var(--erreur-cl
 .en-ligne-formulaire { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
 @media (max-width: 760px) { .revision-calcul { grid-template-columns: 1fr; } }
 button[disabled] { opacity: 0.45; cursor: not-allowed; }
+/* Modèles des documents : liste avec l'état légal, puis page d'un modèle
+   (bandeau de correction, étapes, règles qui s'appliquent). */
+table.liste-modeles { min-width: 560px; }
+table.liste-modeles td:last-child { text-align: right; }
+.bandeau-correction { background: var(--erreur-clair); border: 1px solid #f6c9c6; border-radius: var(--rayon); padding: 14px 16px; margin: 0 0 16px; }
+.bandeau-correction p { margin: 0 0 8px; }
+.bandeau-correction p:last-child { margin: 0; }
+.colonnes-modele { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.colonnes-modele h2 { margin: 0; }
+.etape-correction input[type=text], .etape-correction input[type=url] { width: 100%; margin-top: 6px; }
+.regles-modele { list-style: none; padding: 0; margin: 0 0 12px; }
+.regles-modele li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 7px 0; border-bottom: 1px solid var(--bord); }
+.regles-modele li:last-child { border-bottom: 0; }
+@media (max-width: 760px) { .colonnes-modele { grid-template-columns: 1fr; } }

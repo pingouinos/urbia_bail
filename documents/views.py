@@ -39,6 +39,13 @@ MODELES = {
     "mandat_gestion.docx": ("Mandat de gestion", "mandats.Mandat"),
     "bail_habitation.docx": ("Bail d'habitation (nu ou meublé)", "contrats.Bail"),
 }
+# Groupe du registre des règles légales, et textes proposés pour noter la
+# relecture quand personne ne l'a encore fait.
+DOCUMENT_REGLES = {"mandat_gestion.docx": registre_regles.MANDAT, "bail_habitation.docx": registre_regles.BAIL}
+REFERENCE_RELECTURE = {
+    "mandat_gestion.docx": "la loi Hoguet et le code de la consommation",
+    "bail_habitation.docx": "la loi du 6 juillet 1989 et le décret 2015-587",
+}
 TAILLE_MAX = 10 * 1024 * 1024
 
 
@@ -94,6 +101,35 @@ def _precedent(nom):
     return Path(settings.MEDIA_ROOT) / "modeles" / "precedent" / nom
 
 
+def _essai(nom):
+    """Version reprise ou déposée, en attente de mise en service."""
+    return Path(settings.MEDIA_ROOT) / "modeles" / "essai" / nom
+
+
+def _origine_essai(nom):
+    return _essai(nom).with_suffix(".origine")
+
+
+def _cle_version(nom):
+    return f"essai_version:{nom}"
+
+
+def _empreinte(contenu):
+    return hashlib.sha256(contenu).hexdigest()
+
+
+def preparer_essai(nom, contenu, origine):
+    essai = _essai(nom)
+    essai.parent.mkdir(parents=True, exist_ok=True)
+    essai.write_bytes(contenu)
+    _origine_essai(nom).write_text(origine)
+
+
+def abandonner_essai(nom):
+    _essai(nom).unlink(missing_ok=True)
+    _origine_essai(nom).unlink(missing_ok=True)
+
+
 def _variables(source):
     return DocxTemplate(source).get_undeclared_template_variables()
 
@@ -146,25 +182,67 @@ def mettre_en_service(nom, contenu, origine, utilisateur):
     })
 
 
+def _a_relire(etat):
+    """Jamais relu, relu il y a plus d'un an, ou remplacé depuis."""
+    relu_le = etat.relu_le
+    return (
+        relu_le is None or timezone.localdate() - relu_le > registre_regles.VALIDITE
+        or (etat.mis_en_service_le is not None and timezone.localdate(etat.mis_en_service_le) > relu_le)
+    )
+
+
+def _sans_renvoi(message):
+    # Sans le renvoi vers « Modèles des documents » : on y est déjà.
+    return message.split(" Corriger le modèle")[0]
+
+
+def _etat_legal(nom, groupes):
+    """Défauts du modèle en service, la raison courte à montrer dans la
+    liste, les règles qui s'appliquent et si une correction est proposée."""
+    defauts = defauts_modele(nom)
+    lignes = groupes.get(DOCUMENT_REGLES[nom], [])
+    propres = [ligne for ligne in lignes if getattr(ligne["regle"], "modele", "") == nom
+               and ligne["etat"] == registre_regles.A_CORRIGER]
+    if propres:
+        raison = f"{propres[0]['regle'].libelle} : {propres[0]['regle'].applique.lower()}"
+    else:
+        raison = _sans_renvoi(defauts[0]) if defauts else ""
+    return {
+        "a_corriger": bool(defauts), "raison": raison, "defauts": [_sans_renvoi(defaut) for defaut in defauts],
+        "regles": lignes, "corrigeable": any(ligne["corrigeable"] for ligne in propres),
+    }
+
+
 def modeles(request):
     if not est_administrateur(request.user):
         raise PermissionDenied
-    etats = {modele.nom: modele for modele in Modele.objects.select_related("mis_en_service_par")}
-    liste = [
-        {"nom": nom, "libelle": libelle, "etat": etats.get(nom) or Modele(nom=nom),
-         "personnalise": _depose(nom).exists(), "precedent": _precedent(nom).exists(),
-         "essai": _objet_essai(nom) is not None, "variables": sorted(_variables(MODELES_PAR_DEFAUT / nom))}
-        for nom, (libelle, _) in MODELES.items()
-    ]
-    aujourdhui = timezone.localdate()
-    for modele in liste:
-        # À relire : jamais relu, relu il y a plus d'un an, ou remplacé depuis.
-        etat, relu_le = modele["etat"], modele["etat"].relu_le
-        modele["a_relire"] = (
-            relu_le is None or aujourdhui - relu_le > registre_regles.VALIDITE
-            or (etat.mis_en_service_le is not None and timezone.localdate(etat.mis_en_service_le) > relu_le)
-        )
+    etats = {modele.nom: modele for modele in Modele.objects.select_related("mis_en_service_par", "relu_par")}
+    groupes = registre_regles.registre(timezone.localdate())
+    liste = []
+    for nom, (libelle, _) in MODELES.items():
+        etat = etats.get(nom) or Modele(nom=nom)
+        liste.append({"nom": nom, "libelle": libelle, "etat": etat, "personnalise": _depose(nom).exists(),
+                      "a_relire": _a_relire(etat), "legal": _etat_legal(nom, groupes)})
     return render(request, "documents/modeles.html", {"modeles": liste})
+
+
+def modele(request, nom):
+    """Page d'un modèle : son état légal, les étapes pour en changer le
+    texte (reprise, essai, mise en service avec la relecture) et le reste."""
+    _verifier(request, nom)
+    etat = Modele.objects.select_related("mis_en_service_par", "relu_par").filter(nom=nom).first() or Modele(nom=nom)
+    essai = _essai(nom)
+    en_attente = essai.exists()
+    return render(request, "documents/modele.html", {
+        "nom": nom, "libelle": MODELES[nom][0], "etat": etat, "a_relire": _a_relire(etat),
+        "legal": _etat_legal(nom, registre_regles.registre(timezone.localdate())),
+        "personnalise": _depose(nom).exists(), "precedent": _precedent(nom).exists(),
+        "avec_donnees": _objet_essai(nom) is not None, "variables": sorted(_variables(MODELES_PAR_DEFAUT / nom)),
+        "en_attente": en_attente,
+        "origine_essai": en_attente and _origine_essai(nom).exists() and _origine_essai(nom).read_text(),
+        "essai_vu": en_attente and request.session.get(_cle_version(nom)) == _empreinte(essai.read_bytes()),
+        "reference": etat.relu_reference or REFERENCE_RELECTURE[nom],
+    })
 
 
 def regles(request):
@@ -187,13 +265,13 @@ def relu(request, nom):
     reference = " ".join(request.POST.get("reference", "").split())[:200]
     if not reference:
         messages.error(request, "Indiquer d'après quels textes le modèle a été relu.")
-        return redirect("documents:modeles")
+        return redirect("documents:modele", nom=nom)
     Modele.objects.update_or_create(nom=nom, defaults={
         "relu_le": timezone.localdate(), "relu_par": request.user, "relu_reference": reference,
     })
     noter(request, "modèle relu", MODELES[nom][0], reference)
     messages.success(request, f"{MODELES[nom][0]} : relecture enregistrée.")
-    return redirect("documents:modeles")
+    return redirect("documents:modele", nom=nom)
 
 
 def _correction(nom):
@@ -216,13 +294,12 @@ def corriger(request, nom):
     _, changements, empreinte = _correction(nom)
     if not changements:
         messages.info(request, f"Aucune correction à proposer pour « {MODELES[nom][0]} ».")
-        return redirect("documents:regles")
+        return redirect("documents:modele", nom=nom)
     lignes = []
     for extrait, remplacement, avant, apres in changements:
         debut = avant.find(extrait)
         lignes.append({
-            # Sans le renvoi vers « Modèles des documents » : on y est déjà.
-            "message": CLAUSES_PERIMEES[nom][extrait].split(" Corriger le modèle")[0], "avant": avant[:debut], "retire": extrait,
+            "message": _sans_renvoi(CLAUSES_PERIMEES[nom][extrait]), "avant": avant[:debut], "retire": extrait,
             "ajoute": remplacement, "apres": avant[debut + len(extrait):],
         })
     return render(request, "documents/corriger.html", {
@@ -239,7 +316,7 @@ def essai_correction(request, nom):
     _verifier(request, nom)
     contenu, changements, empreinte = _correction(nom)
     if not changements:
-        return redirect("documents:regles")
+        return redirect("documents:modele", nom=nom)
     request.session[_cle_essai(nom)] = empreinte
     objet = _objet_essai(nom)
     if objet is None:
@@ -260,7 +337,7 @@ def appliquer_correction(request, nom):
     contenu, changements, empreinte = _correction(nom)
     libelle = MODELES[nom][0]
     if not changements:
-        return redirect("documents:regles")
+        return redirect("documents:modele", nom=nom)
     if request.session.get(_cle_essai(nom)) != empreinte:
         messages.error(request, "Ouvrir d'abord le document d'essai de la correction.")
         return redirect("documents:corriger", nom=nom)
@@ -276,7 +353,7 @@ def appliquer_correction(request, nom):
     noter(request, "modèle corrigé", nom, reference)
     messages.success(request, f"« {libelle} » corrigé et mis en service ; la version précédente reste récupérable. "
                               "Reportez la correction dans le Google Doc de l'agence.")
-    return redirect("documents:regles")
+    return redirect("documents:modele", nom=nom)
 
 
 def telecharger(request, nom):
@@ -290,8 +367,30 @@ def essai(request, nom):
     objet = _objet_essai(nom)
     if objet is None:
         messages.error(request, f"Aucun {MODELES[nom][0].lower()} enregistré pour faire un essai.")
-        return redirect("documents:modeles")
+        return redirect("documents:modele", nom=nom)
     return document(request, objet, nom, "pdf")
+
+
+def essai_version(request, nom):
+    """Document d'essai de la version en attente (le dernier document de ce
+    type rempli avec elle, ou à défaut la version elle-même) ; l'ouvrir
+    débloque sa mise en service."""
+    _verifier(request, nom)
+    if not _essai(nom).exists():
+        return redirect("documents:modele", nom=nom)
+    contenu = _essai(nom).read_bytes()
+    request.session[_cle_version(nom)] = _empreinte(contenu)
+    objet = _objet_essai(nom)
+    if objet is None:
+        return HttpResponse(contenu, content_type=DOCX, headers={
+            "Content-Disposition": f'attachment; filename="essai-{nom}"'})
+    rempli = generer_docx(nom, objet.contexte_document(), source=contenu)
+    try:
+        return HttpResponse(convertir_pdf(rempli, nom), content_type="application/pdf", headers={
+            "Content-Disposition": f'inline; filename="essai-{nom[:-5]}.pdf"'})
+    except ConversionImpossible:
+        return HttpResponse(rempli, content_type=DOCX, headers={
+            "Content-Disposition": f'attachment; filename="essai-{nom}"'})
 
 
 @require_POST
@@ -299,27 +398,26 @@ def reprendre(request, nom):
     _verifier(request, nom)
     libelle = MODELES[nom][0]
     modele, _ = Modele.objects.get_or_create(nom=nom)
-    lien = request.POST.get("lien_google", "").strip()
+    lien = request.POST.get("lien_google", "").strip() or modele.lien_google
     if lien != modele.lien_google:
         if google.identifiant(lien) is None:
             messages.error(request, "Coller le lien du Google Doc, de la forme https://docs.google.com/document/d/….")
-            return redirect("documents:modeles")
+            return redirect("documents:modele", nom=nom)
         modele.lien_google = lien
         modele.save(update_fields=["lien_google"])
     try:
         contenu = google.telecharger(modele.lien_google)
     except google.LectureImpossible as erreur:
         messages.error(request, f"« {libelle} » n'a pas été repris. {erreur}")
-        return redirect("documents:modeles")
+        return redirect("documents:modele", nom=nom)
     raison = verifier_modele(nom, contenu)
     if raison:
-        messages.error(request, f"« {libelle} » n'a pas été mis en service. {raison}")
-        return redirect("documents:modeles")
-    mettre_en_service(nom, contenu, Modele.Origine.GOOGLE, request.user)
-    noter(request, "modèle remplacé", nom, "repris de Google Docs")
-    messages.success(request, f"« {libelle} » repris de Google Docs et mis en service. "
-                              "Ouvrez le document d'essai pour vérifier la mise en page.")
-    return redirect("documents:modeles")
+        messages.error(request, f"« {libelle} » n'a pas été repris. {raison}")
+        return redirect("documents:modele", nom=nom)
+    preparer_essai(nom, contenu, Modele.Origine.GOOGLE)
+    messages.success(request, f"« {libelle} » repris de Google Docs. "
+                              "Ouvrez le document d'essai, puis mettez en service.")
+    return redirect("documents:modele", nom=nom)
 
 
 @require_POST
@@ -328,16 +426,57 @@ def deposer(request, nom):
     fichier = request.FILES.get("fichier")
     if not fichier or not fichier.name.lower().endswith(".docx") or fichier.size > TAILLE_MAX:
         messages.error(request, "Fournir un fichier Word (.docx) de 10 Mo au maximum.")
-        return redirect("documents:modeles")
+        return redirect("documents:modele", nom=nom)
     contenu = fichier.read()
     raison = verifier_modele(nom, contenu)
     if raison:
         messages.error(request, raison)
-        return redirect("documents:modeles")
-    mettre_en_service(nom, contenu, Modele.Origine.DEPOT, request.user)
-    noter(request, "modèle remplacé", nom, "fichier déposé")
-    messages.success(request, f"Nouveau modèle « {MODELES[nom][0]} » en service.")
-    return redirect("documents:modeles")
+        return redirect("documents:modele", nom=nom)
+    preparer_essai(nom, contenu, Modele.Origine.DEPOT)
+    messages.success(request, "Fichier Word déposé. Ouvrez le document d'essai, puis mettez en service.")
+    return redirect("documents:modele", nom=nom)
+
+
+@require_POST
+def mettre_en_service_essai(request, nom):
+    """Met en service la version dont l'essai a été ouvert, et note la
+    relecture si l'administrateur la coche."""
+    _verifier(request, nom)
+    libelle, essai = MODELES[nom][0], _essai(nom)
+    if not essai.exists():
+        return redirect("documents:modele", nom=nom)
+    contenu = essai.read_bytes()
+    if request.session.get(_cle_version(nom)) != _empreinte(contenu):
+        messages.error(request, "Ouvrir d'abord le document d'essai.")
+        return redirect("documents:modele", nom=nom)
+    reference = " ".join(request.POST.get("reference", "").split())[:200]
+    if request.POST.get("relu") and not reference:
+        messages.error(request, "Indiquer d'après quels textes le modèle a été relu.")
+        return redirect("documents:modele", nom=nom)
+    raison = verifier_modele(nom, contenu)
+    if raison:
+        messages.error(request, f"« {libelle} » n'a pas été mis en service. {raison}")
+        return redirect("documents:modele", nom=nom)
+    origine = _origine_essai(nom).read_text() if _origine_essai(nom).exists() else Modele.Origine.DEPOT
+    mettre_en_service(nom, contenu, origine, request.user)
+    abandonner_essai(nom)
+    del request.session[_cle_version(nom)]
+    noter(request, "modèle remplacé", nom, "repris de Google Docs" if origine == Modele.Origine.GOOGLE else "fichier déposé")
+    if request.POST.get("relu"):
+        Modele.objects.filter(nom=nom).update(relu_le=timezone.localdate(), relu_par=request.user, relu_reference=reference)
+        noter(request, "modèle relu", libelle, reference)
+        messages.success(request, f"« {libelle} » mis en service, relecture notée. La version précédente reste récupérable.")
+    else:
+        messages.success(request, f"« {libelle} » mis en service, à relire. La version précédente reste récupérable.")
+    return redirect("documents:modele", nom=nom)
+
+
+@require_POST
+def abandonner(request, nom):
+    _verifier(request, nom)
+    abandonner_essai(nom)
+    messages.info(request, "Essai abandonné : le modèle en service n'a pas changé.")
+    return redirect("documents:modele", nom=nom)
 
 
 @require_POST
@@ -348,7 +487,7 @@ def precedent(request, nom):
     mettre_en_service(nom, _precedent(nom).read_bytes(), Modele.Origine.PRECEDENT, request.user)
     noter(request, "modèle remplacé", nom, "version précédente")
     messages.success(request, f"Version précédente de « {MODELES[nom][0]} » remise en service.")
-    return redirect("documents:modeles")
+    return redirect("documents:modele", nom=nom)
 
 
 @require_POST
@@ -357,4 +496,4 @@ def retablir(request, nom):
     mettre_en_service(nom, None, Modele.Origine.ORIGINE, request.user)
     noter(request, "modèle remplacé", nom, "modèle d'origine")
     messages.success(request, f"Modèle d'origine « {MODELES[nom][0]} » rétabli.")
-    return redirect("documents:modeles")
+    return redirect("documents:modele", nom=nom)

@@ -16,6 +16,7 @@
   </div>
 </section>
 {% if agence_manquants %}<p class="message alerte-fond">La fiche de l'agence est incomplète ({{ agence_manquants|join:", " }}) : ces mentions manqueront sur les mandats et les baux. <a href="{% url 'agence' %}">Compléter la fiche</a></p>{% endif %}
+{% for modele in modeles_a_corriger %}<p class="message alerte-fond">Le modèle « {{ modele.libelle }} » ne respecte plus une règle légale : les prochains documents en hériteront. <a href="{% url 'documents:modele' modele.nom %}">Corriger le modèle</a></p>{% endfor %}
 
 {% if parc.geres %}{% url 'proprietes:liste' as biens %}
 <section class="tuiles-parc" aria-label="Le parc">

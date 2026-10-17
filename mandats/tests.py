@@ -394,7 +394,7 @@ class VuesTests(Donnees, TestCase):
         admin = User.objects.create_user("admin")
         attribuer_role(admin, ADMINISTRATEURS)
         self.client.force_login(admin)
-        self.assertContains(self.client.get(reverse("documents:modeles")), "mandant_adresse")
+        self.assertContains(self.client.get(reverse("documents:modele", args=["mandat_gestion.docx"])), "mandant_adresse")
 
         modele = Document(generation.MODELES_PAR_DEFAUT / "mandat_gestion.docx")
         modele.add_paragraph("Ligne ajoutée par l'agence pour {{ mandant }}.")
@@ -403,6 +403,11 @@ class VuesTests(Donnees, TestCase):
         url = reverse("documents:deposer", args=["mandat_gestion.docx"])
         self.client.post(url, {"fichier": SimpleUploadedFile("m.docx", flux.getvalue())})
         mandat = self.creer_mandat()
+        # Le fichier déposé attend son essai, puis la mise en service.
+        self.assertNotIn("Ligne ajoutée", texte_docx(self.client.get(reverse("mandats:word", args=[mandat.pk])).content))
+        with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7"):
+            self.client.get(reverse("documents:essai_version", args=["mandat_gestion.docx"]))
+        self.client.post(reverse("documents:mettre_en_service", args=["mandat_gestion.docx"]))
         texte = texte_docx(self.client.get(reverse("mandats:word", args=[mandat.pk])).content)
         self.assertIn("Ligne ajoutée par l'agence pour Monsieur DURAND", texte)
 

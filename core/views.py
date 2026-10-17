@@ -111,6 +111,14 @@ def locations_en_cours():
     return sorted(lignes.values(), key=lambda l: (l["propriete"].ville, l["propriete"].adresse))
 
 
+def modeles_a_corriger():
+    """Modèles en service qu'une règle légale rend à corriger."""
+    from documents.generation import defauts_modele
+    from documents.views import MODELES
+
+    return [{"nom": nom, "libelle": libelle} for nom, (libelle, _) in MODELES.items() if defauts_modele(nom)]
+
+
 def accueil(request):
     """Page d'accueil : les actions en attente en une liste, rangée par sujet,
     chacune avec un repère de l'étape où attend son dossier ; puis les
@@ -144,6 +152,7 @@ def accueil(request):
     return render(request, "core/accueil.html", {
         "est_admin": est_admin,
         "agence_manquants": Organisation.courante().manquants if est_admin else [],
+        "modeles_a_corriger": modeles_a_corriger() if est_admin else [],
         "derniers_baux": Bail.objects.select_related("propriete__bailleur").prefetch_related("locataires").order_by("-modifie_le")[:5],
         "locations": locations, "taches": par_rubrique(a_faire), "nb_taches": len(a_faire),
         "nb_urgentes": sum(tache.urgent for tache in a_faire),

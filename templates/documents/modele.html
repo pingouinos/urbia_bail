@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block titre %}{{ libelle }} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><a href="{% url 'documents:modeles' %}">Modèles des documents</a><span aria-hidden="true">›</span><span class="fil-ici">{{ libelle }}</span></nav>
+<div class="titre-pastille"><h1>{{ libelle }}</h1>{% if legal.a_corriger %}<span class="pastille pastille-a_corriger">À corriger</span>{% else %}<span class="pastille pastille-a_jour">Conforme</span>{% endif %}{% if a_relire %}<span class="pastille pastille-a_reverifier">À relire</span>{% endif %}</div>
+<p class="discret">{% if etat.mis_en_service_le %}{{ etat.get_origine_display }}, le {{ etat.mis_en_service_le|date:"d/m/Y à H:i" }}{% if etat.mis_en_service_par %} par {{ etat.mis_en_service_par.get_full_name|default:etat.mis_en_service_par.username }}{% endif %}.{% elif personnalise %}Modèle déposé par l'agence.{% else %}Modèle d'origine.{% endif %}
+  {% if etat.relu_le %}Relu le {{ etat.relu_le|date:"d/m/Y" }}{% if etat.relu_par %} par {{ etat.relu_par.get_full_name|default:etat.relu_par.username }}{% endif %}, d'après {{ etat.relu_reference }}.{% else %}Pas encore relu.{% endif %}</p>
+{% if legal.a_corriger %}
+<section class="bandeau-correction">
+  {% for defaut in legal.defauts %}<p>{{ defaut }}</p>{% endfor %}
+  {% if legal.corrigeable %}<p><a class="bouton" href="{% url 'documents:corriger' nom %}">Voir la correction proposée</a></p>{% else %}<p>Modifiez le texte ci-dessous pour le mettre en conformité.</p>{% endif %}
+</section>
+{% endif %}
+<div class="colonnes-modele">
+  <section class="carte etapes-correction">
+    <h2>Modifier le texte</h2>
+    <div class="etape-correction"><span class="numero-etape">1</span>
+      {% if etat.lien_google %}<p>Changer le texte dans Google Docs, sans toucher aux balises entre <code>{% templatetag openvariable %} {% templatetag closevariable %}</code> et <code>{% templatetag openblock %} {% templatetag closeblock %}</code>.</p>
+      <a class="bouton secondaire" href="{{ etat.lien_google }}" target="_blank" rel="noopener noreferrer">Ouvrir le Google Doc</a>
+      {% else %}<div><p>Relier un Google Doc à ce modèle, une seule fois.</p>
+        <details><summary>Comment faire</summary><p class="discret"><a href="{% url 'documents:telecharger' nom %}">Télécharger le modèle en service (Word)</a>, l'importer dans Google Drive, puis <em>Ouvrir avec</em> &gt; <em>Google Docs</em>. Dans <em>Partager</em> &gt; <em>Accès général</em>, choisir « Tous les utilisateurs qui ont le lien », rôle <em>Lecteur</em>, puis coller le lien à l'étape 2. Si le partage par lien n'est pas proposé, un administrateur Google Workspace doit l'autoriser (<em>Drive et Docs</em> &gt; <em>Paramètres de partage</em>).</p></details></div>{% endif %}
+    </div>
+    <form class="etape-correction" method="post" action="{% url 'documents:reprendre' nom %}">{% csrf_token %}
+      <span class="numero-etape{% if en_attente %} fait{% elif not etat.lien_google %} attente{% endif %}">2</span>
+      <div>{% if en_attente %}<p>Essai prêt ({% if origine_essai == "google" %}repris de Google Docs{% else %}fichier Word déposé{% endif %}) : vérifier la mise en page.</p>
+        <p class="actions-formulaire"><a class="bouton secondaire" href="{% url 'documents:essai_version' nom %}" target="_blank" rel="noopener" data-recharger>{% if avec_donnees %}Document d'essai (PDF){% else %}Version reprise (Word){% endif %}</a>
+          <button type="submit" class="lien" formaction="{% url 'documents:abandonner' nom %}">Abandonner l'essai</button></p>
+        {% else %}<p>L'application vérifie les balises et prépare un document d'essai. Le modèle en service ne change pas encore.</p>
+        {% if not etat.lien_google %}<input type="url" name="lien_google" placeholder="https://docs.google.com/document/d/…" aria-label="Lien du Google Doc" required>{% endif %}{% endif %}</div>
+      {% if not en_attente %}<button type="submit">Reprendre et faire un essai</button>{% endif %}
+    </form>
+    <form class="etape-correction" method="post" action="{% url 'documents:mettre_en_service' nom %}">{% csrf_token %}
+      <span class="numero-etape{% if not essai_vu %} attente{% endif %}">3</span>
+      <div><label class="case"><input type="checkbox" name="relu" value="1" checked{% if not essai_vu %} disabled{% endif %}> J'ai relu ce modèle d'après</label>
+        <input type="text" name="reference" maxlength="200" value="{{ reference }}" aria-label="Relu d'après quels textes"{% if not essai_vu %} disabled{% endif %}></div>
+      <button type="submit"{% if not essai_vu %} disabled title="{% if en_attente %}Ouvrir d'abord le document d'essai{% else %}Reprendre d'abord une nouvelle version{% endif %}"{% endif %}>Mettre en service</button>
+    </form>
+  </section>
+  <section class="carte">
+    <h2>Règles légales de ce modèle</h2>
+    <ul class="regles-modele">{% for ligne in legal.regles %}
+      <li><span>{{ ligne.regle.libelle }}</span><span class="pastille pastille-{{ ligne.etat }}">{{ ligne.libelle_etat }}</span></li>{% endfor %}
+    </ul>
+    <p><a href="{% url 'documents:regles' %}">Toutes les règles légales</a></p>
+    {% if a_relire and not en_attente %}
+    <form method="post" action="{% url 'documents:relu' nom %}" class="relecture">{% csrf_token %}
+      <details><summary>Noter une relecture sans changer le texte</summary>
+        <input type="text" name="reference" maxlength="200" required value="{{ reference }}" aria-label="Relu d'après quels textes">
+        <button type="submit" class="secondaire">Enregistrer la relecture</button>
+      </details>
+    </form>
+    {% endif %}
+  </section>
+</div>
+<details class="carte">
+  <summary>Autres actions</summary>
+  <form method="post" enctype="multipart/form-data" action="{% url 'documents:deposer' nom %}" class="en-ligne">{% csrf_token %}
+    <input type="file" name="fichier" accept=".docx" required aria-label="Fichier Word">
+    <button type="submit" class="secondaire">Déposer un fichier Word</button>
+  </form>
+  {% if etat.lien_google %}
+  <form method="post" action="{% url 'documents:reprendre' nom %}" class="copie">{% csrf_token %}
+    <input type="url" name="lien_google" value="{{ etat.lien_google }}" aria-label="Lien du Google Doc" required>
+    <button type="submit" class="secondaire">Changer le lien et reprendre</button>
+  </form>
+  {% endif %}
+  <p class="actions-formulaire">
+    <a href="{% url 'documents:telecharger' nom %}">Télécharger le modèle en service (Word)</a>
+    {% if avec_donnees %}<a href="{% url 'documents:essai' nom %}">Document d'essai du modèle en service (PDF)</a>{% endif %}
+  </p>
+  {% if precedent %}<form method="post" action="{% url 'documents:precedent' nom %}" class="en-ligne">{% csrf_token %}<button type="submit" class="lien">Revenir à la version précédente</button></form>{% endif %}
+  {% if personnalise %}<form method="post" action="{% url 'documents:retablir' nom %}" class="en-ligne">{% csrf_token %}<button type="submit" class="lien">Rétablir le modèle d'origine</button></form>{% endif %}
+  <details><summary>Balises disponibles</summary><p><code>{% for variable in variables %}{% templatetag openvariable %} {{ variable }} {% templatetag closevariable %}{% if not forloop.last %}, {% endif %}{% endfor %}</code></p></details>
+</details>
+<script>
+document.querySelectorAll("[data-recharger]").forEach(function (lien) {
+  lien.addEventListener("click", function () { setTimeout(function () { location.reload(); }, 1500); });
+});
+</script>
+{% endblock %}
