@@ -238,7 +238,7 @@ class OrganisationTests(TestCase):
     def test_fiche_vide_puis_remplie(self):
         self.assertEqual(Organisation.objects.count(), 0)
         organisation = Organisation.courante()
-        self.assertEqual(organisation.designation, "Urbia Gestion")
+        self.assertEqual(organisation.designation, "Agence sans nom")
         self.assertIn("carte professionnelle", organisation.manquants)
         self.connecter(ADMINISTRATEURS)
         self.assertContains(self.client.get(reverse("accueil")), "La fiche de l'agence est incomplète")
