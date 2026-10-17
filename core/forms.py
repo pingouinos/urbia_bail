@@ -125,7 +125,8 @@ class UtilisateurForm(forms.ModelForm):
             if perd_ses_droits and est_administrateur(compte):
                 if self.acteur and compte.pk == self.acteur.pk:
                     raise forms.ValidationError("Vous ne pouvez pas retirer vos propres droits d'administrateur.")
-                autres = [u for u in get_user_model().objects.filter(is_active=True).exclude(pk=compte.pk) if est_administrateur(u)]
+                collegues = get_user_model().objects.filter(membre__organisation=compte.membre.organisation)
+                autres = [u for u in collegues.filter(is_active=True).exclude(pk=compte.pk) if est_administrateur(u)]
                 if not autres:
                     raise forms.ValidationError("C'est le dernier administrateur actif : nommez-en un autre d'abord.")
         return donnees

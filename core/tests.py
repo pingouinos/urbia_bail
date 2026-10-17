@@ -12,7 +12,9 @@ from mandats.models import Mandat
 from proprietes.models import Bailleur, Propriete
 
 from .management.commands.migrate import aligner_applications
-from .models import Organisation
+from .agence import activer
+from .forms import UtilisateurForm
+from .models import Membre, Organisation
 
 
 class AlignementApplicationsTests(TestCase):
@@ -47,6 +49,93 @@ class AlignementApplicationsTests(TestCase):
         self.assertEqual(applications, {"contrats", "proprietes"})
         # Rejouer l'alignement ne fait plus rien.
         self.assertEqual(aligner_applications(connection), [])
+
+
+@override_settings(MFA_OBLIGATOIRE=False)
+class AgencesTests(TestCase):
+    """Chaque compte appartient à une agence : il travaille sur sa fiche et
+    ne voit ni ne touche les comptes des autres agences."""
+
+    def setUp(self):
+        self.urbia = Organisation.objects.create(nom="URBIA Immobilier")
+        self.canal = Organisation.objects.create(nom="Agence du Canal")
+        self.admin_urbia = self.compte("admin-urbia", ADMINISTRATEURS)
+        with activer(self.canal):
+            self.admin_canal = self.compte("admin-canal", ADMINISTRATEURS)
+
+    @staticmethod
+    def compte(nom, role):
+        utilisateur = User.objects.create_user(nom, email=f"{nom}@example.com", password="x")
+        attribuer_role(utilisateur, role)
+        return utilisateur
+
+    def test_rattachement_des_comptes(self):
+        self.assertEqual(self.admin_urbia.membre.organisation, self.urbia)
+        self.assertEqual(self.admin_canal.membre.organisation, self.canal)
+        # Hors de toute requête (commande, création par la console), la première agence.
+        self.assertEqual(self.compte("sans-contexte", GESTIONNAIRES).membre.organisation, self.urbia)
+
+    def test_agence_du_compte_connecte(self):
+        self.client.force_login(self.admin_canal)
+        self.assertContains(self.client.get(reverse("accueil")), "<h1>Agence du Canal</h1>", html=True)
+        self.assertContains(self.client.get(reverse("agence")), "Agence du Canal")
+        self.client.force_login(self.admin_urbia)
+        self.assertContains(self.client.get(reverse("accueil")), "<h1>URBIA Immobilier</h1>", html=True)
+
+    def test_nouveau_compte_dans_l_agence_de_son_createur(self):
+        self.client.force_login(self.admin_canal)
+        reponse = self.client.post(reverse("utilisateur_creer"), {
+            "first_name": "Léa", "last_name": "Martin", "email": "lea@canal.example", "is_active": "on",
+            "role": GESTIONNAIRES,
+        })
+        self.assertRedirects(reponse, reverse("utilisateurs"))
+        self.assertEqual(User.objects.get(username="lea@canal.example").membre.organisation, self.canal)
+
+    def test_comptes_des_autres_agences_hors_d_atteinte(self):
+        self.client.force_login(self.admin_urbia)
+        liste = self.client.get(reverse("utilisateurs"))
+        self.assertContains(liste, "admin-urbia")
+        self.assertNotContains(liste, "admin-canal")
+        autre = self.admin_canal.pk
+        self.assertEqual(self.client.get(reverse("utilisateur_modifier", args=[autre])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("utilisateur_modifier", args=[autre]), {
+            "first_name": "X", "last_name": "Y", "email": "x@example.com", "role": GESTIONNAIRES,
+        }).status_code, 404)
+        self.assertEqual(self.client.post(reverse("utilisateur_mfa", args=[autre])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("utilisateur_debloquer", args=[autre])).status_code, 404)
+        self.assertTrue(est_administrateur(User.objects.get(pk=autre)))
+
+    def test_dernier_administrateur_compte_par_agence(self):
+        """Les administrateurs d'URBIA ne comptent pas pour l'agence du Canal."""
+        form = UtilisateurForm({
+            "first_name": "A", "last_name": "C", "email": "admin-canal@example.com", "role": GESTIONNAIRES,
+            "is_active": "on",
+        }, instance=self.admin_canal)
+        self.assertFalse(form.is_valid())
+        self.assertIn("dernier administrateur actif", str(form.errors))
+
+    def test_console_django_reservee_au_superutilisateur(self):
+        self.client.force_login(self.admin_urbia)
+        reponse = self.client.get(reverse("admin:index"))
+        self.assertEqual(reponse.status_code, 302)
+        self.assertTrue(reponse["Location"].startswith(reverse("admin:login")))
+        exploitant = User.objects.create_superuser("exploitant", password="x")
+        self.client.force_login(exploitant)
+        self.assertEqual(self.client.get(reverse("admin:index")).status_code, 200)
+
+    def test_superutilisateur_sans_agence(self):
+        """Le superutilisateur exploite la plateforme : il n'a pas d'agence et
+        ne voit les données d'aucune dans l'application."""
+        exploitant = User.objects.create_superuser("exploitant", password="x")
+        self.assertFalse(Membre.objects.filter(utilisateur=exploitant).exists())
+        self.client.force_login(exploitant)
+        for page in (reverse("accueil"), reverse("utilisateurs"), reverse("proprietes:liste")):
+            with self.subTest(page=page):
+                self.assertRedirects(self.client.get(page), reverse("admin:index"))
+        # Redevenu un compte ordinaire, il rejoint une agence.
+        exploitant.is_superuser = False
+        exploitant.save()
+        self.assertEqual(exploitant.membre.organisation, self.urbia)
 
 
 @override_settings(MFA_OBLIGATOIRE=False)

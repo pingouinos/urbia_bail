@@ -48,7 +48,8 @@ if HOTE_LOCATAIRES:
     CSRF_TRUSTED_ORIGINS.append(URL_LOCATAIRES)
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    # Console Django réservée au superutilisateur (voir config/admin.py).
+    "config.admin.ConsoleConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -78,6 +79,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.AgenceMiddleware",
     "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

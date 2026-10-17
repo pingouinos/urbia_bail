@@ -1,9 +1,12 @@
-"""En-têtes de sécurité, et limite de débit du formulaire ouvert au public."""
+"""En-têtes de sécurité, limite de débit du formulaire ouvert au public, et
+agence du compte connecté."""
 
 from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponse
+from django.shortcuts import redirect
 
+from .agence import activer
 from .journal import adresse_ip
 
 # Les pages n'appellent que l'application elle-même et, pour l'aide à la
@@ -65,3 +68,29 @@ class SecuriteMiddleware:
         except ValueError:  # la clé a expiré entre les deux appels
             cache.add(cle, 1, FENETRE)
             return False
+
+
+# Le superutilisateur exploite la plateforme : il n'appartient à aucune agence
+# et ne voit les données d'aucune dans l'application, seulement la console.
+CHEMINS_SUPERUTILISATEUR = ("/admin/", "/deconnexion/", "/mfa/", "/connexion/", "/oidc/", "/static/", "/sante/")
+
+
+class AgenceMiddleware:
+    """Pendant la requête, `Organisation.courante()` est l'agence du compte
+    connecté."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from .models import Membre
+
+        agence = None
+        if request.user.is_authenticated and request.user.is_superuser:
+            if not request.path.startswith(CHEMINS_SUPERUTILISATEUR):
+                return redirect("admin:index")
+        elif request.user.is_authenticated:
+            membre = Membre.objects.select_related("organisation").filter(utilisateur=request.user).first()
+            agence = membre.organisation if membre else None
+        with activer(agence):
+            return self.get_response(request)

@@ -144,21 +144,27 @@ def _administrateur(request):
         raise PermissionDenied
 
 
+def comptes_agence():
+    """Les comptes de l'agence courante : un administrateur ne voit ni ne
+    touche ceux des autres agences."""
+    return get_user_model().objects.filter(membre__organisation=Organisation.courante())
+
+
 def administration(request):
     """Accueil de l'administration : l'agence, les utilisateurs, les modèles."""
     _administrateur(request)
-    Utilisateur = get_user_model()
     from documents.regles import registre, resume
+
     return render(request, "core/administration.html", {
         "regles": resume(registre()),
         "organisation": Organisation.courante(),
-        "nb_utilisateurs": Utilisateur.objects.filter(is_active=True).count(),
+        "nb_utilisateurs": comptes_agence().filter(is_active=True).count(),
     })
 
 
 def utilisateurs(request):
     _administrateur(request)
-    comptes = list(get_user_model().objects.order_by("-is_active", "last_name", "first_name", "username"))
+    comptes = list(comptes_agence().order_by("-is_active", "last_name", "first_name", "username"))
     avec_mfa = set(TOTPDevice.objects.filter(confirmed=True).values_list("user_id", flat=True))
     for compte in comptes:
         compte.administrateur = est_administrateur(compte)
@@ -169,7 +175,7 @@ def utilisateurs(request):
 
 def utilisateur_editer(request, pk=None):
     _administrateur(request)
-    compte = get_object_or_404(get_user_model(), pk=pk) if pk else None
+    compte = get_object_or_404(comptes_agence(), pk=pk) if pk else None
     form = UtilisateurForm(request.POST or None, instance=compte, acteur=request.user)
     if form.is_valid():
         creation = compte is None
@@ -190,7 +196,7 @@ def utilisateur_action(request, pk, action):
     """Dépannage d'un compte : nouvelle double authentification, ou
     déblocage après trop d'essais de mot de passe."""
     _administrateur(request)
-    compte = get_object_or_404(get_user_model(), pk=pk)
+    compte = get_object_or_404(comptes_agence(), pk=pk)
     nom = compte.get_full_name() or compte.username
     if action == "mfa":
         TOTPDevice.objects.filter(user=compte).delete()
