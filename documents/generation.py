@@ -52,6 +52,69 @@ CLAUSES_PERIMEES = {
 }
 
 
+# Correction validée de chaque clause périmée, proposée à l'administrateur
+# depuis la page Règles légales (jamais appliquée sans son clic).
+REMPLACEMENTS = {
+    "bail_habitation.docx": {
+        "deux mois après un commandement de payer": "six semaines après un commandement de payer",
+    },
+}
+
+
+def _paragraphes(document):
+    """Paragraphes du corps et des tableaux, imbriqués compris."""
+    def parcourir(conteneur):
+        yield from conteneur.paragraphs
+        for tableau in getattr(conteneur, "tables", []):
+            for ligne in tableau.rows:
+                for cellule in ligne.cells:
+                    yield from parcourir(cellule)
+    yield from parcourir(document)
+
+
+def _remplacer(paragraphe, extrait, remplacement):
+    """Remplace la première occurrence de l'extrait dans le paragraphe, même
+    répartie sur plusieurs morceaux de mise en forme : le remplacement prend
+    la mise en forme du morceau où commence l'extrait."""
+    morceaux = paragraphe.runs
+    texte = "".join(morceau.text for morceau in morceaux)
+    debut = texte.find(extrait)
+    if debut < 0:
+        return False
+    fin, position = debut + len(extrait), 0
+    for morceau in morceaux:
+        longueur = len(morceau.text)
+        a, b = max(debut - position, 0), min(fin - position, longueur)
+        if a < b:
+            premier = position <= debut
+            morceau.text = morceau.text[:a] + (remplacement if premier else "") + morceau.text[b:]
+        position += longueur
+    return True
+
+
+def corriger_modele(nom, contenu=None):
+    """(contenu corrigé, [(avant, après)]) : le modèle en service avec les
+    clauses périmées remplacées par leur correction validée ; liste vide si
+    rien n'est à corriger."""
+    from docx import Document
+
+    remplacements = REMPLACEMENTS.get(nom, {})
+    if contenu is None:
+        contenu = chemin_modele(nom).read_bytes()
+    document = Document(io.BytesIO(contenu))
+    changements = []
+    for paragraphe in _paragraphes(document):
+        for extrait, remplacement in remplacements.items():
+            avant = paragraphe.text
+            if extrait in avant and _remplacer(paragraphe, extrait, remplacement):
+                changements.append((extrait, remplacement, avant, paragraphe.text))
+    if not changements:
+        return contenu, []
+    flux = io.BytesIO()
+    document.save(flux)
+    return flux.getvalue(), changements
+
+
 def texte_docx(contenu):
     """Texte brut du corps d'un .docx, paragraphe par paragraphe."""
     with zipfile.ZipFile(io.BytesIO(contenu)) as archive:

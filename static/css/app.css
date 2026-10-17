@@ -278,6 +278,21 @@ table.regles tr.groupe th { background: var(--melon-clair); }
 .pastille-a_reverifier { background: var(--melon-clair); border-color: var(--melon); }
 .pastille-a_corriger { background: var(--erreur-clair); border-color: #f6c9c6; color: var(--erreur); }
 .relecture { display: grid; gap: 6px; }
+/* Correction proposée d'un modèle : avant, après, puis deux étapes. */
+.comparaison { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 12px 0 20px; }
+.comparaison > div { min-width: 0; padding: 12px 14px; background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); }
+.comparaison p { margin: 6px 0 0; }
+.version-avant { border-left: 4px solid var(--erreur) !important; }
+.version-apres { border-left: 4px solid var(--vert) !important; }
+del { background: var(--erreur-clair); color: var(--erreur); }
+ins { background: var(--vert-clair); text-decoration: none; font-weight: 600; }
+.etapes-correction { display: grid; gap: 14px; }
+.etape-correction { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; margin: 0; }
+.etape-correction p { margin: 0; }
+.numero-etape { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--acier); color: #fff; font-weight: 700; }
+.numero-etape.attente { background: var(--bord); color: var(--discret); }
+.numero-etape.fait { background: var(--vert); color: var(--acier); }
+@media (max-width: 760px) { .etape-correction { grid-template-columns: 32px 1fr; } .etape-correction > :last-child { grid-column: 2; justify-self: start; } }
 .relecture details { display: flex; gap: 8px; flex-wrap: wrap; }
 .relecture input { width: 100%; max-width: 420px; margin: 6px 8px 6px 0; }
 
@@ -628,3 +643,4 @@ a.puce-parc:hover { border-color: var(--corail); color: var(--texte); }
 .texte-courrier { display: block; width: 100%; margin: 8px 0; font: inherit; font-size: 0.92rem; }
 .en-ligne-formulaire { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
 @media (max-width: 760px) { .revision-calcul { grid-template-columns: 1fr; } }
+button[disabled] { opacity: 0.45; cursor: not-allowed; }

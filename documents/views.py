@@ -3,6 +3,7 @@ reprise depuis un Google Doc où Elodie retouche le texte, ou dépôt d'un
 fichier Word. Un modèle n'est mis en service qu'après vérification de ses
 balises et un remplissage d'essai ; la version remplacée reste disponible."""
 
+import hashlib
 import io
 import mimetypes
 from pathlib import Path
@@ -25,8 +26,8 @@ from proprietes.zones_tendues import derniere_liste
 
 from . import google
 from .generation import (
-    DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, defauts_modele, convertir_pdf,
-    generer_docx, remplir,
+    CLAUSES_PERIMEES, DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, corriger_modele,
+    defauts_modele, convertir_pdf, generer_docx, remplir,
 )
 from .archives import interdictions
 from .models import Modele
@@ -193,6 +194,89 @@ def relu(request, nom):
     noter(request, "modèle relu", MODELES[nom][0], reference)
     messages.success(request, f"{MODELES[nom][0]} : relecture enregistrée.")
     return redirect("documents:modeles")
+
+
+def _correction(nom):
+    """(contenu corrigé, changements, empreinte du modèle en service) : la
+    correction vue en essai reste celle qu'on met en service tant que le
+    modèle n'a pas changé entre-temps."""
+    source = chemin_modele(nom).read_bytes()
+    contenu, changements = corriger_modele(nom, source)
+    return contenu, changements, hashlib.sha256(source).hexdigest()
+
+
+def _cle_essai(nom):
+    return f"essai_correction:{nom}"
+
+
+def corriger(request, nom):
+    """Correction proposée d'un modèle aux clauses périmées : avant, après,
+    document d'essai, puis mise en service par l'administrateur."""
+    _verifier(request, nom)
+    _, changements, empreinte = _correction(nom)
+    if not changements:
+        messages.info(request, f"Aucune correction à proposer pour « {MODELES[nom][0]} ».")
+        return redirect("documents:regles")
+    lignes = []
+    for extrait, remplacement, avant, apres in changements:
+        debut = avant.find(extrait)
+        lignes.append({
+            # Sans le renvoi vers « Modèles des documents » : on y est déjà.
+            "message": CLAUSES_PERIMEES[nom][extrait].split(" Corriger le modèle")[0], "avant": avant[:debut], "retire": extrait,
+            "ajoute": remplacement, "apres": avant[debut + len(extrait):],
+        })
+    return render(request, "documents/corriger.html", {
+        "nom": nom, "libelle": MODELES[nom][0], "lignes": lignes,
+        "essai_vu": request.session.get(_cle_essai(nom)) == empreinte,
+        "avec_donnees": _objet_essai(nom) is not None, "lien_google": Modele.objects.filter(nom=nom, lien_google__gt="").exists(),
+    })
+
+
+def essai_correction(request, nom):
+    """Document d'essai produit avec le modèle corrigé (le dernier document
+    de ce type, ou à défaut le modèle corrigé lui-même) ; l'ouvrir débloque
+    la mise en service de cette correction-là."""
+    _verifier(request, nom)
+    contenu, changements, empreinte = _correction(nom)
+    if not changements:
+        return redirect("documents:regles")
+    request.session[_cle_essai(nom)] = empreinte
+    objet = _objet_essai(nom)
+    if objet is None:
+        return HttpResponse(contenu, content_type=DOCX, headers={
+            "Content-Disposition": f'attachment; filename="corrige-{nom}"'})
+    rempli = generer_docx(nom, objet.contexte_document(), source=contenu)
+    try:
+        return HttpResponse(convertir_pdf(rempli, nom), content_type="application/pdf", headers={
+            "Content-Disposition": f'inline; filename="essai-{nom[:-5]}.pdf"'})
+    except ConversionImpossible:
+        return HttpResponse(rempli, content_type=DOCX, headers={
+            "Content-Disposition": f'attachment; filename="essai-{nom}"'})
+
+
+@require_POST
+def appliquer_correction(request, nom):
+    _verifier(request, nom)
+    contenu, changements, empreinte = _correction(nom)
+    libelle = MODELES[nom][0]
+    if not changements:
+        return redirect("documents:regles")
+    if request.session.get(_cle_essai(nom)) != empreinte:
+        messages.error(request, "Ouvrir d'abord le document d'essai de la correction.")
+        return redirect("documents:corriger", nom=nom)
+    raison = verifier_modele(nom, contenu)
+    if raison:
+        messages.error(request, f"« {libelle} » n'a pas été corrigé. {raison}")
+        return redirect("documents:corriger", nom=nom)
+    mettre_en_service(nom, contenu, Modele.Origine.DEPOT, request.user)
+    reference = "; ".join(f"« {remplacement} » au lieu de « {extrait} »" for extrait, remplacement, _, _ in changements)
+    Modele.objects.filter(nom=nom).update(
+        relu_le=timezone.localdate(), relu_par=request.user, relu_reference=f"la correction proposée ({reference})"[:200])
+    del request.session[_cle_essai(nom)]
+    noter(request, "modèle corrigé", nom, reference)
+    messages.success(request, f"« {libelle} » corrigé et mis en service ; la version précédente reste récupérable. "
+                              "Reportez la correction dans le Google Doc de l'agence.")
+    return redirect("documents:regles")
 
 
 def telecharger(request, nom):

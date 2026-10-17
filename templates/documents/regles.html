@@ -16,7 +16,7 @@
         <td>{{ ligne.regle.applique }}</td>
         <td><a href="{{ ligne.regle.url }}" target="_blank" rel="noopener noreferrer">{{ ligne.regle.source }}</a></td>
         <td class="nombre">{{ ligne.regle.verifiee_le|date:"d/m/Y" }}</td>
-        <td><span class="pastille pastille-{{ ligne.etat }}">{{ ligne.libelle_etat }}</span>{% if ligne.explication %}<br><span class="discret">{{ ligne.explication }}</span>{% endif %}</td>
+        <td><span class="pastille pastille-{{ ligne.etat }}">{{ ligne.libelle_etat }}</span>{% if ligne.explication %}<br><span class="discret">{{ ligne.explication }}</span>{% endif %}{% if ligne.corrigeable %}<br><a href="{% url 'documents:corriger' ligne.regle.modele %}">Voir la correction</a>{% endif %}</td>
       </tr>{% endfor %}
     {% endfor %}</tbody>
   </table></div>

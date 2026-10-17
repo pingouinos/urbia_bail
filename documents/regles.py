@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from mandats.models import PLAFOND_BAIL_HORS_ZONE_TENDUE, PLAFOND_BAIL_ZONE_TENDUE, PLAFOND_ETAT_DES_LIEUX
 
-from .generation import BALISES_REQUISES, defauts_modele, montant
+from .generation import BALISES_REQUISES, CLAUSES_PERIMEES, REMPLACEMENTS, defauts_modele, montant
 
 # Au-delà, une règle ou une relecture de modèle est à revérifier.
 VALIDITE = timedelta(days=365)
@@ -93,6 +93,13 @@ def etat(regle, defauts, aujourdhui=None):
     return A_JOUR, ""
 
 
+def corrigeable(regle, explication):
+    """Le défaut signalé est une clause périmée dont la correction est
+    validée : la page « Corriger le modèle » peut la proposer."""
+    clauses = CLAUSES_PERIMEES.get(regle.modele, {})
+    return any(clauses.get(extrait) == explication for extrait in REMPLACEMENTS.get(regle.modele, {}))
+
+
 def zones_tendues():
     """Ligne du registre pour la liste des communes en zone tendue, que
     l'application télécharge elle-même : à revérifier si le dernier
@@ -126,6 +133,7 @@ def registre(aujourdhui=None):
         code, explication = etat(regle, defauts, aujourdhui)
         groupes.setdefault(regle.document, []).append({
             "regle": regle, "etat": code, "libelle_etat": LIBELLES_ETAT[code], "explication": explication,
+            "corrigeable": code == A_CORRIGER and corrigeable(regle, explication),
         })
     groupes[BAIL].append(zones_tendues())
     return groupes
