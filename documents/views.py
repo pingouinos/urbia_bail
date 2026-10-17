@@ -350,10 +350,10 @@ def appliquer_correction(request, nom):
         messages.error(request, f"« {libelle} » n'a pas été corrigé. {raison}")
         return redirect("documents:corriger", nom=nom)
     mettre_en_service(nom, contenu, Modele.Origine.EDITEUR, request.user)
-    reference = "; ".join(
-        f"« {c['ajoute']} » au lieu de « {c['retire']} »" if c["retire"]
-        else f"passage repris du modèle d'origine ({c['ajoute'].splitlines()[0]})"
-        for c in changements)
+    remplacements = [f"« {c['ajoute']} » au lieu de « {c['retire']} »" for c in changements if c["retire"]]
+    if len(remplacements) < len(changements):
+        remplacements.append("mentions obligatoires reprises du modèle d'origine")
+    reference = "; ".join(remplacements)
     Modele.objects.filter(nom=nom).update(
         relu_le=timezone.localdate(), relu_par=request.user, relu_reference=f"la correction proposée ({reference})"[:200])
     del request.session[_cle_essai(nom)]

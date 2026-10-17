@@ -58,8 +58,18 @@
   {% if personnalise %}<form method="post" action="{% url 'documents:retablir' nom %}" class="en-ligne">{% csrf_token %}<button type="submit" class="lien">Rétablir le modèle d'origine</button></form>{% endif %}
 </details>
 <script>
+// Au retour depuis l'onglet du document d'essai, la page se recharge pour
+// activer « Mettre en service » (la conversion peut prendre plusieurs secondes).
 document.querySelectorAll("[data-recharger]").forEach(function (lien) {
-  lien.addEventListener("click", function () { setTimeout(function () { location.reload(); }, 1500); });
+  lien.addEventListener("click", function () {
+    function recharger() { if (document.visibilityState === "visible") location.reload(); }
+    setTimeout(function () {
+      window.addEventListener("focus", recharger);
+      document.addEventListener("visibilitychange", recharger);
+    }, 500);
+  });
 });
+// Retour par le bouton Précédent quand le document s'est ouvert dans le même onglet.
+window.addEventListener("pageshow", function (evenement) { if (evenement.persisted) location.reload(); });
 </script>
 {% endblock %}

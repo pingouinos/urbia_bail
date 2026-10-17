@@ -23,8 +23,18 @@
 </section>
 <p class="discret">Si l'agence garde une copie de ce modèle ailleurs, reportez-y la correction.</p>
 <script>
-document.querySelector("[data-recharger]").addEventListener("click", function () {
-  setTimeout(function () { location.reload(); }, 1500);
+// Au retour depuis l'onglet du document d'essai, la page se recharge pour
+// activer « Mettre en service » (la conversion peut prendre plusieurs secondes).
+document.querySelectorAll("[data-recharger]").forEach(function (lien) {
+  lien.addEventListener("click", function () {
+    function recharger() { if (document.visibilityState === "visible") location.reload(); }
+    setTimeout(function () {
+      window.addEventListener("focus", recharger);
+      document.addEventListener("visibilitychange", recharger);
+    }, 500);
+  });
 });
+// Retour par le bouton Précédent quand le document s'est ouvert dans le même onglet.
+window.addEventListener("pageshow", function (evenement) { if (evenement.persisted) location.reload(); });
 </script>
 {% endblock %}
