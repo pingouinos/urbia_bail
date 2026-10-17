@@ -52,6 +52,7 @@ sur une ligne.
   <div class="alertes">
     <p><strong>À vérifier avant de faire signer</strong></p>
     <ul>{% for alerte in alertes %}<li>{{ alerte }}</li>{% endfor %}</ul>
+    {% if not bail.mandat or not bail.mandat.en_cours %}<p><a href="{% url 'mandats:creer' %}?propriete={{ bail.propriete_id }}">Créer le mandat</a> : il sera rattaché à ce bail.</p>{% endif %}
   </div>
   {% endif %}{% endwith %}{% endif %}
   <form method="post" action="{{ bail.get_absolute_url }}" class="formulaire">

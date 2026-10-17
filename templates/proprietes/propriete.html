@@ -85,6 +85,7 @@
     {% endfor %}
   </ul>
   {% endif %}
+  {% if retenue and not mandat and not situation.a_venir %}<p class="message message-info">Aucun mandat en cours : le bail pourra être rédigé, pas signé. <a href="{% url 'mandats:creer' %}?propriete={{ propriete.pk }}">Créer le mandat</a></p>{% endif %}
   <div class="actions-location">
     {% if situation.a_venir %}
       <a class="bouton" href="{{ situation.a_venir.get_absolute_url }}">{% if situation.a_venir.date_signature %}Ouvrir le bail{% else %}Faire signer le bail{% endif %}</a>

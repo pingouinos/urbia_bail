@@ -40,8 +40,12 @@ class Donnees:
         valeurs.update(autres)
         return Propriete.objects.create(**valeurs)
 
-    def creer_bail(self, propriete=None, locataires=("Martin",), **autres):
-        bail = Bail.depuis_propriete(propriete or self.creer_propriete())
+    def creer_bail(self, propriete=None, locataires=("Martin",), sans_mandat=False, **autres):
+        propriete = propriete or self.creer_propriete()
+        if not sans_mandat and not propriete.mandat_en_cours:
+            # Sans mandat en cours, le bail ne peut être ni préparé ni signé.
+            Mandat.depuis_propriete(propriete).save()
+        bail = Bail.depuis_propriete(propriete)
         bail.date_effet = dt.date(2026, 11, 1)
         bail.irl_trimestre = "2e trimestre 2026"
         bail.irl_valeur = Decimal("146.68")
@@ -96,7 +100,7 @@ class BailTests(Donnees, TestCase):
         self.assertEqual(bail.honoraires_bail_locataire, Decimal("390"))
 
     def test_alertes(self):
-        bail = self.creer_bail(depot_garantie=Decimal("1400"), precedent_loyer=Decimal("650"))
+        bail = self.creer_bail(depot_garantie=Decimal("1400"), precedent_loyer=Decimal("650"), sans_mandat=True)
         alertes = " ".join(bail.alertes)
         self.assertIn("Aucun mandat", alertes)
         self.assertIn("Dépôt de garantie supérieur à 1 mois", alertes)
@@ -415,7 +419,8 @@ class VuesTests(Donnees, TestCase):
         le bail : congé proposé d'avance, puis départ effectif."""
         aujourd_hui = timezone.localdate()
         propriete = self.creer_propriete(zone_tendue=False)
-        bail = self.creer_bail(propriete=propriete, date_effet=dt.date(2024, 9, 1), date_signature=dt.date(2024, 8, 20))
+        bail = self.creer_bail(propriete=propriete, date_effet=dt.date(2024, 9, 1), date_signature=dt.date(2024, 8, 20),
+                               sans_mandat=True)
         self.assertEqual(propriete.situation.code, "loue")
         page = self.client.get(propriete.get_absolute_url())
         self.assertContains(page, '<span class="pastille pastille-loue">Loué</span>')
@@ -570,7 +575,7 @@ class VuesTests(Donnees, TestCase):
         mandat.save()
         bail = self.creer_bail(propriete=propriete, date_effet=dt.date(2024, 9, 1), date_signature=dt.date(2024, 8, 20))
         ancien = self.creer_bail(propriete=self.creer_propriete(adresse="3 rue Ancienne"), date_effet=dt.date(2020, 1, 1),
-                                 date_fin_effective=dt.date(2023, 1, 1))
+                                 date_fin_effective=dt.date(2023, 1, 1), sans_mandat=True)
         page = self.client.get(reverse("contrats:liste"))
         self.assertEqual(list(page.context["page"]), [bail, mandat, ancien])
         self.assertContains(page, "pastille-type-bail")
@@ -840,6 +845,36 @@ class InterdictionsTests(Donnees, TestCase):
     def test_depot_de_garantie_au_dela_du_plafond(self):
         bail = self.creer_bail(loyer=Decimal("700"), depot_garantie=Decimal("1400"))
         self.verifier_bloque(bail, "Dépôt de garantie supérieur à 1 mois")
+
+    def test_bail_sans_mandat_en_cours(self):
+        bail = self.creer_bail(sans_mandat=True)
+        page = self.client.get(bail.get_absolute_url() + "?etape=3")
+        self.assertContains(page, f'{reverse("mandats:creer")}?propriete={bail.propriete_id}')
+        self.verifier_bloque(bail, "Aucun mandat de gestion en cours")
+
+    def test_mandat_termine_bloque_aussi(self):
+        bail = self.creer_bail()
+        bail.mandat.date_fin = dt.date(2026, 9, 30)
+        bail.mandat.save()
+        self.verifier_bloque(bail, "Aucun mandat de gestion en cours")
+
+    def test_mandat_cree_ensuite_se_rattache_au_bail(self):
+        """Le bail rédigé en attendant le mandat le reçoit à sa création."""
+        bail = self.creer_bail(sans_mandat=True)
+        donnees = {
+            "numero": "412", "propriete": bail.propriete_id, "mandant": "Madame DURAND Anne",
+            "mandant_adresse": "9 rue des Lilas", "mandant_code_postal_ville": "31270 Frouzins",
+            "designation": "Appartement T2", "adresse_bien": "12 avenue de Muret", "loyer_cc": "750", "charges": "50",
+            "duree_ans": 3, "reconductions": 0, "taux_gestion": "7", "base_gestion": "charges_comprises",
+            "taux_assurance": "2.90", "honoraires_bail_bailleur": "0", "honoraires_bail_locataire": "0",
+            "honoraires_edl_bailleur": "0", "honoraires_edl_locataire": "0",
+            "conclusion": "agence", "lieu_signature": "Toulouse",
+        }
+        reponse = self.client.post(reverse("mandats:creer"), donnees, follow=True)
+        bail.refresh_from_db()
+        self.assertEqual(bail.mandat.numero, 412)
+        self.assertContains(reponse, "Mandat rattaché au bail de Paul MARTIN")
+        self.assertEqual(bail.interdictions, [])
 
     def test_bail_conforme_se_prepare(self):
         bail = self.creer_bail(loyer=Decimal("700"), depot_garantie=Decimal("700"))

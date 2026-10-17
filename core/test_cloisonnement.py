@@ -35,7 +35,7 @@ class CloisonnementTests(Donnees, TestCase):
             self.lea = creer_gestionnaire("lea")
             remplir_agence()
             self.propriete_canal = self.creer_propriete(adresse="3 quai de Brienne")
-            self.bail_canal = self.creer_bail(self.propriete_canal, locataires=("Garnier",))
+            self.bail_canal = self.creer_bail(self.propriete_canal, locataires=("Garnier",), sans_mandat=True)
             self.mandat_canal = Mandat.depuis_propriete(self.propriete_canal)
             self.mandat_canal.conclusion = Mandat.Conclusion.AGENCE
             self.mandat_canal.save()

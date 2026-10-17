@@ -2,7 +2,7 @@
   <h2>Versions des documents</h2>
   {% if not objet.signe and objet.en_cours %}
   <p>La préparation est obligatoire avant d’enregistrer une nouvelle signature. Préparez une version avant de la transmettre aux parties. Les téléchargements utiliseront cette archive jusqu'à la prochaine préparation.</p>
-  <form method="post" action="{% url 'documents:preparer' objet.code_type objet.pk %}">{% csrf_token %}<button type="submit">Préparer la version à signer</button></form>
+  <form method="post" action="{% url 'documents:preparer' objet.code_type objet.pk %}">{% csrf_token %}<button type="submit"{% if objet.interdictions %} disabled title="Corrigez d'abord les points bloquants du contrat."{% endif %}>Préparer la version à signer</button></form>
   {% elif objet.signe and not objet.versions_document.exists %}
   <p>Contrat historique : le document d'origine ne peut pas être reconstitué avec certitude. Consultez l'exemplaire signé.</p>
   {% if administrateur %}<form method="post" action="{% url 'documents:preparer' objet.code_type objet.pk %}">{% csrf_token %}<button type="submit">Archiver une reconstitution actuelle</button></form>{% endif %}
