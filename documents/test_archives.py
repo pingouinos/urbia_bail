@@ -272,6 +272,6 @@ class ArchivesTests(Donnees, TestCase):
         # Le superutilisateur exploite la plateforme : les documents des agences ne lui sont pas servis.
         self.client.force_login(User.objects.create_superuser("root", "root@example.com", "test-password"))
         self.assertRedirects(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])),
-                             reverse("admin:index"), fetch_redirect_response=False)
+                             reverse("plateforme"), fetch_redirect_response=False)
         self.client.force_login(User.objects.create_user("inconnu"))
         self.assertEqual(self.client.get(reverse("documents:archive", args=[version.pk, "docx"])).status_code, 403)

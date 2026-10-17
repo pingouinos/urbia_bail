@@ -26,6 +26,8 @@ def rubrique(request):
     page = getattr(request, "resolver_match", None)
     if page is None:
         return ""
+    if (page.url_name or "").startswith("plateforme"):
+        return "plateforme"
     if page.url_name in ADMINISTRATION or page.namespace == "documents":
         return "administration"
     if page.namespace == "proprietes" and (page.url_name or "").startswith("bailleur"):

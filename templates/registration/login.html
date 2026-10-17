@@ -3,6 +3,7 @@
 {% block contenu %}
 <section class="carte connexion">
   <h1>Connexion</h1>
+  {% if request.GET.agence == "desactivee" %}<p class="erreur">L'accès de votre agence est suspendu. Contactez l'éditeur de l'application.</p>{% endif %}
   {% if request.GET.echec == "google" %}<p class="erreur">Connexion Google refusée : utilisez votre compte de l'agence. Si le problème persiste, demandez à un administrateur de créer votre accès.</p>{% endif %}
   {% if google_active %}
   <a class="bouton" href="{% url 'oidc_authentication_init' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Se connecter avec Google</a>

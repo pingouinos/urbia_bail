@@ -86,6 +86,10 @@ class Organisation(Horodatage):
         help_text="Taux prérempli à la création d'un mandat ; il reste modifiable sur chaque mandat.",
     )
 
+    active = models.BooleanField(
+        default=True, help_text="Une agence désactivée garde ses données, mais ses comptes ne peuvent plus se connecter.",
+    )
+
     history = HistoricalRecords()
 
     class Meta:

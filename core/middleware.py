@@ -2,9 +2,11 @@
 agence du compte connecté."""
 
 from django.conf import settings
+from django.contrib.auth import logout
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.shortcuts import redirect
+from django.urls import reverse
 
 from .agence import activer
 from .journal import adresse_ip
@@ -71,8 +73,10 @@ class SecuriteMiddleware:
 
 
 # Le superutilisateur exploite la plateforme : il n'appartient à aucune agence
-# et ne voit les données d'aucune dans l'application, seulement la console.
-CHEMINS_SUPERUTILISATEUR = ("/admin/", "/deconnexion/", "/mfa/", "/connexion/", "/oidc/", "/static/", "/sante/")
+# et ne voit les données d'aucune : seulement l'espace Plateforme et la console.
+CHEMINS_SUPERUTILISATEUR = (
+    "/plateforme/", "/admin/", "/deconnexion/", "/mfa/", "/connexion/", "/oidc/", "/static/", "/sante/",
+)
 
 
 class AgenceMiddleware:
@@ -88,9 +92,13 @@ class AgenceMiddleware:
         agence = None
         if request.user.is_authenticated and request.user.is_superuser:
             if not request.path.startswith(CHEMINS_SUPERUTILISATEUR):
-                return redirect("admin:index")
+                return redirect("plateforme")
         elif request.user.is_authenticated:
             membre = Membre.objects.select_related("organisation").filter(utilisateur=request.user).first()
             agence = membre.organisation if membre else None
+            if agence and not agence.active:
+                # Désactivée par l'exploitant, même en pleine session.
+                logout(request)
+                return redirect(f"{reverse(settings.LOGIN_URL)}?agence=desactivee")
         with activer(agence):
             return self.get_response(request)
