@@ -23,8 +23,7 @@
   <a class="tuile-parc" href="{{ biens }}">
     <span class="tuile-chiffre">{{ parc.geres }}</span>
     <span class="tuile-libelle">Bien{{ parc.geres|pluralize }} géré{{ parc.geres|pluralize }}</span>
-    <span class="barre-parc" aria-hidden="true">{% for part in parc.barre %}<i class="parc-{{ part.code }}" style="width: {{ part.part|stringformat:".1f" }}%"></i>{% endfor %}</span>
-    <span class="legende-parc">{% for part in parc.barre %}<span><i class="parc-pastille parc-{{ part.code }}" aria-hidden="true"></i>{{ part.nombre }} {{ part.libelle }}</span>{% endfor %}</span>
+    <span class="barre-parc" role="img" aria-label="{% for part in parc.barre %}{{ part.nombre }} {{ part.libelle }}{% if not forloop.last %}, {% endif %}{% endfor %}">{% for part in parc.barre %}<i class="parc-{{ part.code }}" style="width: {{ part.part|stringformat:".1f" }}%"></i>{% endfor %}</span>
     {% if parc.sans_mandat %}<span class="discret">dont {{ parc.sans_mandat }} sans mandat</span>{% endif %}
   </a>
   <a class="tuile-parc" href="{{ biens }}?situation=loue">

@@ -611,9 +611,6 @@ button.secondaire.bouton-danger[type=submit]:hover { background: var(--erreur-cl
 .parc-sans-bail { background: #d5d8e2; }
 .barre-parc { display: flex; height: 6px; margin-top: 6px; border-radius: 3px; overflow: hidden; background: var(--bord); }
 .barre-parc i { display: block; }
-.legende-parc { display: flex; flex-wrap: wrap; gap: 0 10px; margin-top: 2px; font-size: 0.78rem; color: var(--discret); }
-.legende-parc > span { white-space: nowrap; }
-.legende-parc .parc-pastille { width: 7px; height: 7px; margin-right: 4px; }
 .tuiles-parc + .carte { margin-top: 16px; }
 @media (max-width: 760px) {
   .tuiles-parc { grid-template-columns: repeat(2, minmax(0, 1fr)); }

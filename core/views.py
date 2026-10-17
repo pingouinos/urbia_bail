@@ -147,9 +147,10 @@ def accueil(request):
         ).order_by("date_depart_prevue").values_list("date_depart_prevue", flat=True).first(),
         "part_loues": round(100 * nb_loues / nb_geres) if nb_geres else 0,
     }
-    # Barre d'occupation et sa légende : seules les situations présentes. Les
-    # biens sans bail enregistré sont à part (gris) : souvent loués par un bail
-    # pas encore saisi, ils ne sont pas forcément libres.
+    # Barre d'occupation : seules les situations présentes, avec leur libellé
+    # pour les lecteurs d'écran. Les biens sans bail enregistré sont à part
+    # (gris) : souvent loués par un bail pas encore saisi, ils ne sont pas
+    # forcément libres.
     nb_sans_bail = parc["sans_bail"]
     parc["barre"] = [
         {"code": code, "nombre": nombre, "libelle": libelle, "part": 100 * nombre / nb_geres}
