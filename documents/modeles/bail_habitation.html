@@ -1,0 +1,361 @@
+<p style="text-align: center"><strong>CONTRAT DE LOCATION</strong></p>
+<p style="text-align: center"><strong><span data-donnee="intitule"></span></strong></p>
+<p style="text-align: center"><span data-donnee="regime"></span></p>
+<h2>I. DÉSIGNATION DES PARTIES</h2>
+<p>Le présent contrat est conclu entre les soussignés :</p>
+<p><strong>Bailleur : </strong><span data-donnee="bailleur"></span></p>
+<p><strong>Domicile ou siège social : </strong><span data-donnee="bailleur_adresse"></span></p>
+<p><strong>Qualité du bailleur : </strong><span data-donnee="bailleur_qualite"></span></p>
+<div data-si="bailleur_email">
+<p><strong>Adresse électronique : </strong><span data-donnee="bailleur_email"></span></p>
+</div>
+<p>désigné(s) ci-après « le bailleur » ;</p>
+<p>Représenté par son mandataire : <span data-donnee="agence.nom|upper"></span>, <span data-donnee="agence.adresse"></span>, <span data-donnee="agence.code_postal"></span> <span data-donnee="agence.ville"></span>, exerçant l'activité de gestion immobilière, titulaire de la carte professionnelle <span data-donnee="agence.carte_pro"></span> délivrée par <span data-donnee="agence.carte_delivree_par"></span>, garantie financière assurée par <span data-donnee="agence.garant"></span>, <span data-donnee="agence.garant_adresse"></span>.</p>
+<div data-pour="locataire in locataires">
+<p><strong>Locataire : </strong><span data-donnee="locataire.designation"></span><span data-donnee="locataire.naissance"></span></p>
+<div data-si="locataire.email">
+<p><strong>Adresse électronique : </strong><span data-donnee="locataire.email"></span></p>
+</div>
+<div data-pour="caution in locataire.garants">
+<p><strong>Garant de ce locataire : </strong><span data-donnee="caution"></span></p>
+</div>
+</div>
+<p>désigné(s) ci-après « le locataire » ;</p>
+<div data-si="colocation">
+<p>Le logement est loué en colocation, au sens de l'article 8-1 de la loi n° 89-462 du 6 juillet 1989, à l'ensemble des locataires désignés ci-dessus, par un bail unique.</p>
+</div>
+<div data-pour="caution in garants">
+<p><strong>Garant : </strong><span data-donnee="caution"></span></p>
+</div>
+<p>Il a été convenu ce qui suit :</p>
+<h2>II. OBJET DU CONTRAT</h2>
+<p>Le présent contrat a pour objet la location d'un logement ainsi déterminé :</p>
+<h3>A. Consistance du logement</h3>
+<p><strong>Localisation du logement : </strong><span data-donnee="adresse_logement"></span></p>
+<div data-si="identifiant_fiscal">
+<p><strong>Identifiant fiscal du logement : </strong><span data-donnee="identifiant_fiscal"></span></p>
+</div>
+<p><strong>Type d'habitat : </strong><span data-donnee="type_habitat"></span></p>
+<p><strong>Régime juridique de l'immeuble : </strong><span data-donnee="regime_juridique"></span></p>
+<p><strong>Période de construction : </strong><span data-donnee="periode_construction"></span></p>
+<p><strong>Surface habitable : </strong><span data-donnee="surface"></span> m²</p>
+<p><strong>Nombre de pièces principales : </strong><span data-donnee="nb_pieces"></span></p>
+<p><strong>Éléments d'équipement du logement : </strong><span data-donnee="equipements"></span></p>
+<p><strong>Modalité de production de chauffage : </strong><span data-donnee="chauffage"></span></p>
+<p><strong>Modalité de production d'eau chaude sanitaire : </strong><span data-donnee="eau_chaude"></span></p>
+<p><strong>Niveau de performance du logement : </strong>classe <span data-donnee="classe_dpe"></span> du diagnostic de performance énergétique</p>
+<h3>B. Destination des locaux</h3>
+<p><span data-donnee="destination"></span></p>
+<h3>C. Locaux et équipements accessoires à usage privatif du locataire</h3>
+<p><span data-donnee="accessoires"></span></p>
+<h3>D. Locaux, parties, équipements et accessoires de l'immeuble à usage commun</h3>
+<p><span data-donnee="parties_communes"></span></p>
+<h3>E. Équipements d'accès aux technologies de l'information et de la communication</h3>
+<p><span data-donnee="acces_tic"></span></p>
+<h2>III. DATE DE PRISE D'EFFET ET DURÉE DU CONTRAT</h2>
+<p><strong>A. Date de prise d'effet du contrat : </strong><span data-donnee="date_effet"></span></p>
+<p><strong>B. Durée du contrat : </strong><span data-donnee="duree"></span>, soit jusqu'au <span data-donnee="date_fin"></span></p>
+<p><span data-donnee="texte_duree"></span></p>
+<h2>IV. CONDITIONS FINANCIÈRES</h2>
+<p>Les parties conviennent des conditions financières suivantes :</p>
+<h3>A. Loyer</h3>
+<p><strong>1° Montant du loyer mensuel : </strong><span data-donnee="loyer"></span> € hors charges</p>
+<p><strong>Loyer soumis au décret fixant annuellement le montant maximum d'évolution des loyers à la relocation : </strong><span data-donnee="evolution_encadree"></span></p>
+<p><strong>Loyer soumis au loyer de référence majoré fixé par arrêté préfectoral : </strong><span data-donnee="loyer_reference_applicable"></span></p>
+<div data-si="precedent_loyer">
+<p><strong>Montant du dernier loyer acquitté par le précédent locataire : </strong><span data-donnee="precedent_loyer"></span> €</p>
+<p><strong>Date de versement : </strong><span data-donnee="precedent_date_versement"></span></p>
+<p><strong>Date de la dernière révision du loyer : </strong><span data-donnee="precedent_date_revision"></span></p>
+</div>
+<p><strong>2° Révision du loyer : </strong>le loyer est révisé chaque année à la date anniversaire du contrat, le <span data-donnee="date_revision"></span>, selon la variation de l'indice de référence des loyers publié par l'INSEE</p>
+<p><strong>Trimestre de référence de l'IRL : </strong><span data-donnee="irl_trimestre"></span> (valeur <span data-donnee="irl_valeur"></span>)</p>
+<h3>B. Charges récupérables</h3>
+<p><strong>Modalité de règlement des charges récupérables : </strong><span data-donnee="mode_charges"></span></p>
+<p><strong>Montant <span data-donnee="libelle_charges"></span> : </strong><span data-donnee="charges"></span> € par mois</p>
+<h3>C. Modalités de paiement</h3>
+<p><strong>Périodicité du paiement : </strong>mensuelle, <span data-donnee="terme"></span>, le <span data-donnee="jour_paiement"></span> de chaque mois</p>
+<p><strong>Montant total dû à la première échéance pour une période complète de location : </strong><span data-donnee="total_mensuel"></span> € (loyer <span data-donnee="loyer"></span> € et charges <span data-donnee="charges"></span> €)</p>
+<h3>D. Dépenses d'énergie</h3>
+<p>Montant estimé des dépenses annuelles d'énergie pour un usage standard : <span data-donnee="depenses_energie"></span>.</p>
+<h2>V. TRAVAUX</h2>
+<p><strong>Montant et nature des travaux d'amélioration ou de mise en conformité effectués depuis la fin du dernier contrat de location : </strong><span data-donnee="travaux"></span></p>
+<h2>VI. GARANTIES</h2>
+<p><strong>Montant du dépôt de garantie : </strong><span data-donnee="depot_garantie"></span> €</p>
+<p><span data-donnee="texte_depot"></span></p>
+<div data-si="plusieurs_locataires">
+<h2>VII. CLAUSE DE SOLIDARITÉ</h2>
+<p><span data-donnee="texte_solidarite"></span></p>
+</div>
+<h2>VIII. CLAUSE RÉSOLUTOIRE</h2>
+<p>Le présent contrat sera résilié de plein droit, six semaines après un commandement de payer demeuré infructueux, à défaut de paiement du loyer, des charges dûment justifiées ou du dépôt de garantie ; un mois après un commandement demeuré infructueux, à défaut d'assurance contre les risques locatifs ; et en cas de non-respect de l'obligation d'user paisiblement des locaux loués, résultant de troubles de voisinage constatés par une décision de justice passée en force de chose jugée.</p>
+<h2>IX. HONORAIRES DE LOCATION</h2>
+<h3>A. Dispositions applicables</h3>
+<p>« Conformément à l’article 5 I alinéa 4 de la loi 89-462 du 6 juillet 1989, les parties au présent bail sont informées des modalités fixées par ledit article concernant la rémunération des personnes mandatées pour se livrer ou prêter leur concours à l'entremise ou à la négociation d'une mise en location d'un logement, et dont le texte est reproduit ci-après :</p>
+<p>« "I. ― La rémunération des personnes mandatées pour se livrer ou prêter leur concours à l'entremise ou à la négociation d'une mise en location d'un logement, tel que défini aux articles 2 et 25-3, est à la charge exclusive du bailleur, à l'exception des honoraires liés aux prestations mentionnées aux deuxième et troisième alinéa du présent I.</p>
+<p>« "Les honoraires des personnes mandatées pour effectuer la visite du preneur, constituer son dossier et rédiger un bail sont partagés entre le bailleur et le preneur. Le montant toutes taxes comprises imputé au preneur pour ces prestations ne peut excéder celui imputé au bailleur et demeure inférieur ou égal à un plafond par mètre carré de surface habitable de la chose louée fixé par voie réglementaire et révisable chaque année, dans des conditions définies par décret. Ces honoraires sont dus à la signature du bail.</p>
+<p>« "Les honoraires des personnes mandatées pour réaliser un état des lieux sont partagés entre le bailleur et le preneur. Le montant toutes taxes comprises imputé au locataire pour cette prestation ne peut excéder celui imputé au bailleur et demeure inférieur ou égal à un plafond par mètre carré de surface habitable de la chose louée fixé par voie réglementaire et révisable chaque année, dans des conditions définies par décret. Ces honoraires sont dus à compter de la réalisation de la prestation."</p>
+<p><strong>Plafond des honoraires imputables au locataire pour la visite, la constitution du dossier et la rédaction du bail : </strong><span data-donnee="plafond_bail"></span> € par m² de surface habitable</p>
+<p><strong>Plafond des honoraires imputables au locataire pour l'état des lieux d'entrée : </strong>3 € par m² de surface habitable</p>
+<h3>B. Détail et répartition des honoraires</h3>
+<p><strong>Honoraires à la charge du bailleur : </strong>visite du preneur, constitution de son dossier et rédaction du bail : <span data-donnee="honoraires_bail_bailleur"></span> € TTC, dus à la signature du bail ; état des lieux d'entrée : <span data-donnee="honoraires_edl_bailleur"></span> € TTC, dus à compter de sa réalisation</p>
+<p><strong>Honoraires à la charge du locataire : </strong>visite du preneur, constitution de son dossier et rédaction du bail : <span data-donnee="honoraires_bail_locataire"></span> € TTC, dus à la signature du bail ; état des lieux d'entrée : <span data-donnee="honoraires_edl_locataire"></span> € TTC, dus à compter de sa réalisation</p>
+<h2>X. AUTRES CONDITIONS PARTICULIÈRES</h2>
+<div data-si="conditions_particulieres">
+<p><span data-donnee="conditions_particulieres"></span></p>
+</div>
+<h3>Détecteur de fumée</h3>
+<p>Le logement est équipé d'un détecteur de fumée normalisé conforme à la norme NF EN 14604. Son entretien et son bon fonctionnement sont assurés dans les conditions prévues par le code de la construction et de l'habitation.</p>
+<h3>A / Destination des locaux loués</h3>
+<p>Le bailleur est tenu de délivrer un logement conforme à sa destination.</p>
+<p>Le locataire s’interdit expressément :</p>
+<ul>
+<li><p>d’utiliser les locaux loués autrement qu’à l’usage fixé au présent bail, à l’exclusion de tout autre ;</p>
+</li>
+<li><p>d’exercer dans les locaux loué, en sa qualité de locataire personne physique ou représentant d’une personne morale, aucune activité commerciale, industrielle ou artisanale, ni aucune profession libérale autre que celle éventuellement prévues aux conditions particulières. En cas d’usage mixte professionnel et habitation, le locataire fera son affaire personnelle de toute prescription administrative relative à l’exercice de sa profession. Le locataire s’engage à exercer sa profession, en sorte que le bailleur ne puisse, en aucun cas, être recherché ni inquiété à ce sujet par l’administration, les occupants de l’immeuble ou les voisins.</p>
+</li>
+<li><p>de céder en tout ou partie, à titre onéreux ou gratuit, les droits qu’il détient des présentes, ou de sous-louer, échanger ou mettre à disposition les locaux objet des présentes, en tout ou partie, en meublé ou non, le tout sans l’accord écrit du bailleur, y compris sur le prix du loyer et sans que cet éventuel accord puisse faire acquérir au sous locataire aucun droit à l’encontre du bailleur ni aucun titre d’occupation, les dispositions de la loi du 6 juillet 1989 n’étant pas applicable au contrat de sous-location.</p>
+</li>
+</ul>
+<p></p>
+<p><strong><u>B/ Entretien et nettoyage des générateurs de chauffage et de production d’eau chaude, de pompe à chaleur et des climatisations</u></strong></p>
+<p>Le locataire devra faire entretenir et nettoyer à ses frais, aussi souvent qu’il en sera besoin conformément à la législation ou à la réglementation en vigueur, et au moins une fois par an, tous les appareils et installations diverses (chauffe-eau, chauffage central, pompe à chaleur, climatisation, etc.) pouvant exister dans les locaux loués. Il devra en justifier par la production d’une facture acquittée. Le locataire devra souscrire un contrat d’entretien auprès d’un établissement spécialisé de son choix pour assurer le bon fonctionnement et l’entretien du ou des générateurs de chauffage et de production d’eau chaude lorsqu’il s’agit d’installations individuelles. L’entretien incombant au locataire, il lui appartiendra de produire les justifications de celui-ci, sans que l’absence de demande de justifications d’entretien puisse entraîner une quelconque responsabilité du bailleur.</p>
+<p></p>
+<h3>C/ Visite des locaux loués</h3>
+<p>En cas de mise en vente ou relocation, le locataire devra laisser visiter les lieux loués deux heures pendant les jours ouvrables qui seront conventionnellement arrêtées avec le bailleur. A défaut d’accord les heures de visite sont fixées entre 17 et 19 heures.</p>
+<p></p>
+<h3>D/ Sinistres et dégradations</h3>
+<p>Le locataire s’oblige à déclarer tout sinistre à son assurance et à justifier, sans délai, au bailleur de cette déclaration. Le locataire s’oblige formellement à aviser sans délai par écrit le bailleur de toute dégradation ou de tout sinistre survenant dans les locaux loués ; à défaut, il pourra être tenu responsable de sa carence. Il serait, en outre, responsable envers le bailleur de toute aggravation de ce dommage survenu après cette date.</p>
+<p></p>
+<h3>E/ Ramonage</h3>
+<p>Le locataire devra faire ramoner les cheminées et gaines de fumée des lieux loués aussi souvent qu’il en sera besoin conformément à la législation ou à la réglementation en vigueur et au moins une fois par an. Il en justifiera par la production d’une facture acquittée.  En cas de départ du locataire après la période de chauffe, il devra faire procéder à un nouveau ramonage avant la remise des clés quand bien même le dernier ramonage aurait été réalisé moins d’une année avant son départ.</p>
+<p></p>
+<h3>F/ Interdiction de certains appareils de chauffage</h3>
+<p>Le locataire ne pourra faire usage, dans les locaux loués, d’aucun appareil de chauffage à combustion lente ou continue, en particulier d’aucun appareil utilisant le mazout ou le gaz, sans avoir obtenu préalablement l’accord et l’autorisation écrite du bailleur et, dans le cas où cette autorisation serait donnée le locataire devrait prendre à sa charge les frais consécutifs aux aménagement préalables à réaliser s’il y a lieu (modification ou adaptation des conduits ou des cheminées d’évacuation, etc..). Il reconnaît avoir été avisé de ce que la violation de cette interdiction le rendrait responsable des dommages qui pourraient être causés.</p>
+<p></p>
+<h3>G/ Jouissance paisible</h3>
+<p>Le locataire ne devra commettre aucun abus de jouissance susceptible de nuire soit à la solidité ou à la bonne tenue de l’immeuble, soit d’engager la responsabilité du bailleur envers les autres occupants de l’immeuble ou envers le voisinage. En particulier, il ne pourra rien déposer, sur les appuis de fenêtres, balcons et ouvertures quelconques sur rue ou sur cour, qui puisse présenter un danger pour les autres occupants de l’immeuble, ou causer une gêne à ces occupants ou au voisinage, ou nuire à l’aspect dudit immeuble. Il ne pourra notamment y étendre aucun linge, tapis, chiffon, y déposer aucun objet ménager, ustensile, outil quelconque. Il devra éviter tout bruit de nature à gêner les autres habitants de l’immeuble, notamment régler tout appareil de radio, télévision, et tout appareil de reproduction de sons de telle manière que le voisinage n’ait pas à s’en plaindre.</p>
+<p></p>
+<h3>H/ Détention d’animaux</h3>
+<p>Le locataire ne devra conserver dans les lieux loués aucun animal bruyant, malpropre ou malodorant, susceptible de causer des dégradations ou une gêne aux autres occupants de l’immeuble. De plus, il s’interdit de détenir dans les lieux loués des chiens de première catégorie, en application des articles L.211-12 et suivants du code rural.</p>
+<p></p>
+<h3>I/ Nuisibles</h3>
+<p>Le locataire informera le bailleur ou son mandataire de la présence de parasites, rongeurs et insectes dans les lieux loués. Les dépenses effectuées pour les opérations de désinsectisation ou de désinfection intéressant les parties privatives seront à la charge dans le respect de la législation sur les charges récupérables. Conformément à l’article L.1334 du code de la construction et de l’habitation, le locataire est tenu de déclarer en mairie la présence de termites et/ou d’insectes xylophages dans les lieux loués. Il s’engage parallèlement à en informer le bailleur pour qu’il puisse procéder aux travaux préventifs ou d’éradication nécessaire.</p>
+<p></p>
+<h3>J/ Usage des parties communes</h3>
+<p>Le locataire ne pourra déposer dans les cours, entrées, couloirs, escaliers, ni sur les paliers et, d’une manière générale, dans aucunes des parties communes autres que celles réservées à cet effet, aucun objet, quel qu’il soit, notamment bicyclette, cycles à moteur et autres véhicules, voitures d’enfant et poussettes.</p>
+<p></p>
+<h3>K/ Gel</h3>
+<p>Le locataire devra prendre toutes précautions nécessaires pour protéger du gel les canalisations d’eau ainsi que les compteurs, et sera, dans tous les cas, tenu pour responsable des dégâts qui pourraient survenir, du fait de sa négligence. En cas de dégâts des eaux, et notamment par suite de gel, le locataire devra le signaler au bailleur ou à son mandataire dans les délais les plus brefs et prendre toutes mesures conservatoires visant à limiter les conséquences du sinistre. A défaut, sa responsabilité pourrait être engagée.</p>
+<p></p>
+<h3>L/ Personnel de l’immeuble</h3>
+<p>Le bailleur pourra remplacer l’éventuel employé d’immeuble chargé de l’entretien par une entreprise ou un technicien de surface effectuant les mêmes prestations. Le locataire ne pourra rendre le bailleur ou son mandataire responsable des faits du gardien, du concierge ou de l’employé d’immeuble qui, pour toute mission à lui confiée par le locataire, sera considéré comme  son mandataire exclusif et spécial. Il est spécifié que le gardien, le concierge ou l’employé d’immeuble n’a pas pouvoir d’accepter un congé, de recevoir les clés ou de signer soit un contrat de location, soit les quittances ou reçus, soit un état des lieux ou toute attestation ou certificat ; en conséquence, sa signature ne saurait engager le bailleur ou son mandataire.</p>
+<p></p>
+<h3>M/ Système d’assainissement autonome</h3>
+<p>Le locataire devra entretenir le système d’assainissement autonome et justifier de cet entretien lors de la remise des clés.</p>
+<h3>Traitement des données à caractère personnel</h3>
+<p>Conformément à la loi n°78-17 du 6 janvier 1978 dans sa version en vigueur et au Règlement européen (UE) 2016/679, les Parties sont informées que le Mandataire procède au traitement des données à caractère personnel contenues dans le présent contrat. Le délégué à la protection des données (DPO) désigné au sein du cabinet/de l’agence étant Elodie COUET.</p>
+<p>Les données obtenues sont nécessaires pour l’exécution des missions du Mandataire telles que figurant au présent contrat et dans le respect des obligations découlant des articles 1100 et suivants du code civil, de loi n° 70-9 du 2 janvier 1970 réglementant les conditions d'exercice des activités relatives à certaines opérations portant sur les immeubles et les fonds de commerce, son décret d’application n°72-678 du 20 juillet 1972 et des articles L.561-1 et suivants du code monétaire et financier relatifs à la lutte contre le blanchiment de capitaux et le financement du terrorisme.</p>
+<p>Ces données pourront être transmises à Elodie COUET.</p>
+<p>Elles seront conservées durant toute la durée de la relation commerciale et pendant une durée maximale de 5 ans à compter de la fin de la relation commerciale conformément à l’article 2224 du code civil et à l’article L561-12 du code monétaire et financier relatif à l’obligation de conservation des informations des clients dans le cadre de la lutte contre le blanchiment de capitaux et le financement du terrorisme. Les registres légaux tenus par le Cabinet/l’agence doivent être conservés pendant dix ans (articles 53, 65, et 72 du décret du 20 juillet 1972), les noms et adresses des mandants y figurant seront donc conservés durant toute cette durée.</p>
+<p>Les Parties sont informées qu’elles bénéficient d’un droit d’accès et de rectification de leurs données à caractère personnel traitées, qu’elles peuvent demander leur effacement, leur limitation et leur portabilité dans les conditions prévues aux articles 17, 18 et 20 du règlement européen (UE) 2016/679. Elles peuvent également exercer leur droit à opposition dans les conditions prévues à l’article 21.</p>
+<p>Toute réclamation pourra être formulée auprès de la CNIL - 8 rue de Vivienne - 75083 PARIS cedex 02 – tel : 01 53 73 22 22 - www.cnil.fr</p>
+<h2>XI. ANNEXES</h2>
+<p>Sont annexées et jointes au présent contrat les pièces suivantes :</p>
+<div data-pour="annexe in annexes">
+<p>– <span data-donnee="annexe"></span></p>
+</div>
+<p>Le <span data-donnee="date_signature"></span>, à <span data-donnee="lieu_signature"></span>, en <span data-donnee="exemplaires"></span> exemplaires originaux.</p>
+<table data-bordure="non">
+<tbody>
+<tr>
+<td><p><strong>Signature du bailleur ou de son mandataire</strong></p>
+</td>
+<td><p><strong>Signature du ou des locataires</strong></p>
+</td>
+</tr>
+<tr>
+<td><p>précédée de la mention « lu et approuvé »</p>
+</td>
+<td><p>précédée de la mention « lu et approuvé »</p>
+</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p style="text-align: center">ENTRETIEN ET REPARATIONS</p>
+<p style="text-align: center"><em>Décret N°87-712 du 26 Aout 1987</em></p>
+<p style="text-align: center"><em>(Liste à annexer aux contrats de location)</em></p>
+<p></p>
+<p>Définition de la notion de « ENTRETIEN COURANT et REPARATIONS LOCATIVE »</p>
+<p>(Extrait du décret n° 87-712 du 26 Aout 1987)</p>
+<p></p>
+<p>Art 1er – Sont des réparations locatives et travaux d’entretien courant et de menues réparations, y compris les remplacements d’éléments assimilables auxdites réparations consécutifs à l’usage normal des locaux et équipements à usage privatifs.</p>
+<p>Ont notamment le caractère de réparations locatives les réparations énumérées ci-après.</p>
+<p></p>
+<ol type="I">
+<li><p>PARTIES EXTERIEURES dont le LOCATAIRE à l’USAGE EXCLUSIF</p>
+</li>
+</ol>
+<p></p>
+<h3>A/ JARDIN PRIVATIFS</h3>
+<ul>
+<li><p>Entretien courant, notamment des allées, pelouses, massifs, bassins et piscines : taille, élagage, échenillage des arbres et arbustes.</p>
+</li>
+<li><p>Remplacement des arbustes : réparations et remplacement des installations mobile d’arrosage.</p>
+</li>
+</ul>
+<p></p>
+<h3>B/ AUVENTS, TERRASSES, et MARQUISES</h3>
+<ul>
+<li><p>Enlèvement de la mousse et des autres végétaux.</p>
+</li>
+</ul>
+<p></p>
+<h3>C/ DESCENTES d’EAUX PLUVIALES, CHENEAUX, et GOUTTIERES </h3>
+<ul>
+<li><p>Dégorgement des conduits</p>
+</li>
+</ul>
+<p></p>
+<ol start="2" type="I">
+<li><p>OUVERTURES INTERIEURES ET EXTERIEURES</p>
+</li>
+</ol>
+<p></p>
+<h3>A/ SECTEURS OUVRANTES telles que PORTES et FENETRES </h3>
+<ul>
+<li><p>Graissage des gonds, paumelles et charnières.</p>
+</li>
+<li><p>Menues réparations de boutons et poignées de portes, des gonds, crémones et espagnolette : remplacement notamment de boulons, clavette et targettes.</p>
+</li>
+</ul>
+<p></p>
+<h3>B/ VITRAGES</h3>
+<ul>
+<li><p>Réfection des mastics.</p>
+</li>
+<li><p>Remplacement des vitres détériorées.</p>
+</li>
+</ul>
+<p></p>
+<h3>C/ DISPOSITIFS d’OCCUPATION de la LUMIERE tels que STORES et JALOUSIES</h3>
+<ul>
+<li><p>Graissage</p>
+</li>
+<li><p>Remplacement notamment des cordes, poulies ou de quelques lames.</p>
+</li>
+</ul>
+<p></p>
+<h3>D/ SERRURES ET VERROUS de SECURITE</h3>
+<ul>
+<li><p>Graissage</p>
+</li>
+<li><p>Remplacement des petites pièces ainsi que des clés égarées ou détériorées.</p>
+</li>
+</ul>
+<p></p>
+<h3>E/ GRILLE</h3>
+<ul>
+<li><p>Nettoyages et graissage.</p>
+</li>
+<li><p>Remplacement notamment des boulons, clavettes, targettes.</p>
+</li>
+</ul>
+<p></p>
+<ol start="3" type="I">
+<li><p>PARTIES INTERIEURES</p>
+</li>
+</ol>
+<p></p>
+<h3>A/ PLAFONDS, MURS INTERIEURS et CLOISONS</h3>
+<ul>
+<li><p>Maintien en état de propreté.</p>
+</li>
+<li><p>Menus raccords de peinture et tapisserie : remise en place ou remplacement de quelques éléments des matériaux de revêtements tels que faïence, mosaïque plastique : rebouchage des trous rendus assimilable à une réparation par le nombre, la dimension, et l’emplacement de ceux-ci.</p>
+</li>
+</ul>
+<p></p>
+<h3>B/ PARQUETS, MOQUETTES et autres REVETEMENTS DE SOL</h3>
+<ul>
+<li><p>Encaustiquage et entretien courant de la vitrification.</p>
+</li>
+<li><p>Remplacement de quelques lames de parquets et remise en état, pose de raccords de moquettes et autres revêtements de sols, notamment en cas de tâches et de trous.</p>
+</li>
+</ul>
+<p></p>
+<h3>C/ PLACARD et MENUISERIES telles que PLINTHES, BAGUETTES, et MOULURES</h3>
+<ul>
+<li><p>Remplacement des tablettes et tasseaux de placard et réparation de leur dispositif de fermeture : fixation de raccords et remplacement des pointes de menuiseries.</p>
+</li>
+</ul>
+<p></p>
+<ol start="4" type="I">
+<li><p>INSTALLATIONS et PLOMBERIE</p>
+</li>
+</ol>
+<p></p>
+<h3>A/ CANALISATION d’EAU</h3>
+<ul>
+<li><p>Dégorgement</p>
+</li>
+<li><p>Remplacement notamment de joints et de colliers.</p>
+</li>
+</ul>
+<p></p>
+<h3>B/ CANALISATION DE GAZ </h3>
+<ul>
+<li><p>Entretien courant des robinets, siphons, et ouvertures d’aération.</p>
+</li>
+<li><p>Remplacement périodique des tuyaux souple de raccordement.</p>
+</li>
+</ul>
+<p></p>
+<h3>C/ FOSSES SEPTIQUES, PUISARDS et FOSSES d’AISANCES</h3>
+<ul>
+<li><p>Vidange</p>
+</li>
+</ul>
+<p></p>
+<h3>D/ CHAUFFAGE, PRODUCTION D’EAU CHAUDE ET ROBINETTERIE</h3>
+<ul>
+<li><p>Remplacement des bilames, pistons, membranes, boîtes à eau, allumage piézo-électrique, clapets et joints des appareils à gaz.</p>
+</li>
+<li><p>Rinçage et nettoyage des corps de chauffe et tuyauterie.</p>
+</li>
+<li><p>Remplacement des joints, clapets, et presse-étoupes des robinets</p>
+</li>
+<li><p>Remplacement des joints, flotteurs et joints cloches des chasses d’eau.</p>
+</li>
+</ul>
+<p></p>
+<h3>E/ EVIERS ET APPAREILS SANITAIRES</h3>
+<ul>
+<li><p>Nettoyage des dépôts de calcaire, remplacement des tuyaux flexibles de douches.</p>
+</li>
+</ul>
+<p></p>
+<ol start="5" type="I">
+<li><p>EQUIPEMENTS d’INSTALLATION D’ELECTRICITE</p>
+</li>
+</ol>
+<ul>
+<li><p>Remplacement des interrupteurs, prise de courant, coupe-circuits et fusibles, des ampoules, tubes lumineux, réparation ou remplacement des baguettes ou gaines de protection.</p>
+</li>
+</ul>
+<p></p>
+<ol start="6" type="I">
+<li><p>AUTRES EQUIPEMENTS MENTIONNES AU CONTRAT DE LOCATION</p>
+</li>
+</ol>
+<p></p>
+<p><strong><u>A/ ENTRETIEN COURANT ET MENUES REPARATIONS DES APPAREILS TELS QUE :</u></strong></p>
+<ul>
+<li><p>Réfrigérateur, machine à laver le linge et la vaisselle, sèche-linge, hotte aspirante, adoucisseurs, capteurs solaires, pompe à chaleur, appareils de conditionnement d’air, antenne individuelle de radiodiffusion et de télévision, meubles scellés, cheminées, glaces et miroirs.</p>
+</li>
+</ul>
+<p></p>
+<h3>B/ MENUES REPARATIONS nécessitées par la dépose des bourrelets</h3>
+<p></p>
+<h3>C/ GRAISSAGE ET REMPLACEMENT des joints des vidoirs</h3>
+<p></p>
+<h3>D/ RAMONAGE des conduits d’évacuation des fumées et des gaz et conduits de ventilation</h3>

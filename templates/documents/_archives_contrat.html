@@ -10,7 +10,7 @@
   <p>Une correction administrative ne remplace pas l'exemplaire signé.</p>
   <ul>{% for version in objet.versions_document.all %}
     <li>Version {{ version.pk }} · {{ version.get_nature_display }} · {{ version.cree_le|date:"d/m/Y H:i" }} · {{ version.auteur_nom }}<br>
-      {{ version.motif }} · <a href="{% url 'documents:archive' version.pk 'docx' %}">Word archivé</a> · <a href="{% url 'documents:archive' version.pk 'pdf' %}">PDF archivé</a>
+      {{ version.motif }}{% if version.est_word %} · <a href="{% url 'documents:archive' version.pk 'docx' %}">Word archivé</a>{% endif %} · <a href="{% url 'documents:archive' version.pk 'pdf' %}">PDF archivé</a>
       {% if version.scan %} · <a href="{% url 'documents:archive' version.pk 'scan' %}">Exemplaire signé archivé</a>{% endif %}
     </li>
   {% empty %}<li>Aucune version archivée.</li>{% endfor %}</ul>

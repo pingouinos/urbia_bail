@@ -1,5 +1,4 @@
 import datetime as dt
-import io
 from decimal import Decimal
 from unittest import mock
 
@@ -10,17 +9,12 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from docx import Document
 
 from proprietes.models import Bailleur, Propriete
 from documents import generation
 from mandats.models import Mandat
 
 from .models import Bail, Locataire, ajouter_mois
-
-
-def texte_docx(contenu):
-    return "\n".join(p.text for p in Document(io.BytesIO(contenu)).paragraphs)
 
 
 class Donnees:
@@ -120,7 +114,7 @@ class BailTests(Donnees, TestCase):
     def test_document_nu(self):
         bail = self.creer_bail(locataires=("Martin", "Bernard"), date_signature=dt.date(2026, 10, 20),
                                garants="Mme Anne Roux, 1 place du Capitole, 31000 Toulouse\nM. Marc Roux, idem")
-        texte = texte_docx(generation.generer_docx("bail_habitation.docx", bail.contexte_document()))
+        texte = generation.texte_document(generation.generer_html("bail_habitation", bail.contexte_document()))
         self.assertNotIn("{{", texte)
         self.assertNotIn("{%", texte)
         self.assertIn("Logement nu", texte)
@@ -148,7 +142,7 @@ class BailTests(Donnees, TestCase):
 
     def test_document_meuble_un_locataire(self):
         bail = self.creer_bail(type=Bail.Type.MEUBLE, depot_garantie=Decimal("1400"))
-        texte = texte_docx(generation.generer_docx("bail_habitation.docx", bail.contexte_document()))
+        texte = generation.texte_document(generation.generer_html("bail_habitation", bail.contexte_document()))
         self.assertIn("Logement meublé", texte)
         self.assertIn("annexe 2 du décret n° 2015-587", texte)
         self.assertIn("Durée du contrat : 1 an", texte)
@@ -161,7 +155,7 @@ class BailTests(Donnees, TestCase):
         bail.locataires.filter(nom="Bernard").update(
             garants="Mme Claire Bernard, 3 rue Alsace, 31000 Toulouse\n\nM. Luc Bernard, 3 rue Alsace, 31000 Toulouse"
         )
-        texte = texte_docx(generation.generer_docx("bail_habitation.docx", bail.contexte_document()))
+        texte = generation.texte_document(generation.generer_html("bail_habitation", bail.contexte_document()))
         self.assertNotIn("{{", texte)
         self.assertNotIn("{%", texte)
         self.assertIn("Le logement est loué en colocation, au sens de l'article 8-1", texte)
@@ -175,7 +169,7 @@ class BailTests(Donnees, TestCase):
     def test_colocation_avec_un_seul_locataire(self):
         bail = self.creer_bail(colocation=True)
         self.assertIn("Colocation cochée avec un seul locataire", " ".join(bail.alertes))
-        texte = texte_docx(generation.generer_docx("bail_habitation.docx", bail.contexte_document()))
+        texte = generation.texte_document(generation.generer_html("bail_habitation", bail.contexte_document()))
         self.assertNotIn("loué en colocation", texte)
 
 
@@ -623,9 +617,9 @@ class VuesTests(Donnees, TestCase):
 
     def test_telechargements_et_pages(self):
         bail = self.creer_bail()
-        self.assertIn("MARTIN Paul", texte_docx(self.client.get(reverse("contrats:word", args=[bail.pk])).content))
-        with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7"):
+        with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7") as convertir:
             self.assertEqual(self.client.get(reverse("contrats:pdf", args=[bail.pk])).content, b"%PDF-1.7")
+        self.assertIn("MARTIN Paul", generation.texte_document(convertir.call_args.args[0]))
         for url in [reverse("contrats:liste"), reverse("contrats:bail", args=[bail.pk]),
                     reverse("proprietes:propriete", args=[bail.propriete.pk]),
                     reverse("contrats:nouveau_logement"), reverse("accueil")]:
@@ -825,7 +819,7 @@ class InterdictionsTests(Donnees, TestCase):
         preparer = self.client.post(reverse("documents:preparer", args=["bail", bail.pk]), follow=True)
         self.assertContains(preparer, message)
         self.assertFalse(bail.versions_document.exists())
-        brouillon = self.client.get(reverse("contrats:word", args=[bail.pk]), follow=True)
+        brouillon = self.client.get(reverse("contrats:pdf", args=[bail.pk]), follow=True)
         self.assertContains(brouillon, message)
         from django.core.files.uploadedfile import SimpleUploadedFile
         scan = SimpleUploadedFile("bail.pdf", b"%PDF-1.7", content_type="application/pdf")
@@ -883,35 +877,26 @@ class InterdictionsTests(Donnees, TestCase):
         self.assertTrue(bail.versions_document.filter(nature="preparation").exists())
 
     def test_clause_resolutoire_a_six_semaines(self):
-        texte = generation.texte_docx(generation.chemin_modele("bail_habitation.docx").read_bytes())
+        texte = generation.texte_document(generation.lire_modele("bail_habitation"))
         self.assertIn("six semaines après un commandement de payer", texte)
-        self.assertEqual(generation.defauts_modele("bail_habitation.docx"), [])
+        self.assertEqual(generation.defauts_modele("bail_habitation"), [])
 
     def test_modele_avec_l_ancienne_clause(self):
         """Un modèle déposé qui garde « deux mois » est refusé, et s'il est
         déjà en service, il bloque la préparation."""
         import shutil
         import tempfile
-        import zipfile
 
         from documents.views import verifier_modele
 
-        source = generation.chemin_modele("bail_habitation.docx").read_bytes()
-        sortie = io.BytesIO()
-        with zipfile.ZipFile(io.BytesIO(source)) as entree, zipfile.ZipFile(sortie, "w") as archive:
-            for element in entree.infolist():
-                contenu = entree.read(element.filename)
-                if element.filename == "word/document.xml":
-                    contenu = contenu.replace("six semaines après un commandement".encode(),
-                                              "deux mois après un commandement".encode())
-                archive.writestr(element, contenu)
-        ancien = sortie.getvalue()
-        self.assertIn("six semaines", verifier_modele("bail_habitation.docx", ancien))
+        ancien = generation.lire_modele("bail_habitation").replace(
+            "six semaines après un commandement", "deux mois après un commandement")
+        self.assertIn("six semaines", verifier_modele("bail_habitation", ancien))
         dossier = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, dossier)
         with self.settings(MEDIA_ROOT=dossier):
             (generation.Path(dossier) / "modeles").mkdir()
-            (generation.Path(dossier) / "modeles" / "bail_habitation.docx").write_bytes(ancien)
+            (generation.Path(dossier) / "modeles" / "bail_habitation.html").write_text(ancien)
             bail = self.creer_bail(loyer=Decimal("700"), depot_garantie=Decimal("700"))
             reponse = self.client.post(reverse("documents:preparer", args=["bail", bail.pk]), follow=True)
             self.assertContains(reponse, "c&#x27;est six semaines")

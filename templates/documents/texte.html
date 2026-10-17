@@ -5,18 +5,43 @@
 <nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><a href="{% url 'documents:modeles' %}">Modèles des documents</a><span aria-hidden="true">›</span><a href="{% url 'documents:modele' nom %}">{{ libelle }}</a><span aria-hidden="true">›</span><span class="fil-ici">Modifier le texte</span></nav>
 <div class="titre-pastille"><h1>Modifier le texte</h1><span class="pastille pastille-a_reverifier" data-editeur-etat hidden>Modifications non enregistrées</span></div>
 <p class="discret">{% if en_attente %}Vous reprenez la version en attente d'essai.{% else %}Le modèle en service ne change pas tant que vous n'avez pas vérifié l'essai puis mis en service.{% endif %}
-  Les étiquettes vertes sont remplies avec les données du dossier. Les blocs gris (« Seulement si », « Pour chaque », tableaux) ne se modifient pas ici.</p>
+  Les étiquettes vertes sont remplies avec les données du dossier. Un passage encadré n'est imprimé que si sa condition est remplie.</p>
 {% if corrigeable %}<p class="message alerte-fond">Un paragraphe surligné ne respecte plus la loi. <a href="{% url 'documents:corriger' nom %}">Voir la correction proposée</a></p>{% endif %}
 <form method="post" class="editeur-modele">{% csrf_token %}
   <input type="hidden" name="texte">
-  {% if sommaire %}<nav class="sommaire-modele" aria-label="Sections du modèle">{% for rang, titre in sommaire %}<a href="#rang-{{ rang }}">{{ titre }}</a>{% endfor %}</nav>{% endif %}
+  {% if sommaire %}<nav class="sommaire-modele" aria-label="Sections du modèle">{% for titre in sommaire %}<a href="#" data-titre="{{ forloop.counter0 }}">{{ titre }}</a>{% endfor %}</nav>{% endif %}
   <div class="carte">
     <div class="outils-editeur" role="toolbar" aria-label="Mise en forme">
-      <button type="button" class="secondaire" data-commande="gras" title="Gras (Ctrl+B)"><strong>G</strong></button>
-      <button type="button" class="secondaire" data-commande="italique" title="Italique (Ctrl+I)"><em>I</em></button>
-      <button type="button" class="secondaire" data-commande="annuler" title="Annuler (Ctrl+Z)">Annuler</button>
-      <button type="button" class="secondaire" data-commande="retablir" title="Rétablir (Ctrl+Y)">Rétablir</button>
-      <select data-inserer aria-label="Insérer une donnée"><option value="">Insérer une donnée…</option>{% for code, libelle_donnee in donnees %}<option value="{{ code }}">{{ libelle_donnee }}</option>{% endfor %}</select>
+      <span class="groupe-outils">
+        <button type="button" class="secondaire" data-commande="titre" title="Titre de section">Titre</button>
+        <button type="button" class="secondaire" data-commande="sous-titre" title="Sous-titre">Sous-titre</button>
+        <button type="button" class="secondaire" data-commande="paragraphe" title="Paragraphe">¶</button>
+      </span>
+      <span class="groupe-outils">
+        <button type="button" class="secondaire" data-commande="gras" title="Gras (Ctrl+B)"><strong>G</strong></button>
+        <button type="button" class="secondaire" data-commande="italique" title="Italique (Ctrl+I)"><em>I</em></button>
+        <button type="button" class="secondaire" data-commande="souligne" title="Souligné (Ctrl+U)"><u>S</u></button>
+      </span>
+      <span class="groupe-outils">
+        <button type="button" class="secondaire" data-commande="puces" title="Liste à puces">• Liste</button>
+        <button type="button" class="secondaire" data-commande="numeros" title="Liste numérotée">1. Liste</button>
+      </span>
+      <span class="groupe-outils">
+        <button type="button" class="secondaire" data-commande="gauche" title="Aligner à gauche">Gauche</button>
+        <button type="button" class="secondaire" data-commande="centre" title="Centrer">Centre</button>
+        <button type="button" class="secondaire" data-commande="droite" title="Aligner à droite">Droite</button>
+        <button type="button" class="secondaire" data-commande="justifie" title="Justifier">Justifié</button>
+      </span>
+      <span class="groupe-outils">
+        <button type="button" class="secondaire" data-commande="saut" title="Saut de page">Saut de page</button>
+        <button type="button" class="secondaire" data-commande="annuler" title="Annuler (Ctrl+Z)">Annuler</button>
+        <button type="button" class="secondaire" data-commande="retablir" title="Rétablir (Ctrl+Y)">Rétablir</button>
+      </span>
+      <span class="groupe-outils">
+        <select data-inserer aria-label="Insérer une donnée"><option value="">Insérer une donnée…</option>{% for code, libelle_donnee in donnees %}<option value="{{ code }}">{{ libelle_donnee }}</option>{% endfor %}</select>
+        <select data-condition aria-label="Imprimer seulement si"><option value="">Seulement si…</option>{% for code, libelle_condition in conditions %}<option value="{{ code }}">{{ libelle_condition }}</option>{% endfor %}</select>
+        <button type="button" class="secondaire" data-commande="retirer-condition" title="Le passage sera toujours imprimé" disabled>Retirer la condition</button>
+      </span>
     </div>
     <div class="texte-modele" data-editeur></div>
   </div>

@@ -13,13 +13,13 @@
 <section class="carte etapes-correction">
   <div class="etape-correction"><span class="numero-etape{% if essai_vu %} fait{% endif %}">1</span>
     <p>{% if avec_donnees %}Ouvrir le document d'essai corrigé et vérifier la mise en page.{% else %}Télécharger le modèle corrigé et vérifier la mise en page.{% endif %}</p>
-    <a class="bouton secondaire" href="{% url 'documents:essai_correction' nom %}" target="_blank" rel="noopener" data-recharger>{% if avec_donnees %}Document d'essai (PDF){% else %}Modèle corrigé (Word){% endif %}</a></div>
+    <a class="bouton secondaire" href="{% url 'documents:essai_correction' nom %}" target="_blank" rel="noopener" data-recharger>Document d'essai (PDF)</a></div>
   <form class="etape-correction" method="post" action="{% url 'documents:appliquer_correction' nom %}">{% csrf_token %}
     <span class="numero-etape{% if not essai_vu %} attente{% endif %}">2</span>
     <p>Mettre en service le modèle corrigé. La version actuelle reste récupérable et la relecture est notée à votre nom.</p>
     <button type="submit"{% if not essai_vu %} disabled title="Ouvrir d'abord le document d'essai"{% endif %}>Mettre en service</button></form>
 </section>
-<p class="discret">{% if lien_google %}Le Google Doc de l'agence n'est pas modifié : reportez-y la correction, sinon la prochaine reprise depuis Google Docs sera refusée tant que l'ancien texte y reste.{% else %}Si l'agence garde une copie de ce modèle ailleurs, reportez-y la correction.{% endif %}</p>
+<p class="discret">Si l'agence garde une copie de ce modèle ailleurs, reportez-y la correction.</p>
 <script>
 document.querySelector("[data-recharger]").addEventListener("click", function () {
   setTimeout(function () { location.reload(); }, 1500);
