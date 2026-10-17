@@ -140,7 +140,7 @@ def processus_location(propriete, mandat=None, a_etudier=0, retenue=None, bail=N
               detail=("scan déposé" if bail.fichier_signe else "scan à déposer") if bail and bail.signe else ""),
         Etape("Entrée dans les lieux", date=bail.date_effet if bail else None,
               prevue=bool(bail) and bail.date_effet > aujourd_hui),
-        Etape("Location en cours", detail=f"{bail.total_mensuel} € par mois".replace(".", ",") if bail else ""),
+        Etape("Location en cours", detail=f"{bail.total_actuel} € par mois".replace(".", ",") if bail else ""),
         Etape("Sortie", date=(bail.date_fin_effective or depart or bail.date_fin) if bail else None,
               prevue=bool(bail) and not bail.date_fin_effective,
               detail=_conge(bail) if bail else ""),

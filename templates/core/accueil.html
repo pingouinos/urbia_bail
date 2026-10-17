@@ -13,6 +13,7 @@
       {% endif %}
       {% if nb_taches %}
       {% if locations %}<span class="puce"><b>{{ locations|length }}</b> mise{{ locations|length|pluralize }} en location</span>{% endif %}
+      {% if nb_echeances %}<span class="puce"><b>{{ nb_echeances }}</b> échéance{{ nb_echeances|pluralize }}</span>{% endif %}
       {% if nb_mandats_a_finaliser %}<span class="puce"><b>{{ nb_mandats_a_finaliser }}</b> mandat{{ nb_mandats_a_finaliser|pluralize }} à finaliser</span>{% endif %}
       {% if nb_urgentes %}<span class="puce puce-retard"><b>{{ nb_urgentes }}</b> en retard</span>{% else %}<span class="puce puce-ok">Aucun retard</span>{% endif %}
       {% else %}<span class="puce puce-ok">Tout est à jour</span>{% endif %}
@@ -27,7 +28,7 @@
   <h3 class="rubrique-taches">{{ rubrique }}</h3>
   {% include "core/_lignes_taches.html" %}
   {% empty %}
-  <p class="discret">Rien en attente. Les actions à mener apparaîtront ici : mandat à faire signer, pièces à fournir, candidatures à étudier, bail à rédiger, diagnostic périmé.</p>
+  <p class="discret">Rien en attente. Les actions à mener apparaîtront ici : mandat à faire signer, pièces à fournir, candidatures à étudier, bail à rédiger, loyer à réviser, diagnostic périmé.</p>
   {% endfor %}
 </section>
 

@@ -23,7 +23,8 @@ from django.utils import timezone
 from .forms import (
     BailForm, FinBailForm, LocataireFormSet, LogementForm, ProprietaireForm, SignatureForm, initial_fin,
 )
-from .models import Bail
+from .echeances import assurance_due, euros, prochaine_date_revision, revision_due
+from .models import Bail, IndiceIRL, RevisionLoyer
 
 MODELE = "bail_habitation.docx"
 # Logements proposés à la fois à l'étape « Logement ».
@@ -226,7 +227,30 @@ def etapes(request, pk):
         # Message de fin de parcours, une seule fois après la création.
         "vient_d_etre_cree": request.session.pop("bail_cree", None) == objet.pk,
         "administrateur": administrateur, "historique": objet.history.select_related("history_user")[:10],
+        **suivi_location(objet),
     })
+
+
+def suivi_location(bail):
+    """Révision du loyer et attestation d'assurance, sur la fiche d'un bail
+    signé en cours."""
+    if not bail.signe or bail.date_fin_effective:
+        return {}
+    revisions = list(bail.revisions.select_related("cree_par"))
+    derniere = revisions[0] if revisions else None
+    revision, assurance = revision_due(bail), assurance_due(bail)
+    courrier = derniere if derniere and derniere.statut == RevisionLoyer.Statut.APPLIQUEE \
+        and (timezone.localdate() - derniere.cree_le.date()).days <= 60 else None
+    return {
+        "suivi": True,
+        # Une action à faire (ou le courrier à envoyer) remonte le cadre en haut de la fiche.
+        "suivi_en_haut": bool((revision and not revision.gelee) or assurance or courrier),
+        "revision": revision, "revisions": revisions,
+        "prochaine_revision": prochaine_date_revision(bail),
+        # Courrier au locataire, proposé dans les deux mois qui suivent la révision.
+        "courrier": courrier, "assurance_due": assurance,
+        "aujourd_hui": timezone.localdate(),
+    }
 
 
 @require_POST
@@ -400,3 +424,84 @@ def deposer_signe(request, pk):
 
 def fichier_signe(request, pk):
     return documents.fichier_signe(request, get_object_or_404(Bail, pk=pk))
+
+
+def _date_postee(request, nom):
+    """Date saisie au format du navigateur (AAAA-MM-JJ), aujourd'hui par défaut,
+    jamais dans le futur."""
+    from datetime import date
+
+    try:
+        valeur = date.fromisoformat(request.POST.get(nom, ""))
+    except ValueError:
+        return timezone.localdate()
+    return min(valeur, timezone.localdate())
+
+
+def _indice_poste(request, nom):
+    from decimal import Decimal, InvalidOperation
+
+    texte = request.POST.get(nom, "").strip().replace(",", ".")
+    try:
+        valeur = Decimal(texte)
+    except InvalidOperation:
+        return None
+    return valeur if 50 < valeur < 1000 else None
+
+
+@require_POST
+@verrouiller(Bail)
+def reviser(request, pk):
+    """Révision annuelle du loyer : appliquée au loyer calculé avec l'IRL, ou
+    refusée par le propriétaire pour cette année. Le bail signé ne change pas."""
+    objet = get_object_or_404(Bail.objects.select_related("propriete"), pk=pk)
+    revision = revision_due(objet)
+    if not revision:
+        messages.error(request, "Aucune révision de loyer n'est à faire sur ce bail pour le moment.")
+        return redirect(objet)
+    if request.POST.get("decision") == "renoncer":
+        RevisionLoyer.objects.create(
+            bail=objet, date_revision=revision.date, applicable_le=revision.applicable_le,
+            statut=RevisionLoyer.Statut.RENONCEE, ancien_loyer=revision.ancien_loyer, nouveau_loyer=revision.ancien_loyer,
+            irl_libelle=revision.libelle_irl, irl_ancien=revision.irl_ancien, irl_nouveau=revision.irl_nouveau,
+            cree_par=request.user,
+        )
+        noter(request, "révision de loyer", objet, f"Non révisé au {revision.date:%d/%m/%Y}")
+        messages.success(request, f"Révision du {revision.date:%d/%m/%Y} notée comme non faite : le loyer reste "
+                                  f"à {euros(revision.ancien_loyer)}.")
+        return redirect(f"{objet.get_absolute_url()}#revision")
+    if revision.gelee:
+        messages.error(request, "Logement classé F ou G : la loi interdit d'augmenter le loyer.")
+        return redirect(f"{objet.get_absolute_url()}#revision")
+    # Indice publié depuis la dernière mise à jour : saisi ici, il sert à tous les baux.
+    for nom, annee in (("irl_nouveau", revision.annee), ("irl_ancien", (revision.annee or 0) - 1)):
+        valeur = _indice_poste(request, nom)
+        if valeur and revision.trimestre and getattr(revision, nom) is None:
+            IndiceIRL.objects.get_or_create(trimestre=revision.trimestre, annee=annee, defaults={"valeur": valeur})
+            setattr(revision, nom, valeur)
+    if revision.nouveau_loyer is None:
+        messages.error(request, "Indiquer l'indice publié par l'INSEE pour calculer le nouveau loyer.")
+        return redirect(f"{objet.get_absolute_url()}#revision")
+    RevisionLoyer.objects.create(
+        bail=objet, date_revision=revision.date, applicable_le=revision.applicable_le,
+        statut=RevisionLoyer.Statut.APPLIQUEE, ancien_loyer=revision.ancien_loyer, nouveau_loyer=revision.nouveau_loyer,
+        irl_libelle=revision.libelle_irl, irl_ancien=revision.irl_ancien, irl_nouveau=revision.irl_nouveau,
+        cree_par=request.user,
+    )
+    noter(request, "révision de loyer", objet,
+          f"{euros(revision.ancien_loyer)} → {euros(revision.nouveau_loyer)} au {revision.applicable_le:%d/%m/%Y}")
+    messages.success(request, f"Loyer révisé : {euros(revision.nouveau_loyer)} hors charges à partir du "
+                              f"{revision.applicable_le:%d/%m/%Y}. Le courrier au locataire est prêt ci-dessous.")
+    return redirect(f"{objet.get_absolute_url()}#revision")
+
+
+@require_POST
+@verrouiller(Bail)
+def assurance(request, pk):
+    """Attestation d'assurance habitation reçue du locataire."""
+    objet = get_object_or_404(Bail, pk=pk)
+    objet.attestation_assurance_le = _date_postee(request, "attestation_assurance_le")
+    objet.save(update_fields=["attestation_assurance_le", "modifie_le"])
+    messages.success(request, f"Attestation d'assurance notée au {objet.attestation_assurance_le:%d/%m/%Y} : "
+                              "elle sera redemandée dans un an.")
+    return redirect(f"{objet.get_absolute_url()}#assurance")

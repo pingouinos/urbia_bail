@@ -32,6 +32,7 @@ sur une ligne.
 {% if vient_d_etre_cree %}<p class="message">Bail enregistré : il se télécharge en <a href="{% url 'contrats:pdf' bail.pk %}">PDF</a> ou en <a href="{% url 'contrats:word' bail.pk %}">Word</a> pour le faire signer.</p>{% endif %}
 {% if correction %}<p class="message message-erreur">Correction administrative : une nouvelle version sera créée. Les archives et l’exemplaire signé sont conservés.</p>{% endif %}
 
+{% if suivi and suivi_en_haut %}{% include "contrats/_suivi_location.html" %}{% endif %}
 {% include "documents/_archives_contrat.html" with objet=bail %}
 <div class="etapes-bail">
 {% for section in sections %}{% with etape=section.etape numero=section.numero mode=section.mode %}
@@ -123,12 +124,12 @@ sur une ligne.
 
   {% elif numero == 6 %}
   {% if mode == "ouverte" %}
-  <p class="ligne-etape">Depuis le {{ bail.date_effet|date:"d/m/Y" }} · {{ bail.total_mensuel }} € par mois.</p>
+  <p class="ligne-etape">Depuis le {{ bail.date_effet|date:"d/m/Y" }} · {{ bail.total_actuel }} € par mois{% if revision and not revision.gelee %} · <a href="#revision">loyer à réviser</a>{% endif %}.</p>
   <div class="boutons-etape">
     <a class="bouton pousse" href="?etape=7#etape-7">Un congé est arrivé ›</a>
   </div>
   {% elif mode == "grisee" %}
-  <p class="ligne-etape">Depuis le {{ bail.date_effet|date:"d/m/Y" }} · {{ bail.total_mensuel }} € par mois</p>
+  <p class="ligne-etape">Depuis le {{ bail.date_effet|date:"d/m/Y" }} · {{ bail.total_actuel }} € par mois</p>
   {% else %}
   <p class="ligne-etape">{{ bail.total_mensuel }} € par mois, à partir du {{ bail.date_effet|date:"d/m/Y" }}.</p>
   {% endif %}
@@ -165,6 +166,8 @@ sur une ligne.
 </section>
 {% endwith %}{% endfor %}
 </div>
+
+{% if suivi and not suivi_en_haut %}{% include "contrats/_suivi_location.html" %}{% endif %}
 
 <section class="carte" id="historique">
   <h2>Historique</h2>
