@@ -28,5 +28,5 @@
   <ul>{% for bien in changements_zone_tendue %}<li><a href="{% url 'proprietes:propriete' bien.id %}">{{ bien.bien }}</a> : {{ bien.zone_tendue|yesno:"désormais en zone tendue,plus en zone tendue" }}</li>{% endfor %}</ul>
 </section>
 {% endif %}
-<p class="discret">La relecture de chaque modèle se note dans <a href="{% url 'documents:modeles' %}">Modèles des documents</a>.</p>
+<p class="discret">L'état de chaque modèle et sa relecture se voient dans <a href="{% url 'documents:modeles' %}">Modèles des documents</a>.</p>
 {% endblock %}

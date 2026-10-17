@@ -88,19 +88,45 @@ class ModelesTests(Donnees, TestCase):
         with mock.patch("documents.google.telecharger", return_value=contenu):
             return self.client.post(self.url, {"lien_google": lien}, follow=True)
 
+    def mettre_en_service(self, **donnees):
+        return self.client.post(reverse("documents:mettre_en_service", args=["mandat_gestion.docx"]), donnees, follow=True)
+
+    def ouvrir_essai(self):
+        with mock.patch("documents.views.convertir_pdf", return_value=b"%PDF-1.7"):
+            return self.client.get(reverse("documents:essai_version", args=["mandat_gestion.docx"]))
+
     def texte_mandat(self):
         return texte_docx(self.client.get(reverse("mandats:word", args=[self.mandat.pk])).content)
 
     def test_reprise_depuis_google_docs(self):
         reponse = self.reprendre(modele_mandat("Clause ajoutée dans Google Docs pour {{ mandant }}."))
-        self.assertContains(reponse, "repris de Google Docs et mis en service")
+        self.assertContains(reponse, "repris de Google Docs. Ouvrez le document d&#x27;essai")
+        self.assertContains(reponse, "Essai prêt (repris de Google Docs)")
+        # Rien ne change tant que l'essai n'est pas ouvert puis mis en service.
+        self.assertNotIn("Clause ajoutée", self.texte_mandat())
+        self.assertContains(self.mettre_en_service(relu="1", reference="la loi Hoguet"), "Ouvrir d&#x27;abord le document d&#x27;essai")
+        self.assertNotIn("Clause ajoutée", self.texte_mandat())
+        self.assertEqual(self.ouvrir_essai().content, b"%PDF-1.7")
+        reponse = self.mettre_en_service(relu="1", reference="la loi Hoguet")
+        self.assertContains(reponse, "mis en service, relecture notée")
         self.assertContains(reponse, "Repris de Google Docs, le")
         self.assertContains(reponse, f'value="{LIEN}"')
         self.assertIn("Clause ajoutée dans Google Docs pour Monsieur DURAND Paul", self.texte_mandat())
         modele = Modele.objects.get(nom="mandat_gestion.docx")
         self.assertEqual((modele.origine, modele.lien_google), (Modele.Origine.GOOGLE, LIEN))
-        # Le lien est gardé : un second clic suffit pour la version suivante.
-        self.reprendre(modele_mandat("Deuxième version."), lien=LIEN)
+        self.assertEqual((modele.relu_par.username, modele.relu_reference), ("elodie", "la loi Hoguet"))
+        # Le lien est gardé : la version suivante se reprend sans le recoller,
+        # et sans la case cochée la relecture reste à faire.
+        with mock.patch("documents.google.telecharger", return_value=modele_mandat("Deuxième version.")):
+            self.client.post(self.url)
+        self.ouvrir_essai()
+        self.assertContains(self.mettre_en_service(reference="la loi Hoguet"), "mis en service, à relire")
+        self.assertIn("Deuxième version.", self.texte_mandat())
+        # Un essai abandonné ne change rien.
+        self.reprendre(modele_mandat("Troisième version."))
+        self.client.post(reverse("documents:abandonner", args=["mandat_gestion.docx"]))
+        self.ouvrir_essai()
+        self.mettre_en_service()
         self.assertIn("Deuxième version.", self.texte_mandat())
         # Retour à la version précédente, puis au modèle d'origine.
         self.client.post(reverse("documents:precedent", args=["mandat_gestion.docx"]))
@@ -201,9 +227,9 @@ class ReglesTests(TestCase):
         self.client.post(url, {"reference": "la loi Hoguet et le décret 72-678"})
         modele = Modele.objects.get(nom="mandat_gestion.docx")
         self.assertEqual((modele.relu_par, modele.relu_reference), (self.admin, "la loi Hoguet et le décret 72-678"))
-        page = self.client.get(reverse("documents:modeles"))
+        page = self.client.get(reverse("documents:modele", args=["mandat_gestion.docx"]))
         self.assertContains(page, "d'après la loi Hoguet et le décret 72-678")
-        self.assertContains(page, "Pas encore relu")  # le bail
+        self.assertContains(self.client.get(reverse("documents:modele", args=["bail_habitation.docx"])), "Pas encore relu")
 
 
 class CorrectionTests(TestCase):
@@ -260,8 +286,21 @@ class CorrectionTests(TestCase):
 
     def test_sans_clause_perimee_rien_a_corriger(self):
         self.depose.unlink()
-        self.assertRedirects(self.client.get(self.page), reverse("documents:regles"))
+        self.assertRedirects(self.client.get(self.page), reverse("documents:modele", args=["bail_habitation.docx"]))
+
+    def test_liste_et_tableau_de_bord_signalent_le_modele(self):
+        fiche = reverse("documents:modele", args=["bail_habitation.docx"])
+        liste = self.client.get(reverse("documents:modeles"))
+        self.assertContains(liste, "Clause résolutoire : six semaines après un commandement de payer")
+        self.assertContains(liste, ">Corriger</a>", html=False)
+        self.assertContains(self.client.get(fiche), self.page)
+        alerte = "ne respecte plus une règle légale"
+        self.assertContains(self.client.get(reverse("accueil")), alerte)
+        # Seul un administrateur peut corriger : l'alerte ne s'adresse qu'à lui.
+        self.client.force_login(creer_gestionnaire("gestion"))
+        self.assertNotContains(self.client.get(reverse("accueil")), alerte)
 
     def test_reserve_aux_administrateurs(self):
         self.client.force_login(creer_gestionnaire("gestion"))
         self.assertEqual(self.client.get(self.page).status_code, 403)
+        self.assertEqual(self.client.get(reverse("documents:modele", args=["bail_habitation.docx"])).status_code, 403)

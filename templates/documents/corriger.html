@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Corriger le modèle · {{ nom_application }}{% endblock %}
 {% block contenu %}
-<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><a href="{% url 'documents:regles' %}">Règles légales</a><span aria-hidden="true">›</span><span class="fil-ici">Corriger le modèle</span></nav>
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'administration' %}">Administration</a><span aria-hidden="true">›</span><a href="{% url 'documents:modeles' %}">Modèles des documents</a><span aria-hidden="true">›</span><a href="{% url 'documents:modele' nom %}">{{ libelle }}</a><span aria-hidden="true">›</span><span class="fil-ici">Corriger</span></nav>
 <h1>Corriger : {{ libelle|lower }}</h1>
 {% for ligne in lignes %}
 <p>{{ ligne.message }}</p>
