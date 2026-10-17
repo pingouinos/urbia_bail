@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block titre %}Ticket n° {{ ticket.pk }} · {{ nom_application }}{% endblock %}
+{% block contenu %}
+<nav class="fil" aria-label="Fil d'Ariane"><a href="{% url 'plateforme_tickets' %}">Tickets</a><span aria-hidden="true">›</span><span class="fil-ici">N° {{ ticket.pk }}</span></nav>
+<div class="titre-actions">
+  <h1>{{ ticket.titre }}</h1>
+  <span class="pastille pastille-ticket-{{ ticket.etat }}">{{ ticket.get_etat_display }}</span>
+</div>
+<p class="discret">{{ ticket.get_type_display }} · {{ ticket.auteur.get_full_name|default:ticket.auteur.username|default:"compte supprimé" }} ({{ ticket.agence.designation }}) · {{ ticket.cree_le|date:"d/m/Y à H:i" }}</p>
+<section class="carte">
+  <p class="ticket-texte">{{ ticket.texte }}</p>
+  <p class="discret">Page : {{ ticket.page|default:"non indiquée" }} · {{ ticket.appareil|default:"appareil inconnu" }}</p>
+  {% if ticket.capture %}<a class="ticket-capture" href="{% url 'plateforme_ticket_capture' ticket.pk %}"><img src="{% url 'plateforme_ticket_capture' ticket.pk %}" alt="Capture d'écran jointe au ticket"></a>{% endif %}
+</section>
+{% if lien_issue %}
+<section class="carte">
+  <h2>Backlog GitHub</h2>
+  {% if ticket.issue %}<p><a href="{{ ticket.issue }}" rel="noopener" target="_blank">Ouvrir l'issue liée</a></p>{% endif %}
+  <p class="discret">Le dépôt est public : relis le texte prérempli et retire tout nom de personne avant de valider. La capture n'est pas reprise.</p>
+  <p><a class="bouton-petit secondaire" href="{{ lien_issue }}" rel="noopener" target="_blank">Préparer l'issue sur GitHub</a></p>
+</section>
+{% endif %}
+<form method="post" class="formulaire">
+  {% csrf_token %}
+  <fieldset>
+    <legend>Suivi</legend>
+    <div class="champ pleine-largeur">
+      <span class="libelle">État</span>
+      <div class="choix-radio">{% for radio in form.etat %}<label class="case">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</div>
+    </div>
+    {% include "proprietes/_champ.html" with champ=form.reponse %}
+    {% include "proprietes/_champ.html" with champ=form.issue %}
+  </fieldset>
+  <button type="submit" class="bouton-corail">Enregistrer</button>
+</form>
+{% endblock %}

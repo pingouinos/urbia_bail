@@ -18,7 +18,17 @@ def application(request):
         ),
         # Lue seulement par les pages qui l'affichent.
         "agence": SimpleLazyObject(Organisation.courante),
+        # Menu de l'exploitant : tickets pas encore résolus, toutes agences.
+        "tickets_a_traiter": SimpleLazyObject(lambda: tickets_a_traiter(request)),
     }
+
+
+def tickets_a_traiter(request):
+    from tickets.models import Ticket
+
+    if not (request.user.is_authenticated and request.user.is_superuser):
+        return 0
+    return Ticket.tous.exclude(etat=Ticket.Etat.RESOLU).count()
 
 
 def rubrique(request):
@@ -26,6 +36,8 @@ def rubrique(request):
     page = getattr(request, "resolver_match", None)
     if page is None:
         return ""
+    if (page.url_name or "").startswith("plateforme_ticket"):
+        return "tickets"
     if (page.url_name or "").startswith("plateforme"):
         return "plateforme"
     if page.url_name in ADMINISTRATION or page.namespace == "documents":
