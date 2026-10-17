@@ -10,6 +10,7 @@ urlpatterns = [
     path("", views.modeles, name="modeles"),
     path("regles/", views.regles, name="regles"),
     path("<str:nom>/", views.modele, name="modele"),
+    path("<str:nom>/texte/", views.texte, name="texte"),
     path("<str:nom>/essai/version/", views.essai_version, name="essai_version"),
     path("<str:nom>/mettre-en-service/", views.mettre_en_service_essai, name="mettre_en_service"),
     path("<str:nom>/abandonner/", views.abandonner, name="abandonner"),

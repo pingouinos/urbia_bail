@@ -5,6 +5,7 @@ balises et un remplissage d'essai ; la version remplacée reste disponible."""
 
 import hashlib
 import io
+import json
 import mimetypes
 from pathlib import Path
 
@@ -24,7 +25,7 @@ from core.fichiers import controler_archive, servir
 from core.journal import noter
 from proprietes.zones_tendues import derniere_liste
 
-from . import google
+from . import editeur, google
 from .generation import (
     CLAUSES_PERIMEES, DOCX, MODELES_PAR_DEFAUT, ConversionImpossible, chemin_modele, corriger_modele,
     defauts_modele, convertir_pdf, generer_docx, remplir,
@@ -191,6 +192,10 @@ def _a_relire(etat):
     )
 
 
+def _minuscule(texte):
+    return texte[:1].lower() + texte[1:]
+
+
 def _sans_renvoi(message):
     # Sans le renvoi vers « Modèles des documents » : on y est déjà.
     return message.split(" Corriger le modèle")[0]
@@ -239,7 +244,8 @@ def modele(request, nom):
         "personnalise": _depose(nom).exists(), "precedent": _precedent(nom).exists(),
         "avec_donnees": _objet_essai(nom) is not None, "variables": sorted(_variables(MODELES_PAR_DEFAUT / nom)),
         "en_attente": en_attente,
-        "origine_essai": en_attente and _origine_essai(nom).exists() and _origine_essai(nom).read_text(),
+        "origine_essai": _minuscule(Modele.Origine(_origine_essai(nom).read_text()).label)
+        if en_attente and _origine_essai(nom).exists() else "",
         "essai_vu": en_attente and request.session.get(_cle_version(nom)) == _empreinte(essai.read_bytes()),
         "reference": etat.relu_reference or REFERENCE_RELECTURE[nom],
     })
@@ -393,6 +399,47 @@ def essai_version(request, nom):
             "Content-Disposition": f'attachment; filename="essai-{nom}"'})
 
 
+def texte(request, nom):
+    """Éditeur intégré : le texte du modèle (ou de la version en attente
+    d'essai) modifiable sur place ; l'enregistrement prépare un essai."""
+    _verifier(request, nom)
+    libelle = MODELES[nom][0]
+    en_attente = _essai(nom).exists()
+    source = (_essai(nom) if en_attente else chemin_modele(nom)).read_bytes()
+    alertes = [(extrait, _sans_renvoi(message)) for extrait, message in CLAUSES_PERIMEES.get(nom, {}).items()]
+    document_editeur = None
+    if request.method == "POST":
+        try:
+            document_editeur = json.loads(request.POST.get("texte", ""))
+            contenu = editeur.ecrire(source, document_editeur)
+        except (ValueError, StopIteration) as erreur:
+            raison = str(erreur) if isinstance(erreur, editeur.TexteInvalide) else "Le texte envoyé est illisible : recharger la page."
+            messages.error(request, raison)
+        else:
+            raison = verifier_modele(nom, contenu)
+            if raison:
+                messages.error(request, f"Le texte n'a pas été enregistré. {_sans_renvoi(raison)}")
+            else:
+                preparer_essai(nom, contenu, Modele.Origine.EDITEUR)
+                noter(request, "modèle modifié", libelle, "dans l'application")
+                messages.success(request, "Texte enregistré. Ouvrez le document d'essai, puis mettez en service.")
+                return redirect("documents:modele", nom=nom)
+    if not isinstance(document_editeur, dict):
+        document_editeur = editeur.lire(source, alertes)
+    sommaire = [
+        (bloc["attrs"]["rang"], "".join(n.get("text", "") for n in bloc.get("content", [])))
+        for bloc in document_editeur.get("content", [])
+        if bloc.get("type") == "paragraph" and (bloc.get("attrs") or {}).get("titre")
+    ]
+    donnees = [("{{ " + variable + " }}", editeur.libelle_balise("{{ " + variable + " }}"))
+               for variable in sorted(_variables(MODELES_PAR_DEFAUT / nom))]
+    return render(request, "documents/texte.html", {
+        "nom": nom, "libelle": libelle, "document_editeur": document_editeur, "sommaire": sommaire,
+        "donnees": donnees, "en_attente": en_attente,
+        "corrigeable": bool(alertes) and bool(corriger_modele(nom, source)[1]),
+    })
+
+
 @require_POST
 def reprendre(request, nom):
     _verifier(request, nom)
@@ -461,7 +508,7 @@ def mettre_en_service_essai(request, nom):
     mettre_en_service(nom, contenu, origine, request.user)
     abandonner_essai(nom)
     del request.session[_cle_version(nom)]
-    noter(request, "modèle remplacé", nom, "repris de Google Docs" if origine == Modele.Origine.GOOGLE else "fichier déposé")
+    noter(request, "modèle remplacé", nom, _minuscule(Modele.Origine(origine).label))
     if request.POST.get("relu"):
         Modele.objects.filter(nom=nom).update(relu_le=timezone.localdate(), relu_par=request.user, relu_reference=reference)
         noter(request, "modèle relu", libelle, reference)

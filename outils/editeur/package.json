@@ -1,0 +1,19 @@
+{
+  "private": true,
+  "description": "Éditeur TipTap de la page « Modifier le texte » : npm ci && npm run build écrit static/js/vendor/tiptap.js",
+  "scripts": {
+    "build": "esbuild entree.js --bundle --minify --format=iife --global-name=Tiptap --outfile=../../static/js/vendor/tiptap.js --legal-comments=eof"
+  },
+  "devDependencies": {
+    "@tiptap/core": "3.32.0",
+    "@tiptap/extension-bold": "3.32.0",
+    "@tiptap/extension-document": "3.32.0",
+    "@tiptap/extension-hard-break": "3.32.0",
+    "@tiptap/extension-italic": "3.32.0",
+    "@tiptap/extension-paragraph": "3.32.0",
+    "@tiptap/extension-text": "3.32.0",
+    "@tiptap/extensions": "3.32.0",
+    "@tiptap/pm": "3.32.0",
+    "esbuild": "0.25.10"
+  }
+}

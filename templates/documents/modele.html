@@ -12,28 +12,27 @@
 </section>
 {% endif %}
 <div class="colonnes-modele">
-  <section class="carte etapes-correction">
+  <section class="carte etapes-modele">
     <h2>Modifier le texte</h2>
-    <div class="etape-correction"><span class="numero-etape">1</span>
-      {% if etat.lien_google %}<p>Changer le texte dans Google Docs, sans toucher aux balises entre <code>{% templatetag openvariable %} {% templatetag closevariable %}</code> et <code>{% templatetag openblock %} {% templatetag closeblock %}</code>.</p>
-      <a class="bouton secondaire" href="{{ etat.lien_google }}" target="_blank" rel="noopener noreferrer">Ouvrir le Google Doc</a>
-      {% else %}<div><p>Relier un Google Doc à ce modèle, une seule fois.</p>
-        <details><summary>Comment faire</summary><p class="discret"><a href="{% url 'documents:telecharger' nom %}">Télécharger le modèle en service (Word)</a>, l'importer dans Google Drive, puis <em>Ouvrir avec</em> &gt; <em>Google Docs</em>. Dans <em>Partager</em> &gt; <em>Accès général</em>, choisir « Tous les utilisateurs qui ont le lien », rôle <em>Lecteur</em>, puis coller le lien à l'étape 2. Si le partage par lien n'est pas proposé, un administrateur Google Workspace doit l'autoriser (<em>Drive et Docs</em> &gt; <em>Paramètres de partage</em>).</p></details></div>{% endif %}
+    <div class="etape-modele"><span class="numero-etape{% if en_attente %} fait{% endif %}">1</span>
+      <div><h3>Écrire les changements</h3>
+        <p class="discret">{% if en_attente %}Version en attente d'essai : {{ origine_essai }}. Vous pouvez encore la retoucher.{% else %}Le texte s'ouvre dans l'application. Le modèle en service ne change pas encore.{% endif %}</p>
+        <p class="actions-formulaire"><a class="bouton{% if en_attente %} secondaire{% endif %}" href="{% url 'documents:texte' nom %}">Modifier le texte</a></p></div>
     </div>
-    <form class="etape-correction" method="post" action="{% url 'documents:reprendre' nom %}">{% csrf_token %}
-      <span class="numero-etape{% if en_attente %} fait{% elif not etat.lien_google %} attente{% endif %}">2</span>
-      <div>{% if en_attente %}<p>Essai prêt ({% if origine_essai == "google" %}repris de Google Docs{% else %}fichier Word déposé{% endif %}) : vérifier la mise en page.</p>
-        <p class="actions-formulaire"><a class="bouton secondaire" href="{% url 'documents:essai_version' nom %}" target="_blank" rel="noopener" data-recharger>{% if avec_donnees %}Document d'essai (PDF){% else %}Version reprise (Word){% endif %}</a>
-          <button type="submit" class="lien" formaction="{% url 'documents:abandonner' nom %}">Abandonner l'essai</button></p>
-        {% else %}<p>L'application vérifie les balises et prépare un document d'essai. Le modèle en service ne change pas encore.</p>
-        {% if not etat.lien_google %}<input type="url" name="lien_google" placeholder="https://docs.google.com/document/d/…" aria-label="Lien du Google Doc" required>{% endif %}{% endif %}</div>
-      {% if not en_attente %}<button type="submit">Reprendre et faire un essai</button>{% endif %}
+    <form class="etape-modele" method="post" action="{% url 'documents:abandonner' nom %}">{% csrf_token %}
+      <span class="numero-etape{% if essai_vu %} fait{% elif not en_attente %} attente{% endif %}">2</span>
+      <div><h3>Vérifier le document d'essai</h3>
+        {% if en_attente %}<p class="discret">L'essai est rempli avec le dernier dossier enregistré : vérifiez le texte et la mise en page.</p>
+        <p class="actions-formulaire"><a class="bouton{% if essai_vu %} secondaire{% endif %}" href="{% url 'documents:essai_version' nom %}" target="_blank" rel="noopener" data-recharger>{% if avec_donnees %}Document d'essai (PDF){% else %}Version modifiée (Word){% endif %}</a>
+          <button type="submit" class="lien">Abandonner les changements</button></p>
+        {% else %}<p class="discret">Disponible après l'étape 1.</p>{% endif %}</div>
     </form>
-    <form class="etape-correction" method="post" action="{% url 'documents:mettre_en_service' nom %}">{% csrf_token %}
+    <form class="etape-modele" method="post" action="{% url 'documents:mettre_en_service' nom %}">{% csrf_token %}
       <span class="numero-etape{% if not essai_vu %} attente{% endif %}">3</span>
-      <div><label class="case"><input type="checkbox" name="relu" value="1" checked{% if not essai_vu %} disabled{% endif %}> J'ai relu ce modèle d'après</label>
-        <input type="text" name="reference" maxlength="200" value="{{ reference }}" aria-label="Relu d'après quels textes"{% if not essai_vu %} disabled{% endif %}></div>
-      <button type="submit"{% if not essai_vu %} disabled title="{% if en_attente %}Ouvrir d'abord le document d'essai{% else %}Reprendre d'abord une nouvelle version{% endif %}"{% endif %}>Mettre en service</button>
+      <div><h3>Mettre en service</h3>
+        <label class="case"><input type="checkbox" name="relu" value="1" checked{% if not essai_vu %} disabled{% endif %}> J'ai relu ce modèle d'après :</label>
+        <input type="text" name="reference" maxlength="200" value="{{ reference }}" aria-label="Relu d'après quels textes"{% if not essai_vu %} disabled{% endif %}>
+        <p class="actions-formulaire"><button type="submit"{% if not essai_vu %} disabled title="{% if en_attente %}Ouvrir d'abord le document d'essai{% else %}Modifier d'abord le texte{% endif %}"{% endif %}>Mettre en service</button></p></div>
     </form>
   </section>
   <section class="carte">
@@ -58,12 +57,12 @@
     <input type="file" name="fichier" accept=".docx" required aria-label="Fichier Word">
     <button type="submit" class="secondaire">Déposer un fichier Word</button>
   </form>
-  {% if etat.lien_google %}
   <form method="post" action="{% url 'documents:reprendre' nom %}" class="copie">{% csrf_token %}
-    <input type="url" name="lien_google" value="{{ etat.lien_google }}" aria-label="Lien du Google Doc" required>
-    <button type="submit" class="secondaire">Changer le lien et reprendre</button>
+    <input type="url" name="lien_google" value="{{ etat.lien_google }}" placeholder="https://docs.google.com/document/d/…" aria-label="Lien du Google Doc" required>
+    <button type="submit" class="secondaire">Reprendre depuis Google Docs</button>
   </form>
-  {% endif %}
+  <p class="discret">Le Google Doc doit être partagé en lecture à « Tous les utilisateurs qui ont le lien ».</p>
+  {% if etat.lien_google %}<p><a href="{{ etat.lien_google }}" target="_blank" rel="noopener noreferrer">Ouvrir le Google Doc</a></p>{% endif %}
   <p class="actions-formulaire">
     <a href="{% url 'documents:telecharger' nom %}">Télécharger le modèle en service (Word)</a>
     {% if avec_donnees %}<a href="{% url 'documents:essai' nom %}">Document d'essai du modèle en service (PDF)</a>{% endif %}
