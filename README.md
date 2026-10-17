@@ -32,6 +32,8 @@ La fiche d'un logement est le point d'entrée. Son en-tête donne la situation (
 
 Chaque mandat reçoit à l'enregistrement un numéro d'ordre définitif : la page « Mandats » tient le registre exigé par la loi Hoguet, exportable en Excel, et aucun mandat ne peut être supprimé. Un mandat se crée depuis la fiche d'un bien, prérempli avec le bailleur et le bien, puis se télécharge en Word ou en PDF. L'exemplaire signé et scanné se dépose sur la fiche du mandat.
 
+La zone tendue d'un bien se déduit de sa commune, d'après la liste officielle des communes (décret n° 2013-392 modifié) que l'application télécharge elle-même sur data.gouv.fr une fois par mois, en tâche de fond. Seules les zones d'urbanisation continue comptent : les communes classées « touristiques et tendues » restent hors zone tendue pour le bail. La case « Zone tendue » ne s'affiche que si la commune est introuvable. Après chaque téléchargement, les biens dont la zone tendue a changé sont listés dans « Règles légales » ; `python manage.py maj_zones_tendues --forcer` relance le téléchargement à la main.
+
 L'application signale les honoraires de location contraires à l'article 5 I de la loi du 6 juillet 1989 : part du locataire supérieure à celle du bailleur, ou au plafond de 10 €/m² en zone tendue (8 €/m² ailleurs) pour la visite, le dossier et le bail, et de 3 €/m² pour l'état des lieux.
 
 ## Candidatures

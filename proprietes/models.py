@@ -425,7 +425,13 @@ class Propriete(Horodatage):
     date_dpe = models.DateField("date du DPE", null=True, blank=True)
 
     # Loyer
-    zone_tendue = models.BooleanField("zone tendue", default=False)
+    zone_tendue = models.BooleanField(
+        "zone tendue", default=False,
+        help_text="Déduite de la commune. À cocher seulement si la commune est introuvable dans la liste officielle.",
+    )
+    # Vrai quand la zone tendue vient de la liste officielle des communes
+    # (proprietes.zones_tendues) et non d'une saisie.
+    commune_reconnue = models.BooleanField(default=False, editable=False)
     loyer_reference_majore = models.DecimalField(
         "loyer de référence majoré (€/m²)", max_digits=7, decimal_places=2, null=True, blank=True,
         help_text="Seulement si la commune applique l'encadrement des loyers.",
@@ -455,6 +461,27 @@ class Propriete(Horodatage):
     class Meta:
         ordering = ["ville", "adresse", "complement"]
         verbose_name = "propriété"
+
+    def save(self, *args, **kwargs):
+        self.appliquer_zone_tendue()
+        super().save(*args, **kwargs)
+
+    def appliquer_zone_tendue(self):
+        """La zone tendue suit la commune quand la liste officielle la
+        connaît ; sinon la saisie est gardée."""
+        from .zones_tendues import statut
+
+        tendue, _ = statut(self.code_postal, self.ville)
+        self.commune_reconnue = tendue is not None
+        if tendue is not None:
+            self.zone_tendue = tendue
+
+    @property
+    def commune_officielle(self):
+        """La commune de la liste officielle, ou None si elle est introuvable."""
+        from .zones_tendues import statut
+
+        return statut(self.code_postal, self.ville)[1]
 
     def __str__(self):
         morceaux = [self.adresse, self.complement, f"{self.code_postal} {self.ville}"]
@@ -645,3 +672,38 @@ class Piece(models.Model):
     def cible(self):
         """La propriété ou le bailleur auquel la pièce est attachée."""
         return self.propriete or self.bailleur
+
+
+class Commune(models.Model):
+    """Commune de la liste officielle des zones tendues, téléchargée depuis
+    data.gouv.fr (voir proprietes.zones_tendues). Commune à toutes les
+    agences."""
+
+    code_insee = models.CharField("code INSEE", max_length=5, primary_key=True)
+    nom = models.CharField(max_length=100)
+    departement = models.CharField("département", max_length=3)
+    cle = models.CharField(max_length=100, editable=False)
+    zone_tendue = models.BooleanField("zone tendue", default=False)
+
+    class Meta:
+        ordering = ["nom"]
+        indexes = [models.Index(fields=["departement", "cle"])]
+
+    def __str__(self):
+        return f"{self.nom} ({self.departement})"
+
+
+class ListeCommunes(models.Model):
+    """Chaque téléchargement de la liste des communes, réussi ou non."""
+
+    le = models.DateTimeField("téléchargée le", auto_now_add=True)
+    publiee_le = models.DateTimeField("publiée le", null=True, blank=True)
+    communes = models.PositiveIntegerField(default=0)
+    en_zone_tendue = models.PositiveIntegerField(default=0)
+    erreur = models.TextField(blank=True)
+    # Biens dont la zone tendue a changé : [{"id", "bien", "zone_tendue"}].
+    changements = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ["-le"]
+        verbose_name = "téléchargement de la liste des communes"

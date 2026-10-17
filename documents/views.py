@@ -22,6 +22,7 @@ from jinja2 import TemplateSyntaxError
 from comptes.roles import est_administrateur
 from core.fichiers import controler_archive, servir
 from core.journal import noter
+from proprietes.zones_tendues import derniere_liste
 
 from . import google
 from .generation import (
@@ -170,8 +171,10 @@ def regles(request):
     if not est_administrateur(request.user):
         raise PermissionDenied
     groupes = registre_regles.registre(timezone.localdate())
+    liste = derniere_liste()
     return render(request, "documents/regles.html", {
         "groupes": groupes, "resume": registre_regles.resume(groupes),
+        "changements_zone_tendue": liste.changements if liste else [],
         "relecture_avocat": registre_regles.RELECTURE_AVOCAT,
     })
 
